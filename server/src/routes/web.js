@@ -66,6 +66,7 @@ const viewCustomerQueue = require('../controllers/CustomerService/getQueue')
 const updateQueue = require('../controllers/CustomerService/firstUpdate')
 const picklist = require("../controllers/uploadPicklist");
 const viewPicklist= require("../controllers/CustomerService/picklistController");
+const deletePicklist= require("../controllers/CustomerService/picklistController");
 
 const upload = require("../middleware/upload");
 const uploadPicklist = require("../middleware/uploadPicklist");
@@ -130,7 +131,7 @@ let routes =  (app) => {
   router.put('/api/update-service-point', updateQueue.updateQueue);
   router.post("/api/uploadPicklist", uploadPicklist.single('attachment'), picklist.uploadPicklist);
   router.get("/api/getPicklists", viewPicklist.retrievePicklists);
-
+  router.delete("/api/deletePicklist/:id", deletePicklist.deletePicklist);
   return app.use("/", router);
 };
 
