@@ -191,14 +191,14 @@ const Sidebar = () => {
                 <Task sx={{ mr: 1 }} /> {t("Dashboard")}
               </MenuItem>
             )}
-            {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "Queue Manager" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "WIM Operator" ) && (
+            {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "Queue Manager" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance"  ) && (
               <MenuItem component={Link} to="/outstanding" onClick={handleCustomerMenuClose}>
                 <Task sx={{ mr: 1 }} /> {t("Outstanding Process")}
               </MenuItem>
             )}
-              {( jobTitle === "WIM Operator" ) && (
-              <MenuItem component={Link} to="/picklist" onClick={handleCustomerMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("Picklist")}
+              {( jobTitle === "WIM Operator" || jobTitle === "EWM Officer") && (
+              <MenuItem component={Link} to="/all-picklists" onClick={handleCustomerMenuClose}>
+                <Task sx={{ mr: 1 }} /> {t("Picklists")}
               </MenuItem>
             )}
             {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (

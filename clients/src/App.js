@@ -44,6 +44,7 @@ import TvRegisterList from './pages/Customer-Service/TvRegistrationListPage';
 import Outstanding from './pages/Customer-Service/OustandingPage';
 import DashboardCustomer from './pages/Customer-Service/DashboardCS';
 import Picklist from './pages/Customer-Service/Picklist';
+import AllPicklist from './pages/Customer-Service/AllPicklists';
 
 import {BrowserRouter as Router, Routes, Route} from 'react-router-dom'
 const App = () => {
@@ -98,6 +99,7 @@ const App = () => {
             <Route path = '/outstanding' Component={Outstanding} />
             <Route path = '/customer-dashboard' Component={DashboardCustomer} />
             <Route path = '/picklist/:processId' Component={Picklist} />
+            <Route path = '/all-picklists' Component={AllPicklist} />
         </Route>
         
       </Routes>
