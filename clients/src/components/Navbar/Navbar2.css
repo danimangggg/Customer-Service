@@ -1,0 +1,126 @@
+*,
+*::after,
+*::before {
+  margin: 0;
+  box-sizing: border-box;
+}
+html {
+  font-size: 100%;
+}
+body {
+  font-size: 1.1rem;
+}
+li {
+  list-style: none;
+}
+a {
+  text-decoration: none;
+  color: rgb(255, 255, 255);
+}
+
+.nav {
+  position: fixed;
+  width: 100%;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 8vh;
+  background-color: #333;
+  color: white;
+}
+.nav__brand {
+  text-transform: uppercase;
+  color: white;
+}
+
+.nav__menu {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 3rem;
+}
+.nav__toggler {
+  display: none;
+}
+.nav__toggler div {
+  width: 2.5rem;
+  height: 0.2rem;
+  margin: 0.4rem;
+  background: rgb(204, 204, 204);
+  transition: 0.3s ease-in;
+}
+
+@media screen and (max-width: 768px) {
+  .nav__toggler {
+    display: block;
+    cursor: pointer;
+  }
+  .nav__menu {
+    position: fixed;
+    top: 7vh;
+    right: 0;
+    height: 93vh;
+    width: 50vw;
+    background: #333;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: 0.5s ease-in;
+  }
+}
+/* Active Class */
+.nav__active {
+  transform: translateX(0%);
+}
+
+/* Toggle Icon Animation */
+
+.toggle .line1 {
+  transform: rotate(-45deg) translate(-4px, 5px);
+}
+.toggle .line2 {
+  opacity: 0;
+}
+.toggle .line3 {
+  transform: rotate(45deg) translate(-4px, -5px);
+}
+
+.nav__item.dropdown {
+  position: relative;
+  cursor: pointer;
+}
+
+.dropdown__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 150px;
+  background-color:white;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  display: none;
+  z-index: 1;
+}
+
+.nav__item.dropdown:hover .dropdown__menu,
+.nav__item.dropdown.active .dropdown__menu {
+  display: block;
+  color: white;
+}
+
+.dropdown__item {
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+.dropdown__item a {
+  color: black;
+  text-decoration: none;
+}
+
+.dropdown__item:hover {
+  background-color: #f1f1f1;
+}
+.icon{
+  margin-left: 30px;
+  color: white;
+}

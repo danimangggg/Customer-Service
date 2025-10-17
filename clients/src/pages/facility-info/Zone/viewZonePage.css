@@ -1,0 +1,24 @@
+
+.container{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: rgb(255, 255, 255);
+
+}
+.add {
+    background-color: #04AA6D;
+    border: none;
+    color: rgb(255, 255, 255);
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 20px;
+    border-radius: 40px;
+  }
+  .addIcon{
+    color: rgb(46, 77, 81);
+    justify-content: right;
+  }
