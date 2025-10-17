@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import {
@@ -7,113 +7,100 @@ import {
   Typography,
   CircularProgress,
   Button,
-  Stack,
   List,
   ListItem,
   ListItemText,
   ListItemIcon,
+  Stack,
   Divider,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 
 const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-const PicklistsPage = () => {
-  const [picklists, setPicklists] = useState([]);
-  const [facilities, setFacilities] = useState([]);
+const AllPicklists = () => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [picklists, setPicklists] = useState([]);
+  const [services, setServices] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
   const userStore = (localStorage.getItem('store') || '').toUpperCase();
   const jobTitle = (localStorage.getItem('JobTitle') || '').toLowerCase();
 
-  const pollIntervalRef = useRef(null);
   const audioRef = useRef(null);
+  const notificationIntervalRef = useRef(null);
   const lastPicklistsCountRef = useRef(0);
 
-  const fetchFacilities = useCallback(async () => {
+  // fetch all data once
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const facRes = await axios.get(`${api_url}/api/facilities`);
-      const facilitiesData = Array.isArray(facRes.data) ? facRes.data : [];
-      setFacilities(facilitiesData);
-    } catch (err) {
-      console.error('Error fetching facilities:', err);
-    }
-  }, []);
+      const [pickRes, serviceRes, facilityRes] = await Promise.all([
+        axios.get(`${api_url}/api/getPicklists`),
+        axios.get(`${api_url}/api/serviceList`),
+        axios.get(`${api_url}/api/facilities`),
+      ]);
 
-  const fetchPicklists = useCallback(async () => {
-    try {
-      const pickRes = await axios.get(`${api_url}/api/getPicklists`);
       const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
-      const filtered = allPicklists.filter(
-        (p) => String(p.store || '').toUpperCase() === userStore
-      );
+      const filtered = allPicklists.filter(p => String(p.store || '').toUpperCase() === userStore);
 
-      const enriched = filtered.map((p) => {
-        let fac = null;
-        if (p.facility_id) fac = facilities.find(f => f.id === p.facility_id);
-        if (!fac && p.facility_name) {
-          fac = facilities.find(
-            f => f.facility_name?.trim().toLowerCase() === p.facility_name?.trim().toLowerCase()
-          );
-        }
-        return {
-          ...p,
-          facility_name: fac?.facility_name || 'Unknown',
-          woreda_name: fac?.woreda_name || 'Unknown',
-          zone_name: fac?.zone_name || '',
-          region_name: fac?.region_name || '',
-        };
-      });
-
-      // Compare IDs and ODN only to prevent unnecessary state updates
-      const isDifferent = enriched.length !== picklists.length || enriched.some((p, i) => {
-        const old = picklists[i];
-        return !old || old.id !== p.id || old.odn !== p.odn || old.url !== p.url;
-      });
-
-      if (isDifferent) setPicklists(enriched);
-
-      // Trigger notifications only if new picklists arrived
-      if (filtered.length > lastPicklistsCountRef.current) {
-        const newCount = filtered.length - lastPicklistsCountRef.current;
-        triggerNotifications(newCount);
-      }
-
+      setPicklists(filtered);
       lastPicklistsCountRef.current = filtered.length;
+
+      setServices(Array.isArray(serviceRes.data) ? serviceRes.data : []);
+      setFacilities(Array.isArray(facilityRes.data) ? facilityRes.data : []);
     } catch (err) {
-      console.error('Error fetching picklists:', err);
+      console.error(err);
+      setError('Failed to fetch data');
+    } finally {
+      setLoading(false);
     }
-  }, [facilities, picklists, userStore]);
+  }, [userStore]);
 
   useEffect(() => {
-    if (!jobTitle.includes('wim operator') && !jobTitle.includes('ewm officer')) {
-      Swal.fire('Access Denied', 'You do not have permission to view this page', 'error');
-      return;
-    }
+    fetchAll();
 
-    const init = async () => {
-      await fetchFacilities();
-      await fetchPicklists();
-      setLoading(false);
-    };
-    init();
+    // poll for new picklists
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(`${api_url}/api/getPicklists`);
+        const all = Array.isArray(res.data) ? res.data : [];
+        const filtered = all.filter(p => String(p.store || '').toUpperCase() === userStore);
 
-    pollIntervalRef.current = setInterval(() => {
-      fetchPicklists();
+        // new picklists
+        if (jobTitle.includes('wim operator') && filtered.length > lastPicklistsCountRef.current) {
+          const newlyAdded = filtered.length - lastPicklistsCountRef.current;
+          triggerNotifications(newlyAdded);
+        }
+
+        lastPicklistsCountRef.current = filtered.length;
+        setPicklists(filtered);
+      } catch (err) {
+        console.error(err);
+      }
     }, 5000);
 
     return () => {
-      clearInterval(pollIntervalRef.current);
-      if (audioRef.current) audioRef.current.pause();
+      clearInterval(interval);
+      clearInterval(notificationIntervalRef.current);
     };
-  }, [fetchFacilities, fetchPicklists, jobTitle]);
+  }, [fetchAll, userStore, jobTitle]);
 
-  const triggerNotifications = (newCount) => {
-    try {
+  const triggerNotifications = (newlyAddedCount) => {
+    if (!audioEnabled) return;
+
+    // system notification permission
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    // setup audio
+    if (!audioRef.current) {
       audioRef.current = new Audio('/audio/notification/notification.mp3');
-    } catch (e) {
-      audioRef.current = null;
     }
 
     let fired = 0;
@@ -121,34 +108,39 @@ const PicklistsPage = () => {
     const intervalMs = 60000; // 1 minute
 
     const fire = () => {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {});
-      }
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        try {
+      try {
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(() => {});
+        }
+
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           new Notification('New Picklist submitted', {
-            body: `${newCount} new picklist(s) for ${userStore}`,
+            body: `${newlyAddedCount} new picklist(s) for ${userStore}`,
           });
-        } catch (e) {}
+        }
+
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'info',
+          title: 'New picklist(s) submitted',
+          text: `Check Submitted Picklists (${userStore})`,
+          showConfirmButton: false,
+          timer: 4000,
+        });
+
+      } catch (e) {
+        console.warn(e);
       }
-      Swal.fire({
-        toast: true,
-        position: 'top-end',
-        icon: 'info',
-        title: 'New picklist(s) submitted',
-        text: `Check Submitted Picklists (${userStore})`,
-        showConfirmButton: false,
-        timer: 4000,
-      });
     };
 
     fire();
     fired++;
 
-    const intervalId = setInterval(() => {
+    notificationIntervalRef.current = setInterval(() => {
       if (fired >= maxFires) {
-        clearInterval(intervalId);
+        clearInterval(notificationIntervalRef.current);
         return;
       }
       fire();
@@ -156,103 +148,108 @@ const PicklistsPage = () => {
     }, intervalMs);
   };
 
-  const handleComplete = async (id) => {
-    const res = await Swal.fire({
-      title: 'Mark as Complete?',
-      text: 'This will delete the picklist.',
+  const enableAudio = () => {
+    try {
+      audioRef.current = new Audio('/audio/notification/notification.mp3');
+      audioRef.current.play().then(() => {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        setAudioEnabled(true);
+      }).catch(() => setAudioEnabled(true));
+    } catch (e) {
+      console.warn('Audio init failed', e);
+      setAudioEnabled(true);
+    }
+  };
+
+  const handleComplete = async (picklist) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'This will mark the picklist as complete and delete it.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, complete it',
     });
 
-    if (!res.isConfirmed) return;
+    if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`${api_url}/api/deletePicklist/${id}`);
-      Swal.fire('Completed', 'Picklist has been deleted', 'success');
-      setPicklists(prev => prev.filter(p => p.id !== id));
-      if (audioRef.current) audioRef.current.pause();
+      await axios.delete(`${api_url}/api/deletePicklist/${picklist.id}`, { data: { fileUrl: picklist.url } });
+      Swal.fire({ icon: 'success', title: 'Completed', text: 'Picklist deleted.' });
+      setPicklists(prev => prev.filter(p => p.id !== picklist.id));
+
+      // stop audio immediately
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      clearInterval(notificationIntervalRef.current);
     } catch (err) {
       console.error(err);
-      Swal.fire('Error', 'Failed to complete picklist', 'error');
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not complete picklist.' });
     }
   };
 
-  const handleView = (url) => {
-    window.open(url, '_blank');
-  };
+  if (loading) return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
+      <CircularProgress />
+      <Typography sx={{ ml: 2 }}>Loading Picklists...</Typography>
+    </Box>
+  );
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-        <CircularProgress />
-        <Typography sx={{ ml: 2 }}>Loading picklists...</Typography>
-      </Box>
-    );
-  }
+  if (error) return <Typography color="error">{error}</Typography>;
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" fontWeight="bold" mb={3}>
-        Picklists
-      </Typography>
+      {!audioEnabled && (
+        <Box sx={{ mb: 2 }}>
+          <Button variant="contained" onClick={enableAudio}>
+            Enable Notification Sound
+          </Button>
+        </Box>
+      )}
 
-      <Paper sx={{ p: 3, boxShadow: 4, borderRadius: 4 }}>
+      <Paper sx={{ p: 3, boxShadow: 3, borderRadius: 3 }}>
+        <Typography variant="h6" fontWeight="bold" mb={2}>All Picklists</Typography>
         {picklists.length === 0 ? (
           <Typography color="text.secondary">No picklists available.</Typography>
         ) : (
           <List>
-            {picklists.map((p) => (
-              <React.Fragment key={p.id}>
-                <ListItem
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    mb: 1,
-                    p: 2,
-                    border: '1px solid #e0e0e0',
-                    borderRadius: 2,
-                  }}
-                  secondaryAction={
-                    <Stack direction="row" spacing={1}>
-                      <Button variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={() => handleView(p.url)}>
-                        View
-                      </Button>
-                      <Button variant="contained" color="error" onClick={() => handleComplete(p.id)}>
-                        Complete
-                      </Button>
-                    </Stack>
-                  }
-                >
-                  <ListItemIcon>
-                    <CheckCircleIcon color="success" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={`ODN: ${p.odn}`}
-                    secondary={
-                      <>
-                        <Typography variant="body2">
-                          Facility: {p.facility_name} | Woreda: {p.woreda_name} | Zone: {p.zone_name} | Region: {p.region_name}
-                        </Typography>
-                      </>
+            {picklists.map(p => {
+              const service = services.find(s => String(s.id) === String(p.process_id));
+              const facility = facilities.find(f => service && String(f.id) === String(service.facility_id));
+              return (
+                <React.Fragment key={p.id}>
+                  <ListItem divider
+                    secondaryAction={
+                      <Stack direction="row" spacing={1}>
+                        <Button variant="outlined" onClick={() => window.open(p.url, '_blank')}>
+                          View
+                        </Button>
+                        <Button variant="outlined" color="error" onClick={() => handleComplete(p)}>
+                          Complete
+                        </Button>
+                      </Stack>
                     }
-                  />
-                </ListItem>
-                <Divider sx={{ my: 1 }} />
-              </React.Fragment>
-            ))}
+                  >
+                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
+                    <ListItemText
+                      primary={`ODN: ${p.odn}`}
+                      secondary={
+                        facility
+                          ? `Facility: ${facility.facility_name} | Woreda: ${facility.woreda_name} | Zone: ${facility.zone_name} | Region: ${facility.region_name}`
+                          : 'Facility: Unknown | Woreda: Unknown | Zone: Unknown | Region: Unknown'
+                      }
+                    />
+                  </ListItem>
+                </React.Fragment>
+              );
+            })}
           </List>
         )}
       </Paper>
-
-      <Box sx={{ position: 'fixed', bottom: 16, right: 16 }}>
-        <Button variant="contained" startIcon={<NotificationsActiveIcon />} disabled>
-          WIM Operator Alerts
-        </Button>
-      </Box>
     </Box>
   );
 };
 
-export default PicklistsPage;
+export default AllPicklists;
