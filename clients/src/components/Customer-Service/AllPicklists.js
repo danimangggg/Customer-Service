@@ -6,26 +6,28 @@ import {
   Paper,
   Typography,
   CircularProgress,
-  Button,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
   Stack,
-  Divider,
+  Button,
+  useMediaQuery,
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { useTheme } from '@mui/material/styles';
 
 const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const AllPicklists = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [picklists, setPicklists] = useState([]);
   const [services, setServices] = useState([]);
   const [facilities, setFacilities] = useState([]);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [combinedPicklists, setCombinedPicklists] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const userStore = (localStorage.getItem('store') || '').toUpperCase();
   const jobTitle = (localStorage.getItem('JobTitle') || '').toLowerCase();
@@ -34,11 +36,15 @@ const AllPicklists = () => {
   const notificationIntervalRef = useRef(null);
   const lastPicklistsCountRef = useRef(0);
 
-  // fetch all data once
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const isAllowed =
+    jobTitle.includes('wim operator') || jobTitle.includes('ewm officer');
+
+  const fetchData = useCallback(async () => {
     try {
+      setLoading(true);
       const [pickRes, serviceRes, facilityRes] = await Promise.all([
         axios.get(`${api_url}/api/getPicklists`),
         axios.get(`${api_url}/api/serviceList`),
@@ -46,13 +52,14 @@ const AllPicklists = () => {
       ]);
 
       const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
-      const filtered = allPicklists.filter(p => String(p.store || '').toUpperCase() === userStore);
+      const filteredPicklists = allPicklists.filter(
+        (p) => String(p.store || '').toUpperCase() === userStore
+      );
 
-      setPicklists(filtered);
-      lastPicklistsCountRef.current = filtered.length;
-
+      setPicklists(filteredPicklists);
       setServices(Array.isArray(serviceRes.data) ? serviceRes.data : []);
       setFacilities(Array.isArray(facilityRes.data) ? facilityRes.data : []);
+      lastPicklistsCountRef.current = filteredPicklists.length;
     } catch (err) {
       console.error(err);
       setError('Failed to fetch data');
@@ -61,193 +68,250 @@ const AllPicklists = () => {
     }
   }, [userStore]);
 
+  // Combine picklist + facility info
   useEffect(() => {
-    fetchAll();
+    const combined = picklists.map((p) => {
+      const service = services.find((s) => String(s.id) === String(p.process_id));
+      const facility = facilities.find(
+        (f) => service && String(f.id) === String(service.facility_id)
+      );
+      return {
+        ...p,
+        facility,
+      };
+    });
+    setCombinedPicklists(combined);
+  }, [picklists, services, facilities]);
 
-    // poll for new picklists
+  // Preload audio on mount
+  useEffect(() => {
+    audioRef.current = new Audio('/audio/notification/notification.mp3');
+    audioRef.current.load();
+
+    // Try silent play once to “unlock” playback permission
+    const unlockAudio = () => {
+      audioRef.current
+        .play()
+        .then(() => {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          window.removeEventListener('click', unlockAudio);
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener('click', unlockAudio);
+    return () => window.removeEventListener('click', unlockAudio);
+  }, []);
+
+  // Poll for new picklists (without flicker)
+  useEffect(() => {
+    fetchData();
     const interval = setInterval(async () => {
       try {
-        const res = await axios.get(`${api_url}/api/getPicklists`);
-        const all = Array.isArray(res.data) ? res.data : [];
-        const filtered = all.filter(p => String(p.store || '').toUpperCase() === userStore);
+        const pickRes = await axios.get(`${api_url}/api/getPicklists`);
+        const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+        const filteredPicklists = allPicklists.filter(
+          (p) => String(p.store || '').toUpperCase() === userStore
+        );
 
-        // new picklists
-        if (jobTitle.includes('wim operator') && filtered.length > lastPicklistsCountRef.current) {
-          const newlyAdded = filtered.length - lastPicklistsCountRef.current;
+        if (
+          filteredPicklists.length > lastPicklistsCountRef.current &&
+          jobTitle.includes('wim operator')
+        ) {
+          const newlyAdded = filteredPicklists.length - lastPicklistsCountRef.current;
           triggerNotifications(newlyAdded);
         }
 
-        lastPicklistsCountRef.current = filtered.length;
-        setPicklists(filtered);
+        lastPicklistsCountRef.current = filteredPicklists.length;
+        setPicklists(filteredPicklists);
       } catch (err) {
-        console.error(err);
+        console.error('Polling error', err);
       }
-    }, 5000);
+    }, 10000); // every 10 sec
 
-    return () => {
-      clearInterval(interval);
-      clearInterval(notificationIntervalRef.current);
-    };
-  }, [fetchAll, userStore, jobTitle]);
+    return () => clearInterval(interval);
+  }, [fetchData, userStore, jobTitle]);
 
+  // 🔔 Trigger audio + Swal + browser notification
   const triggerNotifications = (newlyAddedCount) => {
-    if (!audioEnabled) return;
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current
+        .play()
+        .catch(() => console.warn('Audio blocked, user interaction needed.'));
 
-    // system notification permission
-    if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
-      Notification.requestPermission().catch(() => {});
-    }
-
-    // setup audio
-    if (!audioRef.current) {
-      audioRef.current = new Audio('/audio/notification/notification.mp3');
-    }
-
-    let fired = 0;
-    const maxFires = 2;
-    const intervalMs = 60000; // 1 minute
-
-    const fire = () => {
-      try {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0;
-          audioRef.current.play().catch(() => {});
+      // Play again after 1 minute, total 2 plays
+      let played = 1;
+      const interval = setInterval(() => {
+        if (played >= 2) {
+          clearInterval(interval);
+          return;
         }
-
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('New Picklist submitted', {
-            body: `${newlyAddedCount} new picklist(s) for ${userStore}`,
-          });
-        }
-
-        Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'info',
-          title: 'New picklist(s) submitted',
-          text: `Check Submitted Picklists (${userStore})`,
-          showConfirmButton: false,
-          timer: 4000,
-        });
-
-      } catch (e) {
-        console.warn(e);
-      }
-    };
-
-    fire();
-    fired++;
-
-    notificationIntervalRef.current = setInterval(() => {
-      if (fired >= maxFires) {
-        clearInterval(notificationIntervalRef.current);
-        return;
-      }
-      fire();
-      fired++;
-    }, intervalMs);
-  };
-
-  const enableAudio = () => {
-    try {
-      audioRef.current = new Audio('/audio/notification/notification.mp3');
-      audioRef.current.play().then(() => {
-        audioRef.current.pause();
+        played++;
         audioRef.current.currentTime = 0;
-        setAudioEnabled(true);
-      }).catch(() => setAudioEnabled(true));
-    } catch (e) {
-      console.warn('Audio init failed', e);
-      setAudioEnabled(true);
+        audioRef.current.play().catch(() => {});
+      }, 60000);
     }
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification('New Picklist Submitted', {
+        body: `${newlyAddedCount} new picklist(s) for ${userStore}`,
+      });
+    }
+
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'info',
+      title: 'New Picklist Submitted',
+      text: `Check submitted picklists for ${userStore}`,
+      showConfirmButton: false,
+      timer: 4000,
+    });
   };
 
-  const handleComplete = async (picklist) => {
+  const handleComplete = async (picklistId) => {
+    const picklist = combinedPicklists.find((p) => p.id === picklistId);
+    if (!picklist) return;
+
     const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: 'This will mark the picklist as complete and delete it.',
+      title: 'Complete Picklist?',
+      text: 'This will remove the picklist and stop alerts.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Yes, complete it',
+      confirmButtonText: 'Yes, complete',
+      cancelButtonText: 'Cancel',
     });
 
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`${api_url}/api/deletePicklist/${picklist.id}`, { data: { fileUrl: picklist.url } });
-      Swal.fire({ icon: 'success', title: 'Completed', text: 'Picklist deleted.' });
-      setPicklists(prev => prev.filter(p => p.id !== picklist.id));
-
-      // stop audio immediately
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
       clearInterval(notificationIntervalRef.current);
+      if (audioRef.current) audioRef.current.pause();
+
+      await axios.delete(`${api_url}/api/deletePicklist/${picklistId}`, {
+        data: { fileUrl: picklist.url },
+      });
+
+      Swal.fire({ icon: 'success', title: 'Picklist completed' });
+      setPicklists((prev) => prev.filter((p) => p.id !== picklistId));
     } catch (err) {
       console.error(err);
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not complete picklist.' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Failed',
+        text: 'Could not complete picklist',
+      });
     }
   };
 
-  if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
-      <CircularProgress />
-      <Typography sx={{ ml: 2 }}>Loading Picklists...</Typography>
-    </Box>
-  );
+  const handleView = (url) => {
+    window.open(url, '_blank');
+  };
+
+  if (!isAllowed)
+    return <Typography color="error">Access Denied</Typography>;
+
+  if (loading)
+    return (
+      <CircularProgress sx={{ mt: 5, display: 'block', mx: 'auto' }} />
+    );
 
   if (error) return <Typography color="error">{error}</Typography>;
 
   return (
     <Box sx={{ p: 3 }}>
-      {!audioEnabled && (
-        <Box sx={{ mb: 2 }}>
-          <Button variant="contained" onClick={enableAudio}>
-            Enable Notification Sound
-          </Button>
-        </Box>
-      )}
+      <Typography variant="h4" mb={3}>
+        All Picklists
+      </Typography>
 
-      <Paper sx={{ p: 3, boxShadow: 3, borderRadius: 3 }}>
-        <Typography variant="h6" fontWeight="bold" mb={2}>All Picklists</Typography>
-        {picklists.length === 0 ? (
-          <Typography color="text.secondary">No picklists available.</Typography>
+      <Paper sx={{ p: 2, boxShadow: 3, borderRadius: 3 }}>
+        {combinedPicklists.length === 0 ? (
+          <Typography>No picklists submitted yet.</Typography>
         ) : (
           <List>
-            {picklists.map(p => {
-              const service = services.find(s => String(s.id) === String(p.process_id));
-              const facility = facilities.find(f => service && String(f.id) === String(service.facility_id));
-              return (
-                <React.Fragment key={p.id}>
-                  <ListItem divider
-                    secondaryAction={
-                      <Stack direction="row" spacing={1}>
-                        <Button variant="outlined" onClick={() => window.open(p.url, '_blank')}>
-                          View
-                        </Button>
-                        <Button variant="outlined" color="error" onClick={() => handleComplete(p)}>
-                          Complete
-                        </Button>
-                      </Stack>
-                    }
+            {combinedPicklists.map((p) => (
+              <ListItem
+                key={p.id}
+                divider
+                sx={{
+                  flexDirection: isMobile ? 'column' : 'row',
+                  alignItems: isMobile ? 'flex-start' : 'center',
+                  wordBreak: 'break-word',
+                  whiteSpace: 'normal',
+                }}
+              >
+                <ListItemText
+                  primary={`ODN: ${p.odn}`}
+                  secondary={
+                    p.facility ? (
+                      <>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: 'normal',
+                            overflowWrap: 'break-word',
+                            wordWrap: 'break-word',
+                          }}
+                        >
+                          <strong>Facility:</strong> {p.facility.facility_name}
+                          <br />
+                          <strong>Woreda:</strong> {p.facility.woreda_name}
+                          <br />
+                          <strong>Zone:</strong> {p.facility.zone_name}
+                          <br />
+                          <strong>Region:</strong> {p.facility.region_name}
+                        </Typography>
+                      </>
+                    ) : (
+                      'Facility: Unknown'
+                    )
+                  }
+                />
+
+                <Stack
+                  direction={isMobile ? 'row' : 'row'}
+                  spacing={1}
+                  sx={{
+                    mt: isMobile ? 1.5 : 0,
+                    flexWrap: 'wrap',
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: isMobile ? 'flex-start' : 'flex-end',
+                  }}
+                >
+                  <Button
+                    variant="outlined"
+                    onClick={() => handleView(p.url)}
+                    startIcon={<PictureAsPdfIcon />}
                   >
-                    <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-                    <ListItemText
-                      primary={`ODN: ${p.odn}`}
-                      secondary={
-                        facility
-                          ? `Facility: ${facility.facility_name} | Woreda: ${facility.woreda_name} | Zone: ${facility.zone_name} | Region: ${facility.region_name}`
-                          : 'Facility: Unknown | Woreda: Unknown | Zone: Unknown | Region: Unknown'
-                      }
-                    />
-                  </ListItem>
-                </React.Fragment>
-              );
-            })}
+                    View
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    onClick={() => handleComplete(p.id)}
+                    startIcon={<DeleteIcon />}
+                  >
+                    Complete
+                  </Button>
+                </Stack>
+              </ListItem>
+            ))}
           </List>
         )}
       </Paper>
+
+      {jobTitle.includes('wim operator') && (
+        <Box sx={{ position: 'fixed', bottom: 16, right: 16 }}>
+          <Button
+            variant="contained"
+            startIcon={<NotificationsActiveIcon />}
+          >
+            WIM Operator Alerts Active
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 };
