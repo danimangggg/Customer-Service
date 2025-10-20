@@ -25,6 +25,7 @@ const AllPicklists = () => {
   const [picklists, setPicklists] = useState([]);
   const [services, setServices] = useState([]);
   const [facilities, setFacilities] = useState([]);
+  const [employees, setEmployees] = useState([]); // 👈 all employees from /api/get-employee
   const [combinedPicklists, setCombinedPicklists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -46,15 +47,16 @@ const AllPicklists = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [pickRes, serviceRes, facilityRes] = await Promise.all([
+      const [pickRes, serviceRes, facilityRes, empRes] = await Promise.all([
         axios.get(`${api_url}/api/getPicklists`),
         axios.get(`${api_url}/api/serviceList`),
         axios.get(`${api_url}/api/facilities`),
+        axios.get(`${api_url}/api/get-employee`), // ✅ correct endpoint for employee info
       ]);
 
       const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
 
-      // 🔹 Filter picklists based on role
+      // 🔹 Filter picklists by store and operator
       const filteredPicklists = allPicklists.filter((p) => {
         const sameStore = String(p.store || '').toUpperCase() === userStore;
         if (jobTitle.includes('ewm officer')) return sameStore;
@@ -66,6 +68,7 @@ const AllPicklists = () => {
       setPicklists(filteredPicklists);
       setServices(Array.isArray(serviceRes.data) ? serviceRes.data : []);
       setFacilities(Array.isArray(facilityRes.data) ? facilityRes.data : []);
+      setEmployees(Array.isArray(empRes.data) ? empRes.data : []);
       lastPicklistsCountRef.current = filteredPicklists.length;
     } catch (err) {
       console.error(err);
@@ -75,24 +78,26 @@ const AllPicklists = () => {
     }
   }, [userStore, jobTitle, userId]);
 
-  // Combine picklist + facility info
+  // 🔹 Combine picklist + facility + operator info
   useEffect(() => {
     const combined = picklists.map((p) => {
-      const service = services.find(
-        (s) => String(s.id) === String(p.process_id)
-      );
+      const service = services.find((s) => String(s.id) === String(p.process_id));
       const facility = facilities.find(
         (f) => service && String(f.id) === String(service.facility_id)
       );
+      const operator = employees.find(
+        (e) => Number(e.id) === Number(p.operator_id)
+      ); // ✅ get from employees API
       return {
         ...p,
         facility,
+        operator,
       };
     });
     setCombinedPicklists(combined);
-  }, [picklists, services, facilities]);
+  }, [picklists, services, facilities, employees]);
 
-  // Preload audio on mount
+  // 🔹 Preload and unlock sound
   useEffect(() => {
     audioRef.current = new Audio('/audio/notification/notification.mp3');
     audioRef.current.load();
@@ -112,7 +117,7 @@ const AllPicklists = () => {
     return () => window.removeEventListener('click', unlockAudio);
   }, []);
 
-  // Poll for new picklists (without flicker)
+  // 🔹 Poll for new picklists
   useEffect(() => {
     fetchData();
     const interval = setInterval(async () => {
@@ -142,12 +147,11 @@ const AllPicklists = () => {
       } catch (err) {
         console.error('Polling error', err);
       }
-    }, 10000); // every 10 sec
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [fetchData, userStore, jobTitle, userId]);
 
-  // 🔔 Trigger audio + Swal + browser notification
   const triggerNotifications = (newlyAddedCount) => {
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
@@ -261,16 +265,9 @@ const AllPicklists = () => {
                 <ListItemText
                   primary={`ODN: ${p.odn}`}
                   secondary={
-                    p.facility ? (
-                      <>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            whiteSpace: 'normal',
-                            overflowWrap: 'break-word',
-                            wordWrap: 'break-word',
-                          }}
-                        >
+                    <>
+                      {p.facility ? (
+                        <Typography variant="body2" sx={{ whiteSpace: 'normal' }}>
                           <strong>Facility:</strong> {p.facility.facility_name}
                           <br />
                           <strong>Woreda:</strong> {p.facility.woreda_name}
@@ -279,15 +276,32 @@ const AllPicklists = () => {
                           <br />
                           <strong>Region:</strong> {p.facility.region_name}
                         </Typography>
-                      </>
-                    ) : (
-                      'Facility: Unknown'
-                    )
+                      ) : (
+                        'Facility: Unknown'
+                      )}
+
+                      {/* ✅ Show assigned operator only for EWM Officer */}
+                      {jobTitle.includes('ewm officer') && (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            mt: 1,
+                            fontWeight: 'bold',
+                            color: 'primary.main',
+                          }}
+                        >
+                          Assigned Operator:{' '}
+                          {p.operator
+                            ? p.operator.full_name
+                            : `Operator ID: ${p.operator_id}`}
+                        </Typography>
+                      )}
+                    </>
                   }
                 />
 
                 <Stack
-                  direction={isMobile ? 'row' : 'row'}
+                  direction="row"
                   spacing={1}
                   sx={{
                     mt: isMobile ? 1.5 : 0,
@@ -320,10 +334,7 @@ const AllPicklists = () => {
 
       {jobTitle.includes('wim operator') && (
         <Box sx={{ position: 'fixed', bottom: 16, right: 16 }}>
-          <Button
-            variant="contained"
-            startIcon={<NotificationsActiveIcon />}
-          >
+          <Button variant="contained" startIcon={<NotificationsActiveIcon />}>
             WIM Operator Alerts Active
           </Button>
         </Box>

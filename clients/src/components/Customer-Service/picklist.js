@@ -82,7 +82,13 @@ const PickListDetail = () => {
 
       const picklistsRes = await axios.get(`${api_url}/api/getPicklists`);
       const allPicklists = Array.isArray(picklistsRes.data) ? picklistsRes.data : [];
-      const filtered = allPicklists.filter(p => String(p.store || '').toUpperCase() === userStore);
+
+      // ✅ Filter by store AND by process_id for EWM Officers
+      let filtered = allPicklists.filter(p => String(p.store || '').toUpperCase() === userStore);
+      if (jobTitle === 'EWM Officer' && process_id) {
+        filtered = filtered.filter(p => String(p.process_id) === process_id);
+      }
+
       setSubmittedPicklists(filtered);
 
       // ✅ Fetch WIM Operators filtered by store
@@ -100,7 +106,7 @@ const PickListDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [process_id, userStore]);
+  }, [process_id, userStore, jobTitle]);
 
   useEffect(() => {
     fetchAll();
@@ -147,7 +153,6 @@ const PickListDetail = () => {
 
       await fetchAll();
       setPdfFile(null);
-      //setOdnInput('');
       setSelectedOperator('');
     } catch (err) {
       console.error('upload error', err);
