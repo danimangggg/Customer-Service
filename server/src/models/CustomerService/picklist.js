@@ -17,6 +17,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    operator_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     store: {
       type: DataTypes.STRING,
       allowNull: true,

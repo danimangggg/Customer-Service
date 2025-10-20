@@ -11,7 +11,8 @@ const uploadPicklist = (req, res) => {
       odn: req.body.odn,
       url: req.file.filename,
       process_id: req.body.process_id,
-      store: req.body.store
+      store: req.body.store,
+      operator_id: req.body.operator_id,
       });
       if(result){
         res.status(200).send({message:"picklist created"})

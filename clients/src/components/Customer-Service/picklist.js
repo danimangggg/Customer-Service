@@ -18,6 +18,7 @@ import {
   ListItemText,
   ListItemIcon,
   Autocomplete,
+  MenuItem,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
@@ -40,6 +41,9 @@ const PickListDetail = () => {
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploading, setUploading] = useState(false);
   const [submittedPicklists, setSubmittedPicklists] = useState([]);
+
+  const [operators, setOperators] = useState([]);
+  const [selectedOperator, setSelectedOperator] = useState('');
 
   const userStore = (localStorage.getItem('store') || '').toUpperCase();
   const jobTitle = localStorage.getItem('JobTitle') || '';
@@ -80,6 +84,16 @@ const PickListDetail = () => {
       const allPicklists = Array.isArray(picklistsRes.data) ? picklistsRes.data : [];
       const filtered = allPicklists.filter(p => String(p.store || '').toUpperCase() === userStore);
       setSubmittedPicklists(filtered);
+
+      // ✅ Fetch WIM Operators filtered by store
+      const empRes = await axios.get(`${api_url}/api/get-employee`);
+      const employees = Array.isArray(empRes.data) ? empRes.data : [];
+      const wimOps = employees.filter(
+        emp =>
+          emp.jobTitle?.toLowerCase() === 'wim operator' &&
+          String(emp.store || '').toUpperCase() === userStore
+      );
+      setOperators(wimOps);
     } catch (err) {
       console.error('fetchAll error:', err);
       setError(err.message || 'Failed to fetch data');
@@ -102,8 +116,8 @@ const PickListDetail = () => {
 
   const handleSubmit = async (ev) => {
     ev.preventDefault();
-    if (!odnInput || !pdfFile) {
-      setUploadMessage('Please provide both ODN and PDF file.');
+    if (!odnInput || !pdfFile || !selectedOperator) {
+      setUploadMessage('Please provide ODN, PDF, and select a WIM Operator.');
       return;
     }
 
@@ -119,6 +133,7 @@ const PickListDetail = () => {
       formData.append('attachment', pdfFile);
       formData.append('process_id', process_id);
       formData.append('store', userStore);
+      formData.append('operator_id', selectedOperator);
 
       const res = await axios.post(`${api_url}/api/uploadPicklist`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -132,8 +147,8 @@ const PickListDetail = () => {
 
       await fetchAll();
       setPdfFile(null);
-      setOdnInput('');
-      window.location.reload();
+      //setOdnInput('');
+      setSelectedOperator('');
     } catch (err) {
       console.error('upload error', err);
       const msg = err?.response?.data?.message || 'Upload failed';
@@ -205,7 +220,7 @@ const PickListDetail = () => {
           <Typography variant="h6" fontWeight="bold" mb={2}>Upload PickList PDF</Typography>
 
           <form onSubmit={handleSubmit}>
-            <Stack direction="row" spacing={2} alignItems="center">
+            <Stack direction="column" spacing={2}>
               <Autocomplete
                 freeSolo
                 fullWidth
@@ -214,43 +229,45 @@ const PickListDetail = () => {
                 onChange={(e, val) => setOdnInput(val || '')}
                 onInputChange={(e, val) => setOdnInput(val)}
                 renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="ODN Number"
-                    required
-                    sx={{
-                      '& .MuiInputBase-root': {
-                        height: 56,
-                        fontSize: '1rem',
-                      },
-                    }}
-                  />
+                  <TextField {...params} label="ODN Number" required />
                 )}
               />
 
-              <Button variant="contained" component="label" startIcon={<CloudUploadIcon />} sx={{ minWidth: 200 }}>
+              <TextField
+                select
+                label="Select WIM Operator"
+                value={selectedOperator}
+                onChange={(e) => setSelectedOperator(e.target.value)}
+                required
+                fullWidth
+              >
+                {operators.map((op) => (
+                  <MenuItem key={op.id} value={op.id}>
+                    {op.full_name} ({op.store})
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <Button variant="contained" component="label" startIcon={<CloudUploadIcon />}>
                 Choose PDF File
                 <input type="file" accept=".pdf" hidden onChange={handlePdfChange} />
               </Button>
-            </Stack>
 
-            {pdfFile && (
-              <Chip
-                icon={<PictureAsPdfIcon color="error" />}
-                label={`Selected: ${pdfFile.name}`}
-                color="success"
-                variant="outlined"
-                sx={{ mt: 2 }}
-              />
-            )}
+              {pdfFile && (
+                <Chip
+                  icon={<PictureAsPdfIcon color="error" />}
+                  label={`Selected: ${pdfFile.name}`}
+                  color="success"
+                  variant="outlined"
+                />
+              )}
 
-            <Box sx={{ mt: 3 }}>
               <Button type="submit" variant="contained" color="primary" disabled={uploading}>
                 {uploading ? 'Uploading...' : 'Submit'}
               </Button>
-            </Box>
 
-            {uploadMessage && <Alert severity="info" sx={{ mt: 2 }}>{uploadMessage}</Alert>}
+              {uploadMessage && <Alert severity="info">{uploadMessage}</Alert>}
+            </Stack>
           </form>
         </Paper>
       )}
@@ -263,7 +280,9 @@ const PickListDetail = () => {
         ) : (
           <List>
             {submittedPicklists.map(item => (
-              <ListItem key={item.id} divider
+              <ListItem
+                key={item.id}
+                divider
                 secondaryAction={
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={() => window.open(item.url, '_blank')}>View</Button>
@@ -272,7 +291,10 @@ const PickListDetail = () => {
                 }
               >
                 <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
-                <ListItemText primary={`ODN: ${item.odn}`} secondary={`File: ${item.url ? item.url.split('/').pop() : 'Undefined'}`} />
+                <ListItemText
+                  primary={`ODN: ${item.odn}`}
+                  secondary={`File: ${item.url ? item.url.split('/').pop() : 'Undefined'}`}
+                />
               </ListItem>
             ))}
           </List>

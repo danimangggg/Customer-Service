@@ -182,10 +182,12 @@ const Sidebar = () => {
             anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'left' }}
           >
-            
+             {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "Queue Manager" ) && (
               <MenuItem component={Link} to="/register-list" onClick={handleCustomerMenuClose}>
-                <FormatListBulleted sx={{ mr: 1 }} /> {t("Customer Process")}
-              </MenuItem>
+              <FormatListBulleted sx={{ mr: 1 }} /> {t("Customer Process")}
+            </MenuItem>
+            )}
+              
               {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
               <MenuItem component={Link} to="/customer-dashboard" onClick={handleCustomerMenuClose}>
                 <Task sx={{ mr: 1 }} /> {t("Dashboard")}

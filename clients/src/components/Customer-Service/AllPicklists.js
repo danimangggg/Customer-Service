@@ -31,6 +31,7 @@ const AllPicklists = () => {
 
   const userStore = (localStorage.getItem('store') || '').toUpperCase();
   const jobTitle = (localStorage.getItem('JobTitle') || '').toLowerCase();
+  const userId = Number(localStorage.getItem('UserId')) || null;
 
   const audioRef = useRef(null);
   const notificationIntervalRef = useRef(null);
@@ -52,9 +53,15 @@ const AllPicklists = () => {
       ]);
 
       const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
-      const filteredPicklists = allPicklists.filter(
-        (p) => String(p.store || '').toUpperCase() === userStore
-      );
+
+      // 🔹 Filter picklists based on role
+      const filteredPicklists = allPicklists.filter((p) => {
+        const sameStore = String(p.store || '').toUpperCase() === userStore;
+        if (jobTitle.includes('ewm officer')) return sameStore;
+        if (jobTitle.includes('wim operator'))
+          return sameStore && Number(p.operator_id) === userId;
+        return false;
+      });
 
       setPicklists(filteredPicklists);
       setServices(Array.isArray(serviceRes.data) ? serviceRes.data : []);
@@ -66,12 +73,14 @@ const AllPicklists = () => {
     } finally {
       setLoading(false);
     }
-  }, [userStore]);
+  }, [userStore, jobTitle, userId]);
 
   // Combine picklist + facility info
   useEffect(() => {
     const combined = picklists.map((p) => {
-      const service = services.find((s) => String(s.id) === String(p.process_id));
+      const service = services.find(
+        (s) => String(s.id) === String(p.process_id)
+      );
       const facility = facilities.find(
         (f) => service && String(f.id) === String(service.facility_id)
       );
@@ -88,7 +97,6 @@ const AllPicklists = () => {
     audioRef.current = new Audio('/audio/notification/notification.mp3');
     audioRef.current.load();
 
-    // Try silent play once to “unlock” playback permission
     const unlockAudio = () => {
       audioRef.current
         .play()
@@ -111,15 +119,21 @@ const AllPicklists = () => {
       try {
         const pickRes = await axios.get(`${api_url}/api/getPicklists`);
         const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
-        const filteredPicklists = allPicklists.filter(
-          (p) => String(p.store || '').toUpperCase() === userStore
-        );
+
+        const filteredPicklists = allPicklists.filter((p) => {
+          const sameStore = String(p.store || '').toUpperCase() === userStore;
+          if (jobTitle.includes('ewm officer')) return sameStore;
+          if (jobTitle.includes('wim operator'))
+            return sameStore && Number(p.operator_id) === userId;
+          return false;
+        });
 
         if (
           filteredPicklists.length > lastPicklistsCountRef.current &&
           jobTitle.includes('wim operator')
         ) {
-          const newlyAdded = filteredPicklists.length - lastPicklistsCountRef.current;
+          const newlyAdded =
+            filteredPicklists.length - lastPicklistsCountRef.current;
           triggerNotifications(newlyAdded);
         }
 
@@ -131,7 +145,7 @@ const AllPicklists = () => {
     }, 10000); // every 10 sec
 
     return () => clearInterval(interval);
-  }, [fetchData, userStore, jobTitle]);
+  }, [fetchData, userStore, jobTitle, userId]);
 
   // 🔔 Trigger audio + Swal + browser notification
   const triggerNotifications = (newlyAddedCount) => {
@@ -141,7 +155,6 @@ const AllPicklists = () => {
         .play()
         .catch(() => console.warn('Audio blocked, user interaction needed.'));
 
-      // Play again after 1 minute, total 2 plays
       let played = 1;
       const interval = setInterval(() => {
         if (played >= 2) {
@@ -154,7 +167,10 @@ const AllPicklists = () => {
       }, 60000);
     }
 
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    if (
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    ) {
       new Notification('New Picklist Submitted', {
         body: `${newlyAddedCount} new picklist(s) for ${userStore}`,
       });

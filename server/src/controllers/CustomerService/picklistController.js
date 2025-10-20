@@ -12,7 +12,7 @@ const retrievePicklists = async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}/picklists`; // <-- use /picklists route
     const picklists = await Picklist.findAll({
       order: [['id', 'DESC']],
-      attributes: ['id', 'odn', 'url', 'process_id', 'store'],
+      attributes: ['id', 'odn', 'url', 'process_id', 'operator_id', 'store'],
     });
 
     const formatted = picklists.map(p => ({

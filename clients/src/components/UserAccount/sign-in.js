@@ -59,17 +59,18 @@ export default function SignIn() {
         localStorage.setItem("UserId", response.data.UserId);
         localStorage.setItem("store", response.data.store);
         
-        // Save the store ID to local storage, which will be used for filtering tasks
-        // This assumes the API response includes a 'store' field for the user
         
 
         // Redirect to a protected route based on user roles
         if(response.data.AccountType === "Self Assesment" || response.data.AccountType === "Admin"){
           if(response.data.Position === "Admin"){
             navigate('/customer-dashboard');
-          } else if(response.data.Position === "Officer"){
+          } else if(response.data.Position === "Officer" && response.data.JobTitle != "WIM Operator"){
             navigate(`/customer-dashboard`);
-          } else if(response.data.Position === "Coordinator"){
+          } 
+          else if(response.data.Position === "Officer" && response.data.JobTitle === "WIM Operator"){
+            navigate(`/all-picklists`);
+          }else if(response.data.Position === "Coordinator"){
             navigate('/customer-dashboard');
           } else if(response.data.Position === "Manager"){
             navigate('/customer-dashboard');
