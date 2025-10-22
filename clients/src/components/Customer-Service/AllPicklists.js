@@ -16,8 +16,8 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { useTheme } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom';
 
 const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -25,12 +25,11 @@ const AllPicklists = () => {
   const [picklists, setPicklists] = useState([]);
   const [services, setServices] = useState([]);
   const [facilities, setFacilities] = useState([]);
-  const [employees, setEmployees] = useState([]); // 👈 all employees from /api/get-employee
+  const [employees, setEmployees] = useState([]);
   const [combinedPicklists, setCombinedPicklists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const userStore = (localStorage.getItem('store') || '').toUpperCase();
   const jobTitle = (localStorage.getItem('JobTitle') || '').toLowerCase();
   const userId = Number(localStorage.getItem('UserId')) || null;
 
@@ -41,8 +40,7 @@ const AllPicklists = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const isAllowed =
-    jobTitle.includes('wim operator') || jobTitle.includes('ewm officer');
+  const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
     try {
@@ -51,32 +49,28 @@ const AllPicklists = () => {
         axios.get(`${api_url}/api/getPicklists`),
         axios.get(`${api_url}/api/serviceList`),
         axios.get(`${api_url}/api/facilities`),
-        axios.get(`${api_url}/api/get-employee`), // ✅ correct endpoint for employee info
+        axios.get(`${api_url}/api/get-employee`),
       ]);
 
-      const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+      let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
 
-      // 🔹 Filter picklists by store and operator
-      const filteredPicklists = allPicklists.filter((p) => {
-        const sameStore = String(p.store || '').toUpperCase() === userStore;
-        if (jobTitle.includes('ewm officer')) return sameStore;
-        if (jobTitle.includes('wim operator'))
-          return sameStore && Number(p.operator_id) === userId;
-        return false;
-      });
+      // ✅ Remove completed picklists from list
+      allPicklists = allPicklists.filter(
+        (p) => String(p.status || '').toLowerCase() !== 'completed'
+      );
 
-      setPicklists(filteredPicklists);
-      setServices(Array.isArray(serviceRes.data) ? serviceRes.data : []);
-      setFacilities(Array.isArray(facilityRes.data) ? facilityRes.data : []);
-      setEmployees(Array.isArray(empRes.data) ? empRes.data : []);
-      lastPicklistsCountRef.current = filteredPicklists.length;
+      setPicklists(allPicklists);
+      setServices(serviceRes.data || []);
+      setFacilities(facilityRes.data || []);
+      setEmployees(empRes.data || []);
+      lastPicklistsCountRef.current = allPicklists.length;
     } catch (err) {
       console.error(err);
       setError('Failed to fetch data');
     } finally {
       setLoading(false);
     }
-  }, [userStore, jobTitle, userId]);
+  }, []);
 
   // 🔹 Combine picklist + facility + operator info
   useEffect(() => {
@@ -87,7 +81,7 @@ const AllPicklists = () => {
       );
       const operator = employees.find(
         (e) => Number(e.id) === Number(p.operator_id)
-      ); // ✅ get from employees API
+      );
       return {
         ...p,
         facility,
@@ -97,7 +91,7 @@ const AllPicklists = () => {
     setCombinedPicklists(combined);
   }, [picklists, services, facilities, employees]);
 
-  // 🔹 Preload and unlock sound
+  // 🔹 Audio setup
   useEffect(() => {
     audioRef.current = new Audio('/audio/notification/notification.mp3');
     audioRef.current.load();
@@ -117,40 +111,36 @@ const AllPicklists = () => {
     return () => window.removeEventListener('click', unlockAudio);
   }, []);
 
-  // 🔹 Poll for new picklists
+  // 🔹 Poll for updates
   useEffect(() => {
     fetchData();
     const interval = setInterval(async () => {
       try {
         const pickRes = await axios.get(`${api_url}/api/getPicklists`);
-        const allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+        let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
 
-        const filteredPicklists = allPicklists.filter((p) => {
-          const sameStore = String(p.store || '').toUpperCase() === userStore;
-          if (jobTitle.includes('ewm officer')) return sameStore;
-          if (jobTitle.includes('wim operator'))
-            return sameStore && Number(p.operator_id) === userId;
-          return false;
-        });
+        allPicklists = allPicklists.filter(
+          (p) => String(p.status || '').toLowerCase() !== 'completed'
+        );
 
         if (
-          filteredPicklists.length > lastPicklistsCountRef.current &&
+          allPicklists.length > lastPicklistsCountRef.current &&
           jobTitle.includes('wim operator')
         ) {
           const newlyAdded =
-            filteredPicklists.length - lastPicklistsCountRef.current;
+            allPicklists.length - lastPicklistsCountRef.current;
           triggerNotifications(newlyAdded);
         }
 
-        lastPicklistsCountRef.current = filteredPicklists.length;
-        setPicklists(filteredPicklists);
+        lastPicklistsCountRef.current = allPicklists.length;
+        setPicklists(allPicklists);
       } catch (err) {
         console.error('Polling error', err);
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [fetchData, userStore, jobTitle, userId]);
+  }, [fetchData, jobTitle]);
 
   const triggerNotifications = (newlyAddedCount) => {
     if (audioRef.current) {
@@ -176,7 +166,7 @@ const AllPicklists = () => {
       Notification.permission === 'granted'
     ) {
       new Notification('New Picklist Submitted', {
-        body: `${newlyAddedCount} new picklist(s) for ${userStore}`,
+        body: `${newlyAddedCount} new picklist(s) submitted.`,
       });
     }
 
@@ -185,19 +175,20 @@ const AllPicklists = () => {
       position: 'top-end',
       icon: 'info',
       title: 'New Picklist Submitted',
-      text: `Check submitted picklists for ${userStore}`,
+      text: `Check the new picklists list.`,
       showConfirmButton: false,
       timer: 4000,
     });
   };
 
+  // ✅ Mark as completed (delete PDF only)
   const handleComplete = async (picklistId) => {
     const picklist = combinedPicklists.find((p) => p.id === picklistId);
     if (!picklist) return;
 
     const result = await Swal.fire({
       title: 'Complete Picklist?',
-      text: 'This will remove the picklist and stop alerts.',
+      text: 'This will delete the PDF file and mark it as completed.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, complete',
@@ -210,12 +201,13 @@ const AllPicklists = () => {
       clearInterval(notificationIntervalRef.current);
       if (audioRef.current) audioRef.current.pause();
 
-      await axios.delete(`${api_url}/api/deletePicklist/${picklistId}`, {
-        data: { fileUrl: picklist.url },
+      await axios.put(`${api_url}/api/completePicklist/${picklistId}`, {
+        fileUrl: picklist.url,
+        status: 'Completed',
       });
 
-      Swal.fire({ icon: 'success', title: 'Picklist completed' });
-      setPicklists((prev) => prev.filter((p) => p.id !== picklistId));
+      Swal.fire({ icon: 'success', title: 'Picklist marked as completed' });
+      fetchData();
     } catch (err) {
       console.error(err);
       Swal.fire({
@@ -226,17 +218,10 @@ const AllPicklists = () => {
     }
   };
 
-  const handleView = (url) => {
-    window.open(url, '_blank');
-  };
-
-  if (!isAllowed)
-    return <Typography color="error">Access Denied</Typography>;
+  const handleView = (url) => window.open(url, '_blank');
 
   if (loading)
-    return (
-      <CircularProgress sx={{ mt: 5, display: 'block', mx: 'auto' }} />
-    );
+    return <CircularProgress sx={{ mt: 5, display: 'block', mx: 'auto' }} />;
 
   if (error) return <Typography color="error">{error}</Typography>;
 
@@ -245,6 +230,17 @@ const AllPicklists = () => {
       <Typography variant="h4" mb={3}>
         All Picklists
       </Typography>
+
+      {/* ✅ Completed Picklists button (top-right) */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => navigate('/completed-picklists')}
+        >
+          Completed Picklists
+        </Button>
+      </Box>
 
       <Paper sx={{ p: 2, boxShadow: 3, borderRadius: 3 }}>
         {combinedPicklists.length === 0 ? (
@@ -280,8 +276,7 @@ const AllPicklists = () => {
                         'Facility: Unknown'
                       )}
 
-                      {/* ✅ Show assigned operator only for EWM Officer */}
-                      {jobTitle.includes('ewm officer') && (
+                      {p.operator && (
                         <Typography
                           variant="body2"
                           sx={{
@@ -290,10 +285,7 @@ const AllPicklists = () => {
                             color: 'primary.main',
                           }}
                         >
-                          Assigned Operator:{' '}
-                          {p.operator
-                            ? p.operator.full_name
-                            : `Operator ID: ${p.operator_id}`}
+                          Assigned Operator: {p.operator.full_name}
                         </Typography>
                       )}
                     </>
@@ -317,14 +309,19 @@ const AllPicklists = () => {
                   >
                     View
                   </Button>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => handleComplete(p.id)}
-                    startIcon={<DeleteIcon />}
-                  >
-                    Complete
-                  </Button>
+
+                  {/* ✅ Only assigned WIM Operator can complete */}
+                  {jobTitle.includes('wim operator') &&
+                    Number(p.operator_id) === userId && (
+                      <Button
+                        variant="outlined"
+                        color="success"
+                        onClick={() => handleComplete(p.id)}
+                        startIcon={<CheckCircleIcon />}
+                      >
+                        Complete
+                      </Button>
+                    )}
                 </Stack>
               </ListItem>
             ))}

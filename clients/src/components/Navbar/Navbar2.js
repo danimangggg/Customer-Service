@@ -198,7 +198,7 @@ const Sidebar = () => {
                 <Task sx={{ mr: 1 }} /> {t("Outstanding Process")}
               </MenuItem>
             )}
-              {( jobTitle === "WIM Operator" || jobTitle === "EWM Officer") && (
+              {( jobTitle === "WIM Operator" || jobTitle === "Queue Manager" || isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
               <MenuItem component={Link} to="/all-picklists" onClick={handleCustomerMenuClose}>
                 <Task sx={{ mr: 1 }} /> {t("Picklists")}
               </MenuItem>

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const { uploadPicklist, retrievePicklists } = require('../controllers/picklistController');
+const { uploadPicklist, retrievePicklists, deletePdf } = require('../controllers/picklistController');
 
 // 🧱 Multer storage setup
 const storage = multer.diskStorage({
@@ -20,5 +20,6 @@ const upload = multer({ storage });
 // ✅ Routes
 router.post('/uploadPicklist', upload.single('attachment'), uploadPicklist);
 router.get('/getPicklists', retrievePicklists);
+router.put('/completePicklist/:id', deletePdf);
 
 module.exports = router;

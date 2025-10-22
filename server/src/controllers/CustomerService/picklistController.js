@@ -12,7 +12,7 @@ const retrievePicklists = async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get('host')}/picklists`; // <-- use /picklists route
     const picklists = await Picklist.findAll({
       order: [['id', 'DESC']],
-      attributes: ['id', 'odn', 'url', 'process_id', 'operator_id', 'store'],
+      attributes: ['id', 'odn', 'url', 'process_id', 'operator_id', 'store', 'status'],
     });
 
     const formatted = picklists.map(p => ({
@@ -63,8 +63,31 @@ const deletePicklist = async (req, res) => {
   }
 };
 
+const deletePdf = async (req, res) => {
+  try {
+    const { fileUrl, status } = req.body;
+    const picklistId = req.params.id;
+
+    // delete only PDF file
+    const fs = require('fs');
+    const path = require('path');
+    const filePath = path.join(__dirname, '../uploads', fileUrl);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    await Picklist.update(
+      { url: null, status: status || 'Completed' },
+      { where: { id: picklistId } }
+    );
+
+    res.json({ message: 'Picklist marked as completed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Failed to complete picklist' });
+  }
+}
 
 module.exports = {
   retrievePicklists,
-  deletePicklist
+  deletePicklist, 
+  deletePdf
 };

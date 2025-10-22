@@ -132,6 +132,8 @@ let routes =  (app) => {
   router.post("/api/uploadPicklist", uploadPicklist.single('attachment'), picklist.uploadPicklist);
   router.get("/api/getPicklists", viewPicklist.retrievePicklists);
   router.delete("/api/deletePicklist/:id", deletePicklist.deletePicklist);
+  router.put('/api/completePicklist/:id', deletePicklist.deletePdf);
+
   return app.use("/", router);
 };
 

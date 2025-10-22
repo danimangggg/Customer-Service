@@ -12,6 +12,7 @@ const uploadPicklist = (req, res) => {
       url: req.file.filename,
       process_id: req.body.process_id,
       store: req.body.store,
+      status: req.body.status,
       operator_id: req.body.operator_id,
       });
       if(result){

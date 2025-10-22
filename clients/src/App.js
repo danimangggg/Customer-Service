@@ -45,6 +45,7 @@ import Outstanding from './pages/Customer-Service/OustandingPage';
 import DashboardCustomer from './pages/Customer-Service/DashboardCS';
 import Picklist from './pages/Customer-Service/Picklist';
 import AllPicklist from './pages/Customer-Service/AllPicklists';
+import CompletedPicklists from './pages/Customer-Service/CompletedPicklists';
 
 import {BrowserRouter as Router, Routes, Route} from 'react-router-dom'
 const App = () => {
@@ -100,6 +101,7 @@ const App = () => {
             <Route path = '/customer-dashboard' Component={DashboardCustomer} />
             <Route path = '/picklist/:processId' Component={Picklist} />
             <Route path = '/all-picklists' Component={AllPicklist} />
+            <Route path = '/completed-picklists' Component={CompletedPicklists} />
         </Route>
         
       </Routes>
