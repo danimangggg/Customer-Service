@@ -32,6 +32,7 @@ const AllPicklists = () => {
 
   const jobTitle = (localStorage.getItem('JobTitle') || '').toLowerCase();
   const userId = Number(localStorage.getItem('UserId')) || null;
+  const userStore = (localStorage.getItem('store') || '').toUpperCase();
 
   const audioRef = useRef(null);
   const notificationIntervalRef = useRef(null);
@@ -39,7 +40,6 @@ const AllPicklists = () => {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-
   const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
@@ -54,10 +54,24 @@ const AllPicklists = () => {
 
       let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
 
-      // ✅ Remove completed picklists from list
+      // ✅ Remove completed picklists
       allPicklists = allPicklists.filter(
         (p) => String(p.status || '').toLowerCase() !== 'completed'
       );
+
+      // ✅ If user is a WIM Operator, show only their assigned picklists
+      if (jobTitle.includes('wim operator')) {
+        allPicklists = allPicklists.filter(
+          (p) => Number(p.operator_id) === userId
+        );
+      }
+
+      // ✅ If user is an EWM Officer, show only their store picklists
+      if (jobTitle.includes('ewm officer')) {
+        allPicklists = allPicklists.filter(
+          (p) => String(p.store || '').toUpperCase() === userStore
+        );
+      }
 
       setPicklists(allPicklists);
       setServices(serviceRes.data || []);
@@ -70,7 +84,7 @@ const AllPicklists = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [jobTitle, userId, userStore]);
 
   // 🔹 Combine picklist + facility + operator info
   useEffect(() => {
@@ -119,9 +133,24 @@ const AllPicklists = () => {
         const pickRes = await axios.get(`${api_url}/api/getPicklists`);
         let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
 
+        // Remove completed
         allPicklists = allPicklists.filter(
           (p) => String(p.status || '').toLowerCase() !== 'completed'
         );
+
+        // ✅ WIM Operator: only their assigned
+        if (jobTitle.includes('wim operator')) {
+          allPicklists = allPicklists.filter(
+            (p) => Number(p.operator_id) === userId
+          );
+        }
+
+        // ✅ EWM Officer: only their store
+        if (jobTitle.includes('ewm officer')) {
+          allPicklists = allPicklists.filter(
+            (p) => String(p.store || '').toUpperCase() === userStore
+          );
+        }
 
         if (
           allPicklists.length > lastPicklistsCountRef.current &&
@@ -140,7 +169,7 @@ const AllPicklists = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [fetchData, jobTitle]);
+  }, [fetchData, jobTitle, userId, userStore]);
 
   const triggerNotifications = (newlyAddedCount) => {
     if (audioRef.current) {
@@ -181,7 +210,6 @@ const AllPicklists = () => {
     });
   };
 
-  // ✅ Mark as completed (delete PDF only)
   const handleComplete = async (picklistId) => {
     const picklist = combinedPicklists.find((p) => p.id === picklistId);
     if (!picklist) return;
@@ -274,6 +302,16 @@ const AllPicklists = () => {
                         </Typography>
                       ) : (
                         'Facility: Unknown'
+                      )}
+
+                      {/* 🟩 Added Store Information */}
+                      {p.store && (
+                        <Typography
+                          variant="body2"
+                          sx={{ mt: 1, fontWeight: 'bold', color: 'text.secondary' }}
+                        >
+                          Store: {p.store}
+                        </Typography>
                       )}
 
                       {p.operator && (

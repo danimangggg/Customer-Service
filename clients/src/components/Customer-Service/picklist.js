@@ -81,13 +81,20 @@ const PickListDetail = () => {
       setFacility(fac || null);
 
       const picklistsRes = await axios.get(`${api_url}/api/getPicklists`);
-      const allPicklists = Array.isArray(picklistsRes.data) ? picklistsRes.data : [];
+      let allPicklists = Array.isArray(picklistsRes.data) ? picklistsRes.data : [];
 
       // ✅ Filter by store AND by process_id for EWM Officers
-      let filtered = allPicklists.filter(p => String(p.store || '').toUpperCase() === userStore);
+      let filtered = allPicklists.filter(
+        p => String(p.store || '').toUpperCase() === userStore
+      );
       if (jobTitle === 'EWM Officer' && process_id) {
         filtered = filtered.filter(p => String(p.process_id) === process_id);
       }
+
+      // ✅ Remove completed picklists
+      filtered = filtered.filter(
+        p => String(p.status || '').toLowerCase() !== 'completed'
+      );
 
       setSubmittedPicklists(filtered);
 
