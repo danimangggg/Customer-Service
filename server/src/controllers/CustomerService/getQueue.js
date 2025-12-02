@@ -13,7 +13,7 @@ const retriveQueue = (req, res) => {
           data.forEach((element)=>{
             jsonArray.push(element.toJSON());
           });
-          console.log(jsonArray);
+          //console.log(jsonArray);
           res.send(jsonArray)
           }).catch ((error) => {
     console.log(error);

@@ -236,7 +236,7 @@ const OutstandingCustomers = () => {
             if (allStoresCompleted) {
                 await updateServiceStatus(
                     customerAfterUpdate,
-                    'Completed',
+                    'ewm_completed',
                     null,
                     undefined,
                     'Customer',
