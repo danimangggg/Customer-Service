@@ -2,7 +2,7 @@ module.exports = {
   HOST: process.env.REACT_APP_API_URL,
   USER: "root",
   PASSWORD: "areacode",
-  DB: "CustomerS",
+  DB: "cmmis-new",
   dialect: "mysql",
   pool: {
     max: 5,

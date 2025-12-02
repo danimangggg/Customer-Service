@@ -8,7 +8,7 @@ import {
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useNavigate } from 'react-router-dom';
-
+ 
 const OutstandingCustomers = () => {
     const [customers, setCustomers] = useState([]);
     const [facilities, setFacilities] = useState([]);
@@ -239,7 +239,7 @@ const OutstandingCustomers = () => {
                     'ewm_completed',
                     null,
                     undefined,
-                    'Customer',
+                    'Dispatch',
                     new Date().toISOString()
                 );
                 Swal.fire('Completed!', 'All stores have completed this task. Service is now complete and sent to Customer.', 'success');

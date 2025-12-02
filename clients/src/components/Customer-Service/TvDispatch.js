@@ -36,29 +36,29 @@ const TvRegistrationList = () => {
 
   const oneWeekAgo = dayjs().subtract(7, 'days').startOf('day');
   
-  // --- Data Filtering: Only EWM_COMPLETED and DISPATCHING ---
+  // --- Data Filtering: Only Logistics Statuses (ewm_completed, dispatch_notify, dispatching) ---
   const orderedCustomers = customers
     .filter(cust => {
       const status = cust.status?.toLowerCase();
       const nextServicePoint = cust.next_service_point?.toLowerCase();
       
-      // STRICT RULE: Only display these two logistics statuses on the TV.
       const displayStatuses = [
         'ewm_completed', 
+        'dispatch_notify', 
         'dispatching'    
       ];
 
       return (
         displayStatuses.includes(status) &&
-        nextServicePoint === 'o2c' &&
+        nextServicePoint === 'dispatch' && 
         dayjs(cust.started_at).isAfter(oneWeekAgo)
       );
     })
     .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
 
-  // Separate the lists for rendering purposes (will mostly be 'otherCustomers')
-  const notifyingCustomers = orderedCustomers.filter(cust => cust.status?.toLowerCase() === 'notifying');
-  const otherCustomers = orderedCustomers.filter(cust => cust.status?.toLowerCase() !== 'notifying');
+  // Separate the lists for rendering purposes
+  const notifyingCustomers = orderedCustomers.filter(cust => cust.status?.toLowerCase() === 'dispatch_notify');
+  const otherCustomers = orderedCustomers.filter(cust => cust.status?.toLowerCase() !== 'dispatch_notify');
     
   // --- Video Playlist (Short clips, max 10 min) ---
   const videoPlaylist = [
@@ -130,6 +130,7 @@ const TvRegistrationList = () => {
   }, [orderedCustomers]);
   
   const getFacility = (id) => facilities.find((f) => f.id === id);
+  // NOTE: getOfficerName is no longer used, but kept for reference
   const getOfficerName = (officerId) => {
     const user = employees.find(u => u.id === officerId);
     return user ? user.full_name : 'N/A';
@@ -141,6 +142,8 @@ const TvRegistrationList = () => {
     
     if (lowerStatus === 'ewm_completed') {
       return 'Ready for Dispatch'; 
+    } else if (lowerStatus === 'dispatch_notify') {
+      return 'Calling for Dispatch';
     } else if (lowerStatus === 'dispatching') {
       return 'Dispatching'; 
     }
@@ -183,16 +186,15 @@ const TvRegistrationList = () => {
     setTimeout(() => {
       isPlayingAudio.current = false;
       playNextAudioInQueue();
-    }, 3000);
+    }, 3000); // Wait 3 seconds before trying the next audio
   }, [getCustomerIndex, playNumber]);
 
+  // Audio Announcement Logic
   useEffect(() => {
     if (!audioStarted) return;
     
     const now = Date.now();
-    // Audio announcement logic (calling, notifying) is included here but will not trigger
-    // due to the status filtering applied to orderedCustomers.
-    const customersToAnnounce = orderedCustomers.filter(c => c.status?.toLowerCase() === 'notifying');
+    const customersToAnnounce = orderedCustomers.filter(c => c.status?.toLowerCase() === 'dispatch_notify');
     
     const currentNotifyingIds = new Set(customersToAnnounce.map(c => c.id));
     for (let customerId of lastCallTimes.current.keys()) {
@@ -218,20 +220,25 @@ const TvRegistrationList = () => {
     }
   }, [orderedCustomers, audioStarted, ANNOUNCEMENT_REPEAT_INTERVAL_MS, playNextAudioInQueue]);
 
-  // --- Card Styling for Logistics Board (CORRECTED) ---
+  // --- Card Styling for Logistics Board ---
   const renderCustomerCard = (cust, index) => {
     const facility = getFacility(cust.facility_id);
     const status = cust.status?.toLowerCase();
     
     // Status Logic
-    const isDispatching = status === 'dispatching'; // <--- Green Color Trigger
+    const isDispatching = status === 'dispatching'; // Green Color
+    const isDispatchNotify = status === 'dispatch_notify'; // Yellow/Calling Color
 
     const durationInDays = dayjs().diff(dayjs(cust.started_at), 'day');
     
     let cardBgColor = '#2f3640'; // Default color for EWM_COMPLETED (Ready for Dispatch)
     let textColor = '#fff';
 
-    if (isDispatching) { 
+    if (isDispatchNotify) { 
+      cardBgColor = '#ffc107'; // Yellow for Calling/Notify
+      textColor = '#212121';
+    }
+    else if (isDispatching) { 
       cardBgColor = '#4caf50'; // Green for Dispatching
       textColor = '#fff';
     } 
@@ -247,14 +254,15 @@ const TvRegistrationList = () => {
           padding: '20px 16px',
           minHeight: '60px',
           display: 'grid',
-          gridTemplateColumns: '0.5fr 2fr 2fr 1.5fr 1fr',
+          // 🎯 ADJUSTED GRID: 0.5fr (Ticket) 4fr (Facility) 1.5fr (Status) 1fr (Time)
+          gridTemplateColumns: '0.5fr 4fr 1.5fr 1fr',
           alignItems: 'center',
           px: 2,
           transition: 'all 0.2s ease-in-out',
-          animation: 'none', 
-          boxShadow: 'none',
+          animation: isDispatchNotify ? 'glowPulse 1.5s infinite alternate' : 'none', 
+          boxShadow: isDispatchNotify ? '0 0 12px #ffc107' : 'none',
           '&:hover': {
-            boxShadow: `0 0 15px rgba(0, 229, 255, 0.7), 0 0 8px #00e5ff`,
+            boxShadow: `0 0 15px rgba(0, 229, 255, 0.7), 0 0 8px ${isDispatchNotify ? '#ffc107' : '#00e5ff'}`,
             transform: 'translateY(-2px)',
           }
         }}
@@ -274,18 +282,7 @@ const TvRegistrationList = () => {
         >
           {facility?.facility_name || 'N/A'}
         </Typography>
-        <Typography 
-          sx={{ 
-            color: textColor, 
-            fontWeight: 'bold', 
-            fontSize: '1.1rem',
-            wordBreak: 'break-word',
-            textAlign: 'left',
-            pl: 1
-          }}
-        >
-          {getOfficerName(cust.assigned_officer_id)}
-        </Typography>
+        {/* ❌ REMOVED: Assigned Officer Column */}
         <Typography sx={{ color: textColor, fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'left', pl: 1 }}>
           {getDisplayStatus(cust.status)}
         </Typography>
@@ -356,7 +353,6 @@ const TvRegistrationList = () => {
     
     // Use an async function for cleaner audio playback with Promises
     const playQrAudio = async () => {
-      // Check if the audio element is loaded before proceeding
       if (!qrAudioRef.current || qrAudioRef.current.readyState < 2) {
         console.error("QR audio element is not ready or has no supported source.");
         return;
@@ -367,7 +363,7 @@ const TvRegistrationList = () => {
           const timeoutId = setTimeout(() => {
             clearInterval(checkInterval);
             reject(new Error("Timeout while waiting for customer audio to finish."));
-          }, 5000); // 5-second timeout
+          }, 5000);
 
           const checkInterval = setInterval(() => {
             if (!isPlayingAudio.current) {
@@ -378,7 +374,6 @@ const TvRegistrationList = () => {
           }, 200);
         });
 
-        // Attempt to play the QR audio
         await qrAudioRef.current.play();
       } catch (error) {
         console.error('Failed to play QR audio:', error);
@@ -402,7 +397,7 @@ const TvRegistrationList = () => {
   };
 
   const onPlayerReady = (event) => {
-    // The player object is only used for internal logic
+    // Player object is ready
   };
 
   const animationDuration = otherCustomers.length > 0 ? `${otherCustomers.length * 3}s` : '0s';
@@ -422,7 +417,7 @@ const TvRegistrationList = () => {
         fontFamily: 'Inter, sans-serif',
         overflowX: 'hidden'
       }}
-    > 
+    >
       <Box
         sx={{
           width: '100%',
@@ -454,7 +449,7 @@ const TvRegistrationList = () => {
 
       {orderedCustomers.length === 0 ? (
         <Typography variant="h6" sx={{ mt: 5, color: '#e0f7fa' }}>
-          No facilities currently in Ready for Dispatch or Dispatching status.
+          No facilities currently in the logistics queue.
         </Typography>
       ) : (
         <Box
@@ -483,8 +478,9 @@ const TvRegistrationList = () => {
             {/* Static Header */}
             <Box
               sx={{
+                // 🎯 ADJUSTED HEADER GRID
                 display: 'grid',
-                gridTemplateColumns: '0.5fr 2fr 2fr 1.5fr 1fr',
+                gridTemplateColumns: '0.5fr 4fr 1.5fr 1fr',
                 alignItems: 'center',
                 bgcolor: '#1a1a1a',
                 borderRadius: '8px 8px 0 0',
@@ -497,12 +493,12 @@ const TvRegistrationList = () => {
             >
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left' }}>Ticket</Typography>
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left', pl: 1 }}>Facility Name</Typography>
-              <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left', pl: 1 }}>Assigned Officer</Typography>
+              {/* ❌ REMOVED: Assigned Officer Header */}
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left', pl: 1 }}>Status</Typography>
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'right' }}>Elapsed Time</Typography>
             </Box>
 
-            {/* Static "Notifying" Customers Section (will be empty) */}
+            {/* Static "NOTIFYING" Customers Section */}
             {notifyingCustomers.length > 0 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', mb: 2 }}>
                 {notifyingCustomers.map((cust, index) => renderCustomerCard(cust, index))}
