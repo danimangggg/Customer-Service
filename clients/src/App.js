@@ -48,6 +48,7 @@ import AllPicklist from './pages/Customer-Service/AllPicklists';
 import CompletedPicklists from './pages/Customer-Service/CompletedPicklists';
 import TvDispatch from './pages/Customer-Service/TvDispatchPage';
 import Dispatch from './pages/Customer-Service/Dispatch/DispatchPage';
+import TvCustomer from './pages/Customer-Service/Dispatch/TvCustomerPage';
 
 import {BrowserRouter as Router, Routes, Route} from 'react-router-dom'
 const App = () => {
@@ -106,6 +107,7 @@ const App = () => {
             <Route path = '/completed-picklists' Component={CompletedPicklists} />
             <Route path = '/tv-dispatch' Component={TvDispatch} />
             <Route path = '/dispatch' Component={Dispatch} />
+            <Route path = '/tvcustomer' Component={TvCustomer} />
         </Route>
         
       </Routes>

@@ -1,48 +1,38 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc'; 
-import customParseFormat from 'dayjs/plugin/customParseFormat'; 
 
-// Extend Day.js with necessary plugins
-dayjs.extend(utc);
-dayjs.extend(customParseFormat); 
+// --- CONFIGURATION ---
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-// --- Utility Function to Retrieve Store ID from Local Storage (Key: 'store') ---
-const getUserStoreFromLocalStorage = () => {
-    const storeId = localStorage.getItem('store'); 
-    
-    if (!storeId) {
-        // Fallback or default if local storage key 'store' is missing
-        return 'AA1'; 
+// --- UTILITY FUNCTIONS ---
+
+// Function to check if two arrays of objects have the same content (ULTRA-STABILIZATION)
+const arraysAreEqual = (arr1, arr2) => {
+    if (arr1.length !== arr2.length) return false;
+    for (let i = 0; i < arr1.length; i++) {
+        if (JSON.stringify(arr1[i]) !== JSON.stringify(arr2[i])) return false;
     }
-    return storeId.toUpperCase();
+    return true;
 };
 
-// --- Utility to get the dynamic store column name (AA1 -> store_completed_1) ---
+const getUserStoreFromLocalStorage = () => {
+    return 'AA1';
+};
+
 const getStoreCompletedKey = (userStore) => {
   const storeMap = { 'AA1': 1, 'AA2': 2, 'AA3': 3, 'AA4': 4 };
   const index = storeMap[userStore] || 1; 
   return `store_completed_${index}`; 
 };
 
-// --- Format Waiting Time (Fixed for UTC/SQL Date Parsing) ---
+/**
+ * Calculates the elapsed time in Dd Hh Mm Ss format.
+ */
 const formatWaitingTime = (startedAt) => {
   if (!startedAt) return 'N/A';
-  
-  // Treat the incoming server datetime string as UTC using custom parser
-  const startedTime = dayjs.utc(startedAt, 'YYYY-MM-DD HH:mm:ss');
-  
-  if (!startedTime.isValid()) return 'N/A (Invalid Date)';
-  
-  // Calculate duration from the UTC start time to the current moment.
-  const duration = dayjs().diff(startedTime);
-
-  if (duration < 0) {
-      return '0m 0s (Pending Start)'; 
-  }
-
+  const duration = dayjs().diff(dayjs(startedAt));
   const totalSeconds = Math.floor(duration / 1000);
   
   const days = Math.floor(totalSeconds / (3600 * 24));
@@ -58,84 +48,124 @@ const formatWaitingTime = (startedAt) => {
   return result.trim();
 };
 
+/**
+ * Determines the display status and styling.
+ */
 const getDisplayStatusAndStyle = (cust, userStore) => {
   const primaryStatus = cust.status?.toLowerCase();
   const storeCompletedKey = getStoreCompletedKey(userStore); 
   const storeValue = cust[storeCompletedKey]?.toLowerCase() || '';
 
-  // 1. FINAL: Remove from TV 
   if (primaryStatus === 'completed' || primaryStatus === 'canceled') {
     return { key: 'completed', display: 'COMPLETED (Removed)', color: 'status-removed', bgColor: 'transparent', textColor: '#fff', isFinal: true };
   }
-
-  // 2. CHECK STORE-SPECIFIC STATUSES (store_completed_X)
   if (storeValue === 'notifying') { 
-    return { key: 'dispatch_notify', display: 'CALLING', color: 'status-yellow-glow', bgColor: '#ffc107', textColor: '#212121', isCalling: true };
+    return { key: 'notifying', display: 'CALLING', color: 'status-yellow-glow', bgColor: '#ffc107', textColor: '#212121', isCalling: true };
   }
-  
   if (storeValue === 'dispatching') { 
     return { key: 'dispatching', display: 'DISPATCHING', color: 'status-green', bgColor: '#4caf50', textColor: '#fff' };
   }
-
   if (storeValue === 'ewm_completed') {
-    return { key: storeCompletedKey, display: 'EWM COMPLETED', color: 'status-purple', bgColor: '#9c27b0', textColor: '#fff' };
+    return { key: 'ewm_completed', display: 'EWM COMPLETED', color: 'status-blue', bgColor: '#2196f3', textColor: '#fff' };
   }
-
   if (storeValue === 'ewm_started') {
-    return { key: 'ewm_started', display: 'EWM STARTED', color: 'status-blue', bgColor: '#2196f3', textColor: '#fff' };
+    return { key: 'ewm_started', display: 'EWM STARTED', color: 'status-purple', bgColor: '#9c27b0', textColor: '#fff' };
   }
-  
-  // 3. INITIAL STATUS: Check 'o2c_completed' from the main status column
   if (primaryStatus === 'o2c_completed') {
       return { key: 'o2c_completed', display: 'WAITING', color: 'status-normal', bgColor: '#2f3640', textColor: '#fff' };
   }
   
-  // Fallback
   return { key: 'o2c_not_started', display: 'N/A', color: 'status-default', bgColor: '#607d8b', textColor: '#fff' };
 };
 
+// --- NEW DECOUPLED COMPONENT FOR SMOOTH TIME REFRESH ---
+const TimeDisplay = React.memo(({ startedAt }) => {
+    const [waitingTime, setWaitingTime] = useState(() => formatWaitingTime(startedAt));
 
-const PostO2cTvDisplay = ({ apiUrl }) => { 
+    useEffect(() => {
+        if (!startedAt) return;
+        // This interval runs every second, but only updates *this* component
+        const interval = setInterval(() => {
+            setWaitingTime(formatWaitingTime(startedAt));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [startedAt]);
+
+    return (
+        <Typography 
+            sx={{ 
+                color: '#fff', 
+                fontWeight: 'bold', 
+                fontSize: '1.1rem', 
+                textAlign: 'right' 
+            }}
+        >
+            {waitingTime}
+        </Typography>
+    );
+});
+// ---------------------------------------------------------
+
+
+// --- MAIN COMPONENT ---
+
+const PostO2cTvDisplay = () => {
   const [userStore, setUserStore] = useState(null); 
   const [customers, setCustomers] = useState([]);
   const [facilities, setFacilities] = useState([]);
-  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(dayjs().format('dddd, MMMM D, YYYY — hh:mm:ss A'));
+  const lastCallingCountRef = useRef(0); 
+  const audioRef = useRef(null); 
 
-  // Step 1: Get the user store ID
+  // --- AUDIO LOGIC ---
+  const playAlert = useCallback(() => { 
+      if (audioRef.current) {
+          audioRef.current.play().catch(error => {
+              console.warn("Audio autoplay blocked or failed:", error.message);
+          });
+      }
+  }, []);
+
   useEffect(() => {
     const store = getUserStoreFromLocalStorage();
     setUserStore(store);
   }, []);
 
-  // Step 2: Fetch data 
-  useEffect(() => {
-    if (!userStore || !apiUrl) return; 
+  // Step 2: Data Fetching (ULTRA-STABILIZED)
+  const fetchData = useCallback(async () => {
+    if (!userStore) return; 
+    setLoading(true);
 
-    const fetchData = async () => {
-      try {
-        const [custRes, facRes, empRes] = await Promise.all([
-          axios.get(`${apiUrl}/api/serviceList`), 
-          axios.get(`${apiUrl}/api/facilities`),
-          axios.get(`${apiUrl}/api/get-employee`)
+    try {
+        const [custRes, facRes] = await Promise.all([
+            axios.get(`${API_URL}/api/serviceList`), 
+            axios.get(`${API_URL}/api/facilities`),
         ]);
-        setCustomers(custRes.data);
-        setFacilities(facRes.data);
-        setEmployees(empRes.data);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setLoading(false);
-      }
-    };
 
+        const newCustomers = custRes.data;
+        const newFacilities = facRes.data;
+        
+        // STABILIZATION 1: Customers
+        setCustomers(prevCustomers => arraysAreEqual(prevCustomers, newCustomers) ? prevCustomers : newCustomers);
+        
+        // STABILIZATION 2: Facilities
+        setFacilities(prevFacilities => arraysAreEqual(prevFacilities, newFacilities) ? prevFacilities : newFacilities);
+
+    } catch (error) {
+        console.error('Error fetching data:', error);
+    } finally {
+        setLoading(false);
+    }
+  }, [userStore]);
+
+  useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 3000); 
     return () => clearInterval(interval);
-  }, [apiUrl, userStore]); 
+  }, [fetchData]);
 
-  // Time update logic
+  // Global Time update logic
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(dayjs().format('dddd, MMMM D, YYYY — hh:mm:ss A'));
@@ -143,27 +173,40 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
     return () => clearInterval(timer);
   }, []);
   
-  // --- Data Filtering and Processing ---
-  const activeOrders = customers
-    .map(cust => ({
-      ...cust,
-      currentStatus: getDisplayStatusAndStyle(cust, userStore) 
-    }))
-    .filter(cust => {
-      const primaryStatus = cust.status?.toLowerCase();
-      const hasStarted = primaryStatus === 'o2c_completed' || cust.currentStatus.key !== 'o2c_not_started';
-      const hasCompleted = cust.currentStatus.isFinal;
-      
-      return hasStarted && !hasCompleted;
-    })
-    .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+  // --- Data Filtering and Processing (Memoized) ---
+  const activeOrders = useMemo(() => {
+    if (!userStore) return [];
+
+    return customers
+      .map(cust => ({
+        ...cust,
+        currentStatus: getDisplayStatusAndStyle(cust, userStore)
+      }))
+      .filter(cust => {
+        const primaryStatus = cust.status?.toLowerCase();
+        const hasStarted = primaryStatus === 'o2c_completed' || cust.currentStatus.key !== 'o2c_not_started';
+        const hasCompleted = cust.currentStatus.isFinal;
+        
+        return hasStarted && !hasCompleted;
+      })
+      .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+  }, [customers, userStore]);
+
+  
+  // --- AUDIO ALERT TRIGGER ---
+  useEffect(() => {
+    const currentCallingCount = activeOrders.filter(cust => cust.currentStatus.isCalling).length;
+    const lastCount = lastCallingCountRef.current;
+    
+    if (currentCallingCount > lastCount) {
+      playAlert();
+    }
+    
+    lastCallingCountRef.current = currentCallingCount;
+  }, [activeOrders, playAlert]); 
 
 
   const getFacility = (id) => facilities.find((f) => f.id === id);
-  const getOfficerName = (officerId) => {
-    const user = employees.find(u => u.id === officerId);
-    return user ? user.full_name : 'N/A';
-  };
   
   const getOrderIndex = useCallback((orderId) => {
     return activeOrders.findIndex(c => c.id === orderId);
@@ -176,8 +219,7 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
 
     const cardBgColor = statusData.bgColor;
     const textColor = statusData.textColor;
-    
-    const customerNumber = getOrderIndex(cust.id) + 1;
+    const customerNumber = getOrderIndex(cust.id) + 1; 
 
     return (
       <Box
@@ -185,10 +227,12 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
         sx={{
           backgroundColor: cardBgColor,
           borderRadius: 1.5,
-          padding: '20px 16px',
+          // Row size fix
+          padding: '16px 16px', 
           minHeight: '60px',
           display: 'grid',
-          gridTemplateColumns: '0.5fr 2fr 2fr 1.5fr 1fr',
+          // Column setup: Order, Customer/Facility, Status, Time
+          gridTemplateColumns: '0.5fr 2fr 2fr 1fr', 
           alignItems: 'center',
           px: 2,
           transition: 'all 0.2s ease-in-out',
@@ -203,41 +247,44 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
         <Typography sx={{ color: textColor, fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'left' }}>
           {customerNumber}
         </Typography>
+        
+        {/* FACILITY NAME: Text Wrapping enabled */}
         <Typography 
           sx={{ 
             color: textColor, 
             fontWeight: 'bold', 
             fontSize: '1.1rem',
-            wordBreak: 'break-word',
+            wordBreak: 'break-word', 
+            whiteSpace: 'normal',   
             textAlign: 'left',
             pl: 1
           }}
         >
           {facility?.facility_name || 'N/A'}
         </Typography>
+        
+        {/* STATUS: Text Wrapping enabled */}
         <Typography 
-          sx={{ 
-            color: textColor, 
-            fontWeight: 'bold', 
-            fontSize: '1.1rem',
-            wordBreak: 'break-word',
-            textAlign: 'left',
-            pl: 1
-          }}
+            sx={{ 
+                color: textColor, 
+                fontWeight: 'bold', 
+                fontSize: '1.2rem', 
+                textAlign: 'left', 
+                pl: 1,
+                wordBreak: 'break-word', 
+                whiteSpace: 'normal',
+            }}
         >
-          {getOfficerName(cust.assigned_officer_id)}
-        </Typography>
-        <Typography sx={{ color: textColor, fontWeight: 'bold', fontSize: '1.2rem', textAlign: 'left', pl: 1 }}>
           {statusData.display} 
         </Typography>
-        <Typography sx={{ color: textColor, fontWeight: 'bold', fontSize: '1.1rem', textAlign: 'right' }}>
-          {formatWaitingTime(cust.started_at)}
-        </Typography>
+        
+        {/* TIME FIX: Use the decoupled TimeDisplay component */}
+        <TimeDisplay startedAt={cust.started_at} />
       </Box>
     );
   };
   
-  if (loading || !userStore || !apiUrl) { 
+  if (loading || !userStore) { 
     return (
       <Box sx={{ height: '100vh', bgcolor: '#0d131f', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <CircularProgress color="inherit" />
@@ -266,6 +313,9 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
         overflowX: 'hidden'
       }}
     >
+      {/* AUDIO FIX: Hidden HTML5 Audio Element (Ensure the 'src' path is correct) */}
+      <audio ref={audioRef} src="/path/to/your/alert_sound.mp3" preload="auto" />
+
       <Box
         sx={{
           width: '100%',
@@ -301,6 +351,7 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
         </Typography>
       ) : (
         <Box
+          key="tv-display-container" 
           sx={{
             flexGrow: 1,
             width: '98vw',
@@ -310,13 +361,14 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
             p: 1,
             overflow: 'hidden',
             boxShadow: '0 0 15px rgba(0, 229, 255, 0.4)',
-            display: 'flex',
+            display: 'grid',
+            // LAYOUT FIX: Main list (2fr) is wider than the legend (1fr)
+            gridTemplateColumns: '2fr 1fr', 
             gap: '16px',
           }}
         >
           <Box
             sx={{
-              flex: 1,
               overflowY: 'hidden',
               position: 'relative',
               display: 'flex',
@@ -327,7 +379,7 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: '0.5fr 2fr 2fr 1.5fr 1fr',
+                gridTemplateColumns: '0.5fr 2fr 2fr 1fr', 
                 alignItems: 'center',
                 bgcolor: '#1a1a1a',
                 borderRadius: '8px 8px 0 0',
@@ -340,14 +392,13 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
             >
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left' }}>Order</Typography>
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left', pl: 1 }}>Customer/Facility</Typography>
-              <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left', pl: 1 }}>Assigned Officer</Typography>
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'left', pl: 1 }}>Current Status</Typography>
               <Typography sx={{ fontWeight: 'bold', fontSize: '1rem', textAlign: 'right' }}>Process Time</Typography>
             </Box>
 
             {/* Static "Calling" Orders Section */}
             {callingOrders.length > 0 && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', mb: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '8px', mb: 1 }}>
                 {callingOrders.map((cust, index) => renderCustomerCard(cust, index))}
               </Box>
             )}
@@ -364,7 +415,7 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
                 sx={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
+                  gap: '8px',
                   position: 'absolute',
                   top: 0,
                   left: 0,
@@ -381,10 +432,9 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
             </Box>
           </Box>
             
-          {/* Status Key / Legend */}
+          {/* Status Key / Legend (MADE LARGER) */}
           <Box
             sx={{
-              flex: 1,
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -392,25 +442,25 @@ const PostO2cTvDisplay = ({ apiUrl }) => {
               justifyContent: 'center',
               bgcolor: 'rgba(0,0,0,0.7)',
               borderRadius: 2,
-              p: 4,
+              p: 3, 
             }}
           >
-            <Typography variant="h5" sx={{ color: '#00e5ff', fontWeight: 'bold', mb: 3 }}>
+            <Typography variant="h5" sx={{ color: '#00e5ff', fontWeight: 'bold', mb: 3, fontSize: '1.4rem' }}>
               Process Status Legend
             </Typography>
             {[
-              { status: 'WAITING', color: '#2f3640', desc: 'O2C Completed (Waiting for EWM)' },
-              { status: 'EWM STARTED', color: '#2196f3', desc: 'EWM Process Started' },
-              { status: 'EWM COMPLETED', color: '#9c27b0', desc: 'Warehouse Process Completed' },
-              { status: 'DISPATCHING', color: '#4caf50', desc: 'Loading/Dispatch in Progress (Assumed)' },
-              { status: 'CALLING', color: '#ffc107', desc: 'Customer/Driver Notified (Assumed)' },
+              { status: 'WAITING', color: '#2f3640', desc: 'O2C Completed' },
+              { status: 'EWM STARTED', color: '#9c27b0', desc: 'EWM Started (Purple)' },
+              { status: 'EWM COMPLETED', color: '#2196f3', desc: 'Warehouse Done (Blue)' },
+              { status: 'DISPATCHING', color: '#4caf50', desc: 'Loading/Dispatch (Green)' },
+              { status: 'CALLING', color: '#ffc107', desc: 'Customer Notified (Yellow)' },
             ].map((item, i) => (
-              <Box key={i} sx={{ display: 'flex', alignItems: 'center', mb: 2, width: '80%' }}>
-                <Box sx={{ width: 30, height: 30, bgcolor: item.color, borderRadius: 1, mr: 2, boxShadow: '0 0 5px rgba(255,255,255,0.3)' }} />
-                <Typography variant="body1" sx={{ color: '#fff', fontWeight: 'bold', flexGrow: 1 }}>
+              <Box key={i} sx={{ display: 'flex', alignItems: 'center', mb: 2, width: '90%' }}>
+                <Box sx={{ width: 24, height: 24, bgcolor: item.color, borderRadius: 1, mr: 1.5, boxShadow: '0 0 5px rgba(255,255,255,0.3)' }} />
+                <Typography variant="body1" sx={{ color: '#fff', fontWeight: 'bold', flexGrow: 1, fontSize: '1rem' }}>
                   {item.status}
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#ccc', ml: 1, textAlign: 'right' }}>
+                <Typography variant="body2" sx={{ color: '#ccc', ml: 1, textAlign: 'right', fontSize: '0.85rem' }}>
                   {item.desc}
                 </Typography>
               </Box>
