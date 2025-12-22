@@ -46,7 +46,7 @@ import DashboardCustomer from './pages/Customer-Service/DashboardCS';
 import Picklist from './pages/Customer-Service/Picklist';
 import AllPicklist from './pages/Customer-Service/AllPicklists';
 import CompletedPicklists from './pages/Customer-Service/CompletedPicklists';
-import TvDispatch from './pages/Customer-Service/TvDispatchPage';
+import TvDispatch from './pages/Customer-Service/Dispatch/TvDispatchPage';
 import Dispatch from './pages/Customer-Service/Dispatch/DispatchPage';
 import TvCustomer from './pages/Customer-Service/Dispatch/TvCustomerPage';
 

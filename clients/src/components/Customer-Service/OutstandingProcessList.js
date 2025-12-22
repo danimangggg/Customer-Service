@@ -542,15 +542,15 @@ const OutstandingCustomers = () => {
                     store_id_1: selectedStores.includes('AA1') ? 'AA1' : null,
                     store_id_2: selectedStores.includes('AA2') ? 'AA2' : null,
                     store_id_3: selectedStores.includes('AA3') ? 'AA3' : null,
-                    store_completed_1: selectedStores.includes('AA1') ? 'o2c_completed' : 'ewm_completed',
-                    store_completed_2: selectedStores.includes('AA2') ? 'o2c_completed' : 'ewm_completed',
-                    store_completed_3: selectedStores.includes('AA3') ? 'o2c_completed' : 'ewm_completed',
+                    store_completed_1: selectedStores.includes('AA1') ? 'o2c_completed' : 'completed',
+                    store_completed_2: selectedStores.includes('AA2') ? 'o2c_completed' : 'completed',
+                    store_completed_3: selectedStores.includes('AA3') ? 'o2c_completed' : 'completed',
                 };
             } else {
                 updateData = {
                     aa1_odn: null, aa2_odn: null, aa3_odn: null,
                     store_id_1: null, store_id_2: null, store_id_3: null,
-                    store_completed_1: 'ewm_completed', store_completed_2: 'ewm_completed', store_completed_3: 'ewm_completed',
+                    store_completed_1: 'completed', store_completed_2: 'completed', store_completed_3: 'completed',
                 };
             }
 
