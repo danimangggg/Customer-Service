@@ -1,24 +1,11 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { 
-    Box, 
-    Typography, 
-    CircularProgress, 
-    Paper, 
-    Table, 
-    TableBody, 
-    TableCell, 
-    TableContainer, 
-    TableHead, 
-    TableRow, 
-    Button,
-    Chip,
-    Snackbar,
-    Alert
+    Box, Typography, CircularProgress, Paper, Table, TableBody, 
+    TableCell, TableContainer, TableHead, TableRow, Button, Chip, Snackbar, Alert
 } from '@mui/material';
 import dayjs from 'dayjs';
 
-// --- Configuration ---
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
 const DispatcherAccount = () => {
@@ -27,34 +14,32 @@ const DispatcherAccount = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-
+    
     // --- STATE for Store Info ---
     const [store, setStore] = useState(null); 
     const [storeCompletionField, setStoreCompletionField] = useState(null); 
+    const [odnKey, setOdnKey] = useState(null); // Dynamic key for aaX_odn
 
-    // Define the single primary status that triggers initial visibility: ewm_completed
     const TARGET_PRIMARY_STATUSES = useMemo(() => ['ewm_completed'], []); 
 
-    // Define all statuses where the Dispatcher MUST see the item (the 3 stages of their work).
-    const DISPATCHER_ACTIVE_STATUSES = useMemo(() => ['ewm_completed', 'dispatch_started', 'notifying'], []);
-
-
-    // 1. Get Store ID from Local Storage and set the dynamic field
+    // 1. Initialize Store Info and dynamic column keys
     useEffect(() => {
         const storedStore = localStorage.getItem('store'); 
         if (storedStore) {
-            setStore(storedStore); 
-            const match = storedStore.match(/AA(\d)/i);
+            const storeId = storedStore.toUpperCase().trim();
+            setStore(storeId); 
+            
+            const match = storeId.match(/AA(\d)/i);
             if (match) {
                 setStoreCompletionField(`store_completed_${match[1]}`);
+                setOdnKey(`${storeId.toLowerCase()}_odn`); // Sets 'aa1_odn', etc.
             }
         } else {
-            console.warn("User store not found in localStorage ('store'). Cannot load dispatch list.");
-            setError("Configuration Error: Store ID not found in Local Storage. Cannot load dispatch list.");
+            setError("Configuration Error: Store ID not found in Local Storage.");
         }
     }, []);
 
-    // --- Data Fetching: Facilities (for lookup table) ---
+    // 2. Fetch Facilities Lookup
     useEffect(() => {
         const fetchFacilities = async () => {
             try {
@@ -66,317 +51,147 @@ const DispatcherAccount = () => {
                 setFacilitiesMap(map);
             } catch (err) {
                 console.error('Error fetching facilities:', err);
-                setError('Failed to load facility list for lookup.');
             }
         };
         fetchFacilities();
     }, []);
 
-
-    // --- Data Fetching: Service List (FINAL CORRECTED FILTERING) ---
+    // 3. Fetch and Filter List
     const fetchDispatchList = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        
-        if (Object.keys(facilitiesMap).length === 0 || !storeCompletionField) {
-            setLoading(false);
-            return; 
-        }
+        if (Object.keys(facilitiesMap).length === 0 || !storeCompletionField) return; 
         
         try {
             const response = await axios.get(`${API_URL}/api/serviceList`);
             const allItems = response.data;
             
-            // FILTER: 
-            const filteredItems = allItems
-                .filter(item => {
-                    const primaryStatus = item.status?.toLowerCase();
-                    const storeStatus = item[storeCompletionField]?.toLowerCase();
+            const filteredItems = allItems.filter(item => {
+                const primaryStatus = (item.status || "").toLowerCase().trim();
+                const storeStatus = (item[storeCompletionField] || "").toLowerCase().trim();
 
-                    // Condition 1: Primary status must be one of the ready/in-progress statuses (e.g., ewm_completed)
-                    const isReadyPrimaryStatus = TARGET_PRIMARY_STATUSES.includes(primaryStatus);
-                    
-                    // Condition 2: Store's custom status must be one of the active stages the Dispatcher is currently managing.
-                    // This ensures the item is only removed when storeStatus is 'completed' (which is NOT in DISPATCHER_ACTIVE_STATUSES).
-                    const isDispatchStage = DISPATCHER_ACTIVE_STATUSES.includes(storeStatus);
+                const isReadyToStart = TARGET_PRIMARY_STATUSES.includes(primaryStatus);
+                const isInProgress = ['dispatch_started', 'notifying'].includes(storeStatus);
+                const isNotDone = storeStatus !== 'dispatch_completed';
 
-                    return isReadyPrimaryStatus && isDispatchStage;
-                })
-                .sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
+                return isNotDone && (isReadyToStart || isInProgress);
+            }).sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
 
             setDispatchList(filteredItems);
-
         } catch (err) {
             console.error('Error fetching dispatch list:', err);
-            setError('Failed to load dispatch list.');
         } finally {
             setLoading(false);
         }
-    }, [facilitiesMap, storeCompletionField, TARGET_PRIMARY_STATUSES, DISPATCHER_ACTIVE_STATUSES]);
+    }, [facilitiesMap, storeCompletionField, TARGET_PRIMARY_STATUSES]);
 
     useEffect(() => {
         if (Object.keys(facilitiesMap).length > 0 && storeCompletionField) {
             fetchDispatchList();
-            const interval = setInterval(fetchDispatchList, 5000);
+            const interval = setInterval(fetchDispatchList, 10000);
             return () => clearInterval(interval);
         }
     }, [fetchDispatchList, facilitiesMap, storeCompletionField]);
 
-
-    // --- Status Update Logic (Handles status freezing and store tracking) ---
+    // 4. Update Status Logic
     const handleStatusUpdate = async (item, newStatus) => {
         try {
             setLoading(true);
             
-            let completedAtValue = null;
-            let nextServicePointValue = 'dispatch'; 
-            let delegateId = item.assigned_officer_id || null; 
-            
-            // 1. Primary status remains the original status (ewm_completed) until final action
-            let statusToSend = item.status; 
-            
-            // 2. Prepare Store Completion Update (Track Dispatcher's status with status name)
-            const storeUpdate = {};
-            const storeUpdateValue = newStatus.toLowerCase(); 
-            
-            if (storeCompletionField) {
-                storeUpdate[storeCompletionField] = storeUpdateValue;
-            }
-            
-            // 3. Handle Final Completion (ONLY time primary status changes)
-            if (newStatus.toLowerCase() === 'completed') {
-                completedAtValue = dayjs().format(); 
-                nextServicePointValue = null; 
-                statusToSend = 'completed'; // ONLY here does the primary status change
-            }
-            
-            // === CONSTRUCTING THE PAYLOAD ===
-            const putData = {
-                ...item, 
-                id: item.id, 
-                status: statusToSend, 
-                next_service_point: nextServicePointValue, 
-                assigned_officer_id: delegateId, 
-                completed_at: completedAtValue,
-                ...(Object.keys(storeUpdate).length > 0) && storeUpdate
+            const isFinalStep = newStatus === 'completed';
+            const statusValue = isFinalStep ? 'dispatch_completed' : newStatus;
+            const nextPoint = isFinalStep ? 'Exit-Permit' : 'dispatch';
+
+            const payload = {
+                ...item,
+                status: statusValue, 
+                next_service_point: nextPoint,
+                [storeCompletionField]: statusValue 
             };
 
-            await axios.put(`${API_URL}/api/update-service-point`, putData); 
+            await axios.put(`${API_URL}/api/update-service-point`, payload); 
             
-            
-            // --- OPTIMISTICALLY UPDATE LOCAL STATE (Remove immediately if 'completed') ---
-            setDispatchList(prevList => {
-                // If status changed to 'completed', filter the item out immediately
-                if (newStatus.toLowerCase() === 'completed') {
-                    return prevList.filter(i => i.id !== item.id);
-                }
-                // Otherwise, update the item's custom field for button visibility
-                return prevList.map(i => {
-                    if (i.id === item.id) {
-                        return {
-                            ...i,
-                            ...storeUpdate,
-                            status: statusToSend, 
-                            completed_at: completedAtValue,
-                        };
-                    }
-                    return i;
-                });
-            });
-
-            
-            let successMessage = `Store tracking set to **'${newStatus.toUpperCase()}'** successfully!`;
-            if (newStatus.toLowerCase() === 'completed') {
-                 successMessage = `Process **COMPLETED** successfully. Item removed from queue.`;
-            }
-
             setSnackbar({ 
                 open: true, 
-                message: successMessage, 
+                message: isFinalStep ? "Order sent to Exit Permit registry" : `Process: ${newStatus}`, 
                 severity: 'success' 
             });
 
-            // Fetch in background to confirm data consistency
             fetchDispatchList(); 
-
         } catch (err) {
-            console.error(`Error updating status for ID ${item.id}:`, err.response?.data || err.message);
-            setSnackbar({ 
-                open: true, 
-                message: `Failed to update status. Error: ${err.response?.data?.message || err.message}`, 
-                severity: 'error' 
-            });
+            setSnackbar({ open: true, message: "Update failed", severity: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
+    const getFacilityName = (facilityId) => facilitiesMap[facilityId]?.facility_name || `ID: ${facilityId}`;
 
-    // --- Helper Functions ---
-    const getFacilityName = (facilityId) => {
-        return facilitiesMap[facilityId]?.facility_name || `ID: ${facilityId} (Name Missing)`;
-    };
-
-    const formatWaitingTime = (startedAt) => {
-        if (!startedAt) return 'N/A';
-        const now = dayjs();
-        const start = dayjs(startedAt);
-        const duration = now.diff(start, 'minute');
-        
-        const hours = Math.floor(duration / 60);
-        const minutes = duration % 60;
-        
-        if (hours > 0) {
-            return `${hours}h ${minutes}m`;
-        }
-        return `${minutes}m`;
-    };
-
-    // This helper function now uses the item's store-specific status to determine the color/label
-    const getStoreStatusChip = (item) => {
-        const storeStatus = item[storeCompletionField]?.toLowerCase();
-        
-        switch (storeStatus) {
-            case 'ewm_completed':
-                return <Chip label="Ready for Dispatch" color="primary" variant="outlined" size="small" />;
-            case 'dispatch_started':
-                return <Chip label="Dispatch Started" color="info" variant="outlined" size="small" />;
-            case 'notifying':
-                return <Chip label="Notifying Delegate" color="warning" size="small" />;
-            case 'completed':
-                return <Chip label="Delivered" color="success" size="small" />;
-            default:
-                // Fallback to primary status if store-specific status is missing/unexpected
-                return <Chip label={item.status || 'N/A'} size="small" />;
-        }
-    };
-
-    // --- Main Render (Button Logic based on the store_completed_X field) ---
-
-    if (loading && dispatchList.length === 0) {
-        return (
-            <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-                <CircularProgress />
-                <Typography variant="h6" sx={{ ml: 2 }}>Loading Dispatch Data...</Typography>
-            </Box>
-        );
-    }
+    if (loading && dispatchList.length === 0) return <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>;
 
     return (
         <Box sx={{ p: 4 }}>
-            <Typography variant="h4" gutterBottom>
+            <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
                 Logistics Dispatch Console 🚚
             </Typography>
-            <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-                Active Store: **{store || 'N/A'}**
+            <Typography variant="h6" sx={{ mb: 3, color: 'text.secondary' }}>
+                Store ID: <strong>{store}</strong>
             </Typography>
             
-            {error && <Alert severity="error">{error}</Alert>}
-            
-            <TableContainer component={Paper} elevation={3}>
-                <Table stickyHeader aria-label="dispatcher table">
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+            <TableContainer component={Paper} elevation={4} sx={{ borderRadius: 2 }}>
+                <Table stickyHeader>
                     <TableHead>
-                        <TableRow sx={{ '& th': { fontWeight: 'bold', backgroundColor: '#f0f0f0' } }}>
-                            <TableCell>Ticket</TableCell>
+                        <TableRow sx={{ '& th': { fontWeight: 'bold', backgroundColor: '#e3f2fd' } }}>
+                            <TableCell>#</TableCell>
                             <TableCell>Facility Name</TableCell>
-                            <TableCell>Waiting Time</TableCell>
-                            <TableCell>Customer Type</TableCell>
-                            <TableCell>Delegate Phone</TableCell>
-                            <TableCell>Current Status</TableCell>
+                            <TableCell>ODN Number</TableCell> {/* Replaced Status with ODN */}
+                            <TableCell>Customer</TableCell>
                             <TableCell align="center">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {dispatchList.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={7} align="center">
-                                    <Typography variant="h6" sx={{ py: 3, color: 'text.secondary' }}>
-                                        🎉 Queue is clear!
-                                    </Typography>
-                                </TableCell>
-                            </TableRow>
+                            <TableRow><TableCell colSpan={5} align="center" sx={{ py: 6 }}>No pending dispatches.</TableCell></TableRow>
                         ) : (
-                            dispatchList.map((item, index) => (
-                                <TableRow 
-                                    key={item.id} 
-                                    sx={{ 
-                                        '&:nth-of-type(odd)': { backgroundColor: '#f9f9f9' }, 
-                                    }}
-                                >
-                                    <TableCell>{index + 1}</TableCell>
-                                    <TableCell sx={{ fontWeight: 'bold' }}>{getFacilityName(item.facility_id)}</TableCell>
-                                    <TableCell>{formatWaitingTime(item.started_at)}</TableCell>
-                                    <TableCell>{item.customer_type || 'Retail'}</TableCell>
-                                    <TableCell>{item.delegate_phone || 'N/A'}</TableCell>
-                                    <TableCell>{getStoreStatusChip(item)}</TableCell>
-                                    <TableCell align="center" sx={{ minWidth: '350px' }}>
+                            dispatchList.map((item, index) => {
+                                const storeStatus = (item[storeCompletionField] || "").toLowerCase().trim();
+                                return (
+                                    <TableRow key={item.id} hover>
+                                        <TableCell>{index + 1}</TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>{getFacilityName(item.facility_id)}</TableCell>
                                         
-                                        {/* Dynamic Button Logic based on the store_completed_X status */}
-                                        {(() => {
-                                            const storeStatus = item[storeCompletionField]?.toLowerCase();
+                                        {/* Show Dynamic ODN Column */}
+                                        <TableCell>
+                                            <Typography sx={{ fontWeight: 'medium', color: '#1976d2' }}>
+                                                {item[odnKey] || "Pending..."}
+                                            </Typography>
+                                        </TableCell>
 
-                                            // STATE 3: Notifying -> Show Stop & Completed
-                                            if (storeStatus === 'notifying') {
-                                                return (
-                                                    <>
-                                                        <Button 
-                                                            variant="outlined" 
-                                                            size="small" 
-                                                            color="error" 
-                                                            onClick={() => handleStatusUpdate(item, 'dispatch_started')}
-                                                            sx={{ mr: 1 }}
-                                                            disabled={loading}
-                                                        >
-                                                            Stop
-                                                        </Button>
-                                                        <Button 
-                                                            variant="contained" 
-                                                            size="small" 
-                                                            color="success" 
-                                                            onClick={() => handleStatusUpdate(item, 'completed')}
-                                                            disabled={loading}
-                                                        >
-                                                            Completed
-                                                        </Button>
-                                                    </>
-                                                );
-                                            } 
-                                            // STATE 2: Dispatch Started / Stopped -> Show Notify Delegate
-                                            else if (storeStatus === 'dispatch_started') {
-                                                return (
-                                                    <Button 
-                                                        variant="contained" 
-                                                        size="small" 
-                                                        color="warning" 
-                                                        onClick={() => handleStatusUpdate(item, 'notifying')}
-                                                        disabled={loading}
-                                                    >
-                                                        Notify Delegate
+                                        <TableCell>{item.customer_type || 'Retail'}</TableCell>
+                                        
+                                        <TableCell align="center">
+                                            {storeStatus === 'notifying' ? (
+                                                <>
+                                                    <Button size="small" variant="outlined" color="error" onClick={() => handleStatusUpdate(item, 'dispatch_started')} sx={{ mr: 1 }}>
+                                                        Stop
                                                     </Button>
-                                                );
-                                            } 
-                                            // STATE 1: Initial state (ewm_completed) -> Show Start Dispatch
-                                            else if (storeStatus === 'ewm_completed') {
-                                                return (
-                                                    <Button 
-                                                        variant="contained" 
-                                                        size="small" 
-                                                        color="info" 
-                                                        onClick={() => handleStatusUpdate(item, 'dispatch_started')}
-                                                        disabled={loading}
-                                                    >
-                                                        Start Dispatch
+                                                    <Button size="small" variant="contained" color="success" onClick={() => handleStatusUpdate(item, 'completed')}>
+                                                        Complete
                                                     </Button>
-                                                );
-                                            }
-                                            else {
-                                                // Fallback for unexpected or missing status 
-                                                return <Chip label={`Unexpected Status: ${storeStatus || 'N/A'}`} size="small" />;
-                                            }
-                                        })()}
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                                                </>
+                                            ) : storeStatus === 'dispatch_started' ? (
+                                                <Button size="small" variant="contained" color="warning" onClick={() => handleStatusUpdate(item, 'notifying')}>
+                                                    Notify Delegate
+                                                </Button>
+                                            ) : (
+                                                <Button size="small" variant="contained" color="info" onClick={() => handleStatusUpdate(item, 'dispatch_started')}>
+                                                    Start Dispatch
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
@@ -384,13 +199,11 @@ const DispatcherAccount = () => {
 
             <Snackbar
                 open={snackbar.open}
-                autoHideDuration={6000}
+                autoHideDuration={3000}
                 onClose={() => setSnackbar({ ...snackbar, open: false })}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message.includes('**') ? <span dangerouslySetInnerHTML={{ __html: snackbar.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} /> : snackbar.message}
-                </Alert>
+                <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
             </Snackbar>
         </Box>
     );

@@ -49,6 +49,7 @@ import CompletedPicklists from './pages/Customer-Service/CompletedPicklists';
 import TvDispatch from './pages/Customer-Service/Dispatch/TvDispatchPage';
 import Dispatch from './pages/Customer-Service/Dispatch/DispatchPage';
 import TvCustomer from './pages/Customer-Service/Dispatch/TvCustomerPage';
+import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
 
 import {BrowserRouter as Router, Routes, Route} from 'react-router-dom'
 const App = () => {
@@ -108,6 +109,7 @@ const App = () => {
             <Route path = '/tv-dispatch' Component={TvDispatch} />
             <Route path = '/dispatch' Component={Dispatch} />
             <Route path = '/tvcustomer' Component={TvCustomer} />
+            <Route path = '/exit-permit' Component={ExitPermit} />
         </Route>
         
       </Routes>
