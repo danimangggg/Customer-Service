@@ -15,7 +15,7 @@ const CreateEmployee = async (req, res) => {
         position: req.body.position,	
         department: req.body.department,	
         account_status: req.body.account_status });
-
+ 
     res.status(201).json(employee);
   } catch (error) {
     res.status(500).json({ message: 'Failed to create employee', error });
@@ -34,12 +34,8 @@ module.exports = {
     res.status(500).json({ message: 'Failed to fetch employees', error });
   }
 };
-module.exports = {
-  getEmployees
-}
-
 // Get a single employee by ID
-exports.getEmployeeById = async (req, res) => {
+const getEmployeeById = async (req, res) => {
   try {
     const employee = await Employee.findByPk(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
@@ -51,7 +47,7 @@ exports.getEmployeeById = async (req, res) => {
 };
 
 // Update an employee
-exports.updateEmployee = async (req, res) => {
+const updateEmployee = async (req, res) => {
   try {
     const { fullName, jobTitle, department } = req.body;
     const employee = await Employee.findByPk(req.params.id);
@@ -65,7 +61,7 @@ exports.updateEmployee = async (req, res) => {
 };
 
 // Delete an employee
-exports.deleteEmployee = async (req, res) => {
+const deleteEmployee = async (req, res) => {
   try {
     const employee = await Employee.findByPk(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
@@ -76,3 +72,10 @@ exports.deleteEmployee = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete employee', error });
   }
 };
+
+module.exports = {
+  getEmployees,
+  deleteEmployee, 
+  updateEmployee,
+  getEmployeeById
+}

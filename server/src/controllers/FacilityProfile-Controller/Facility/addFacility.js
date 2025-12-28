@@ -7,7 +7,9 @@ const addFacility = (req, res) => {
       zone_name: req.body.zone_name,
       woreda_name: req.body.woreda_name,
       facility_name: req.body.facility_name,
-      facility_type: req.body.facility_type
+      facility_type: req.body.facility_type,
+      period: req.body.period,
+      route: req.body.route
       });
       if(result){
         res.status(200).send({message:'Facility created successfully'})

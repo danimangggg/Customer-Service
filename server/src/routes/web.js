@@ -12,6 +12,7 @@ const addWoreda = require('../controllers/FacilityProfile-Controller/Woreda/addW
 const showWoreda = require('../controllers/FacilityProfile-Controller/Woreda/showWoreda')
 const addFacility = require('../controllers/FacilityProfile-Controller/Facility/addFacility')
 const showFacility = require('../controllers/FacilityProfile-Controller/Facility/showFacility')
+const manageFacility = require('../controllers/FacilityProfile-Controller/Facility/manageFacilities')
 
 // contract controller path
 const deleteContract = require('../controllers/CreaditController/DeleteCreditController')
@@ -51,6 +52,9 @@ const AddAchivment = require('../controllers/PerformanceTracking-Controller/Achi
 const getAchivment = require('../controllers/PerformanceTracking-Controller/viewAchivment')
 const updateAchivment = require('../controllers/PerformanceTracking-Controller/updateAchivment')
 const getEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
+const addEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
+const updateEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
+const deleteEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
 
 
 //Plan
@@ -83,6 +87,7 @@ let routes =  (app) => {
   router.get('/api/woredas', showWoreda.retriveWoreda);
   router.post("/api/addfacility", upload.none(), addFacility.addFacility);
   router.get('/api/facilities', showFacility.retriveFacility);
+  router.put('/api/update-facilities/:id', manageFacility.updateFacility);
 
   router.delete('/api/deleteContract/:id', deleteContract.deleteFiles);
   router.get('/api/find/:id', findOne.findFiles);
@@ -119,6 +124,7 @@ let routes =  (app) => {
   router.get("/api/get-achievements", getAchivment.retriveAchievement)
   router.put('/api/update-achievement/:id', updateAchivment.updateFiles);
   router.get('/api/get-employee', getEmployee.getEmployees);
+  router.put('/api/update-employee/:id', updateEmployee.updateEmployee);
 
   router.post("/api/add-Orgplan", addOrgPlan.AddOrgPlan)
   router.post("/api/add-Branchplan", addBranchPlan.AddBranchPlan)
