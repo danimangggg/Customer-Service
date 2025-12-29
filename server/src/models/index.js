@@ -38,5 +38,6 @@ db.branchPlanCatagory = require("./Plan/planBranchCatagoryModel.js")(sequelize, 
 db.measurement = require("./Plan/measurementModel.js")(sequelize, Sequelize);
 db.customerService = require("./CustomerService/customerQueue.js")(sequelize, Sequelize);
 db.picklist = require("./CustomerService/picklist.js")(sequelize, Sequelize);
+db.process = require("./CustomerService/process.js")(sequelize, Sequelize);
 
 module.exports = db;

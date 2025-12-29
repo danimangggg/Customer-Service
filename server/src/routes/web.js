@@ -71,6 +71,8 @@ const updateQueue = require('../controllers/CustomerService/firstUpdate')
 const picklist = require("../controllers/uploadPicklist");
 const viewPicklist= require("../controllers/CustomerService/picklistController");
 const deletePicklist= require("../controllers/CustomerService/picklistController");
+const processController = require('../controllers/CustomerService/processController');
+const processQueryController = require('../controllers/CustomerService/processQueryController');
 
 const upload = require("../middleware/upload");
 const uploadPicklist = require("../middleware/uploadPicklist");
@@ -139,6 +141,8 @@ let routes =  (app) => {
   router.get("/api/getPicklists", viewPicklist.retrievePicklists);
   router.delete("/api/deletePicklist/:id", deletePicklist.deletePicklist);
   router.put('/api/completePicklist/:id', deletePicklist.deletePdf);
+  router.post('/api/start-process', processController.startProcess);
+  router.get('/api/active-processes', processQueryController.getActiveProcesses);
 
   return app.use("/", router);
 };

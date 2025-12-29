@@ -1,9 +1,10 @@
 module.exports = {
-  HOST: process.env.REACT_APP_API_URL,
-  USER: "root",
-  PASSWORD: "areacode",
-  DB: "customer-service",
-  dialect: "mysql",
+  // Prefer explicit DB_HOST env var; fall back to localhost for local dev
+  HOST: process.env.DB_HOST || process.env.REACT_APP_API_URL || 'localhost',
+  USER: process.env.DB_USER || 'root',
+  PASSWORD: process.env.DB_PASSWORD || 'areacode',
+  DB: process.env.DB_NAME || 'customer-service',
+  dialect: 'mysql',
   pool: {
     max: 5,
     min: 0,

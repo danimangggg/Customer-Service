@@ -52,6 +52,7 @@ import TvCustomer from './pages/Customer-Service/Dispatch/TvCustomerPage';
 import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
 import facilityManager from './pages/Customer-Service/HealthProgram/FacilityManagerPage';
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
+import HpFacilities from './pages/Customer-Service/HealthProgram/HP-FacilitiesPage';
 
 import {BrowserRouter as Router, Routes, Route} from 'react-router-dom'
 const App = () => {
@@ -112,8 +113,9 @@ const App = () => {
             <Route path = '/dispatch' Component={Dispatch} />
             <Route path = '/tvcustomer' Component={TvCustomer} />
             <Route path = '/exit-permit' Component={ExitPermit} />
-            <Route path = '/manage-facility' Component={facilityManager} />
+            <Route path = '/update-facility' Component={facilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
+            <Route path = '/hp-facilities' Component={EmployeeManager} />
         </Route>
         
       </Routes>

@@ -19,10 +19,12 @@ app.use(
   express.static(path.join(__dirname, '/resources/static/assets/picklists'))
 );
 
-db.sequelize.sync();
+// Run a simple model sync at startup (no automatic ALTERs)
 db.sequelize.sync().then(() => {
-  console.log("Drop and re-sync db.");   
-  });
+  console.log('Database synchronized.');
+}).catch(err => {
+  console.error('DB sync error:', err);
+});
 
 
 let port = "3001";
