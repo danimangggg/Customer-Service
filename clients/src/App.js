@@ -115,7 +115,7 @@ const App = () => {
             <Route path = '/exit-permit' Component={ExitPermit} />
             <Route path = '/update-facility' Component={facilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
-            <Route path = '/hp-facilities' Component={EmployeeManager} />
+            <Route path = '/hp-facilities' Component={HpFacilities} />
         </Route>
         
       </Routes>

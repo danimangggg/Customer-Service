@@ -4,7 +4,7 @@ const Employee = db.employee;
 
 const startProcess = async (req, res) => {
   try {
-    const { facility_id, service_point, status, userId } = req.body;
+    const { facility_id, service_point, status, userId, reporting_month } = req.body;
     if (!facility_id || !service_point || !status) {
       return res.status(400).send({ message: 'facility_id, service_point and status are required' });
     }
@@ -24,7 +24,7 @@ const startProcess = async (req, res) => {
       service_point,
       status,
       o2c_officer_id: officerId,
-      o2c_officer: officerName,
+      reporting_month: reporting_month || null,
     });
 
     // Return the auto-incremented id as process_id and include officerName for UI
@@ -35,4 +35,17 @@ const startProcess = async (req, res) => {
   }
 };
 
-module.exports = { startProcess };
+const revertProcess = async (req, res) => {
+  try {
+    const pid = req.params.id || req.body.process_id;
+    if (!pid) return res.status(400).send({ message: 'process id required' });
+    const deleted = await Process.destroy({ where: { id: pid } });
+    if (deleted) return res.status(200).send({ message: 'Process removed', process_id: pid });
+    return res.status(404).send({ message: 'Process not found' });
+  } catch (err) {
+    console.error('revertProcess error:', err);
+    return res.status(500).send({ message: 'Internal server error', error: err.message });
+  }
+};
+
+module.exports = { startProcess, revertProcess };

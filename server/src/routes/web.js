@@ -143,6 +143,7 @@ let routes =  (app) => {
   router.put('/api/completePicklist/:id', deletePicklist.deletePdf);
   router.post('/api/start-process', processController.startProcess);
   router.get('/api/active-processes', processQueryController.getActiveProcesses);
+  router.delete('/api/process/:id', processController.revertProcess);
 
   return app.use("/", router);
 };
