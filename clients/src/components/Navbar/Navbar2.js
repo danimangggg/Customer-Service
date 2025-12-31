@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import {
   Drawer,
   List,
@@ -8,19 +7,16 @@ import {
   ListItemIcon,
   ListItemText,
   Collapse,
-  Toolbar,
   Typography,
   Box,
   Divider,
-  Menu,
-  MenuItem,
   Tooltip,
-  IconButton
+  Avatar,
+  Chip,
+  Stack
 } from '@mui/material';
 import {
-  Home,
   Assignment,
-  Business,
   ExpandLess,
   ExpandMore,
   AccountCircle,
@@ -28,34 +24,25 @@ import {
   VpnKey,
   ExitToApp,
   Group,
-  Settings,
   Task,
   FormatListBulleted,
-  PlaylistAddCheckCircle,
-  PlaylistAdd,
-  Menu as MenuIcon
+  LocalHospital,
+  Dashboard,
+  Assessment,
+  Inventory,
+  BarChart,
+  PieChart,
+  ShowChart,
+  TrendingUp,
+  Analytics
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
 
 const Sidebar = () => {
-  const [collapsed, setCollapsed] = useState(false);
-  const [orgProfileOpen, setOrgProfileOpen] = useState(false);
-  const [assessmentAnchorEl, setAssessmentAnchorEl] = useState(null);
-  const [customerAnchorEl, setCustomerAnchorEl] = useState(null);
-  const { t, i18n } = useTranslation();
+  const [reportsOpen, setReportsOpen] = useState(false);
 
-  const handleChangeLanguage = (lang) => {
-    i18n.changeLanguage(lang);
-    localStorage.setItem('i18nextLng', lang);
-  };
-
-  const handleToggleSidebar = () => setCollapsed(!collapsed);
-  const handleOrgProfileToggle = () => setOrgProfileOpen(!orgProfileOpen);
-  const handleAssessmentMenuOpen = (event) => setAssessmentAnchorEl(event.currentTarget);
-  const handleAssessmentMenuClose = () => setAssessmentAnchorEl(null);
-  const handleCustomerMenuOpen = (event) => setCustomerAnchorEl(event.currentTarget);
-  const handleCustomerMenuClose = () => setCustomerAnchorEl(null);
+  const handleReportsToggle = () => setReportsOpen(!reportsOpen);
 
   const signOut = () => {
     localStorage.clear();
@@ -71,12 +58,10 @@ const Sidebar = () => {
   const jobTitle = localStorage.getItem("JobTitle");
 
   const isAdmin = accountType === "Admin";
-  const isPodManager = accountType === "Pod Manager";
   const isCreditManager = accountType === "Credit Manager";
-  const isSelfAssessment = accountType === "Self Assesment";
 
   const MenuTooltip = ({ title, children }) => (
-    <Tooltip title={collapsed ? title : ''} placement="right" enterDelay={300}>
+    <Tooltip title={title} placement="right" enterDelay={300}>
       {children}
     </Tooltip>
   );
@@ -87,200 +72,648 @@ const Sidebar = () => {
         variant="permanent"
         anchor="left"
         sx={{
-          width: collapsed ? 70 : drawerWidth,
+          width: drawerWidth,
           flexShrink: 0,
           whiteSpace: 'nowrap',
           boxSizing: 'border-box',
           '& .MuiDrawer-paper': {
-            width: collapsed ? 70 : drawerWidth,
+            width: drawerWidth,
             boxSizing: 'border-box',
-            bgcolor: '#2E2E3E',
+            bgcolor: '#1a1a2e',
+            background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
             color: 'white',
             overflowX: 'hidden',
-            transition: 'width 0.3s ease-in-out',
             position: 'fixed',
             height: '100vh',
+            boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
+            border: 'none',
+            '&::-webkit-scrollbar': {
+              width: '6px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'rgba(255,255,255,0.1)',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: 'rgba(255,255,255,0.3)',
+              borderRadius: '3px',
+            },
           },
         }}
       >
-        <Toolbar sx={{ justifyContent: collapsed ? 'center' : 'space-between', bgcolor: '#6B4226', px: 2 }}>
-          {!collapsed && (
-            <Typography variant="h6" fontWeight="bold">
-              EPSS - Hub 1
-            </Typography>
-          )}
-          <IconButton onClick={handleToggleSidebar} sx={{ color: 'white' }}>
-            <MenuIcon />
-          </IconButton>
-        </Toolbar>
+        {/* Enhanced Header */}
+        <Box sx={{ 
+          bgcolor: 'rgba(107, 66, 38, 0.9)',
+          backdropFilter: 'blur(10px)',
+          px: 3,
+          py: 2,
+          borderBottom: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Avatar 
+              sx={{ 
+                bgcolor: 'rgba(255,255,255,0.2)', 
+                width: 48, 
+                height: 48,
+                border: '2px solid rgba(255,255,255,0.3)'
+              }}
+            >
+              <LocalHospital />
+            </Avatar>
+            <Box>
+              <Typography variant="h6" fontWeight="bold" sx={{ fontSize: '1.2rem' }}>
+                EPSS - Hub 1
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.75rem' }}>
+                Health Management System
+              </Typography>
+            </Box>
+          </Stack>
+        </Box>
 
-       <List>
-         {/* <MenuTooltip title={t("Self Assessment")}> 
-            <ListItem button onClick={handleAssessmentMenuOpen}>
-              <ListItemIcon><Assignment sx={{ color: 'white' }} /></ListItemIcon>
-              {!collapsed && <ListItemText primary={t("Self Assessment")} />}
-              {!collapsed && (assessmentAnchorEl ? <ExpandLess /> : <ExpandMore />)}
-            </ListItem>
-          </MenuTooltip>
+        {/* Quick Stats Section */}
+        <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Chip 
+              icon={<Dashboard />} 
+              label="Active" 
+              size="small" 
+              sx={{ 
+                bgcolor: 'rgba(76, 175, 80, 0.2)', 
+                color: '#4caf50',
+                border: '1px solid rgba(76, 175, 80, 0.3)',
+                fontWeight: 500
+              }} 
+            />
+            <Chip 
+              icon={<Assessment />} 
+              label="Online" 
+              size="small" 
+              sx={{ 
+                bgcolor: 'rgba(33, 150, 243, 0.2)', 
+                color: '#2196f3',
+                border: '1px solid rgba(33, 150, 243, 0.3)',
+                fontWeight: 500
+              }} 
+            />
+          </Stack>
+        </Box>
 
-          <Menu
-            anchorEl={assessmentAnchorEl}
-            open={Boolean(assessmentAnchorEl)}
-            onClose={handleAssessmentMenuClose}
-            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-          >
-            {(isAdmin || position === "manager" || position === "coordinator") && (
-              <MenuItem component={Link} to="/all-employee" onClick={handleAssessmentMenuClose}>
-                <FormatListBulleted sx={{ mr: 1 }} /> {t("All Assessment")}
-              </MenuItem>
-            )}
-            {(isAdmin || position === "manager" || position === "coordinator" || position === "officer") && (
-              <MenuItem component={Link} to="/assigned-task" onClick={handleAssessmentMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("My Tasks")}
-              </MenuItem>
-            )}
-            {(position === "Coordinator" || position === "Officer" || position === "coordinator" || position === "officer") && (
-              <MenuItem component={Link} to= {`/employee-detail/${localStorage.getItem("UserId")}`} onClick={handleAssessmentMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("My Achievement")}
-              </MenuItem>
-            )}
-            {(isAdmin || position === "manager") && (
-              <MenuItem component={Link} to="/add-task" onClick={handleAssessmentMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("Add Tasks")}
-              </MenuItem>
-            )}
-            {(isAdmin || position === "manager" || position === "coordinator") && (
-              <MenuItem component={Link} to="/team-tasks" onClick={handleAssessmentMenuClose}>
-                <PlaylistAddCheckCircle sx={{ mr: 1 }} /> {t("Team Tasks")}
-              </MenuItem>
-            )}
-            {(isAdmin || position === "manager" || position === "coordinator") && (
-              <MenuItem component={Link} to="/assign-task" onClick={handleAssessmentMenuClose}>
-                <PlaylistAdd sx={{ mr: 1 }} /> {t("Assign Tasks")}
-              </MenuItem>
-            )}
-            {isAdmin && (
-              <MenuItem component={Link} to="/users" onClick={handleAssessmentMenuClose}>
-                <PlaylistAdd sx={{ mr: 1 }} /> {t("Employee Profile")}
-              </MenuItem>
-            )}
-          </Menu> */}
+       <List sx={{ pt: 2, px: 1 }}>
+         {/* Outstanding Process (HP Facilities) - for HP Officers */}
+         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
+           <MenuTooltip title={"Outstanding Process"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/hp-facilities"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#4caf50' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Outstanding Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
 
-          <MenuTooltip title={t("Customer Service")}> 
-            <ListItem button onClick={handleCustomerMenuOpen}>
-              <ListItemIcon><Assignment sx={{ color: 'white' }} /></ListItemIcon>
-              {!collapsed && <ListItemText primary={t("Customer Service")} />}
-              {!collapsed && (assessmentAnchorEl ? <ExpandLess /> : <ExpandMore />)}
-            </ListItem>
-          </MenuTooltip>
+         {/* Picklists - for HP Officers */}
+         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
+           <MenuTooltip title={"Picklists"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/all-picklists"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Inventory sx={{ color: '#9c27b0' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Picklists"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
 
-          <Menu
-            anchorEl={customerAnchorEl}
-            open={Boolean(customerAnchorEl)}
-            onClose={handleCustomerMenuClose}
-            anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-          >
-             {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "Queue Manager" ) && (
-              <MenuItem component={Link} to="/register-list" onClick={handleCustomerMenuClose}>
-              <FormatListBulleted sx={{ mr: 1 }} /> {t("Customer Process")}
-            </MenuItem>
-            )}
-              
-              {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
-              <MenuItem component={Link} to="/customer-dashboard" onClick={handleCustomerMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("Dashboard")}
-              </MenuItem>
-            )}
-            {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "Queue Manager" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance"  ) && (
-              <MenuItem component={Link} to="/outstanding" onClick={handleCustomerMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("Outstanding Process")}
-              </MenuItem>
-            )}
-              {( jobTitle === "WIM Operator" || jobTitle === "Queue Manager" || isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
-              <MenuItem component={Link} to="/all-picklists" onClick={handleCustomerMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("Picklists")}
-              </MenuItem>
-            )}
-            {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
-              <MenuItem component={Link} to="/customer-slide" onClick={handleCustomerMenuClose}>
-                <Task sx={{ mr: 1 }} /> {t("TV Slide")}
-              </MenuItem>
-            )}
-            {(isAdmin || jobTitle === "Customer Service Officer") && (
-              <MenuItem component={Link} to="/register-customer" onClick={handleCustomerMenuClose}>
-              <Task sx={{ mr: 1 }} /> {t("Customer Registration")}
-            </MenuItem>
-            )}
-          </Menu>
+         {/* Customer Process - for all users */}
+         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "Queue Manager") && (
+           <MenuTooltip title={"Customer Process"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/register-list"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <FormatListBulleted sx={{ color: '#4caf50' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Customer Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Dashboard - for all users */}
+         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
+           <MenuTooltip title={"Dashboard"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/customer-dashboard"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Dashboard sx={{ color: '#2196f3' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Dashboard"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Outstanding Process - for non-HP officers */}
+         {!(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (isAdmin || position === "manager" || position === "coordinator" || jobTitle === "Queue Manager" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
+           <MenuTooltip title={"Outstanding Process"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/outstanding"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assessment sx={{ color: '#ff9800' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Outstanding Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Picklists - for non-HP officers */}
+         {!(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (jobTitle === "WIM Operator" || jobTitle === "Queue Manager" || isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
+           <MenuTooltip title={"Picklists"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/all-picklists"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Inventory sx={{ color: '#9c27b0' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Picklists"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* TV Slide - for all users */}
+         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
+           <MenuTooltip title={"TV Slide"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/customer-slide"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Task sx={{ color: '#f44336' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"TV Slide"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Customer Registration - for all users */}
+         {(isAdmin || jobTitle === "Customer Service Officer") && (
+           <MenuTooltip title={"Customer Registration"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/register-customer"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <AddCircleOutline sx={{ color: '#00bcd4' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Customer Registration"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Reports Menu - for all users */}
+         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
+           <MenuTooltip title={"Reports"}>
+             <ListItem 
+               button 
+               onClick={handleReportsToggle}
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 bgcolor: reportsOpen ? 'rgba(25, 118, 210, 0.1)' : 'transparent',
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <BarChart sx={{ color: '#e91e63' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Reports"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+               {reportsOpen ? <ExpandLess /> : <ExpandMore />}
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Reports Sub-menu */}
+         <Collapse in={reportsOpen} timeout="auto" unmountOnExit>
+           <List component="div" disablePadding sx={{ pl: 2 }}>
+             {/* Dashboard Analytics */}
+             <MenuTooltip title={"Dashboard Analytics"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/dashboard"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <Analytics sx={{ color: '#2196f3', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Dashboard Analytics"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Performance Reports */}
+             <MenuTooltip title={"Performance Reports"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/performance"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <TrendingUp sx={{ color: '#4caf50', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Performance Reports"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Customer Analytics */}
+             <MenuTooltip title={"Customer Analytics"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/customer-analytics"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <PieChart sx={{ color: '#ff9800', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Customer Analytics"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Financial Reports */}
+             <MenuTooltip title={"Financial Reports"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/financial"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <ShowChart sx={{ color: '#9c27b0', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Financial Reports"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Inventory Reports */}
+             <MenuTooltip title={"Inventory Reports"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/inventory"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <Inventory sx={{ color: '#607d8b', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Inventory Reports"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Health Program Reports - for HP Officers */}
+             {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
+               <MenuTooltip title={"Health Program Reports"}>
+                 <ListItem 
+                   button 
+                   component={Link} 
+                   to="/reports/health-program"
+                   sx={{
+                     borderRadius: 2,
+                     mx: 1,
+                     mb: 0.5,
+                     '&:hover': {
+                       bgcolor: 'rgba(25, 118, 210, 0.1)',
+                       transform: 'translateX(4px)',
+                       transition: 'all 0.2s ease'
+                     },
+                     transition: 'all 0.2s ease'
+                   }}
+                 >
+                   <ListItemIcon>
+                     <LocalHospital sx={{ color: '#f44336', fontSize: 20 }} />
+                   </ListItemIcon>
+                   <ListItemText 
+                     primary={"Health Program Reports"} 
+                     sx={{ 
+                       '& .MuiListItemText-primary': { 
+                         fontWeight: 400,
+                         fontSize: '0.9rem'
+                       } 
+                     }} 
+                   />
+                 </ListItem>
+               </MenuTooltip>
+             )}
+           </List>
+         </Collapse>
 
           {(isCreditManager || isAdmin) && (
-            <MenuTooltip title={t("Contract")}>
-              <ListItem button component={Link} to="/viewContract">
-                <ListItemIcon><Business sx={{ color: 'white' }} /></ListItemIcon>
-                {!collapsed && <ListItemText primary={t("Contract")} />}
+            <MenuTooltip title={"All Employees"}>
+              <ListItem 
+                button 
+                component={Link} 
+                to="/all-employee"
+                sx={{
+                  borderRadius: 2,
+                  mx: 1,
+                  mb: 1,
+                  '&:hover': {
+                    bgcolor: 'rgba(25, 118, 210, 0.1)',
+                    transform: 'translateX(4px)',
+                    transition: 'all 0.2s ease'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <ListItemIcon>
+                  <Group sx={{ color: '#795548' }} />
+                </ListItemIcon>
+                <ListItemText 
+                  primary={"All Employees"} 
+                  sx={{ 
+                    '& .MuiListItemText-primary': { 
+                      fontWeight: 500,
+                      fontSize: '0.95rem'
+                    } 
+                  }} 
+                />
               </ListItem>
             </MenuTooltip>
           )}
 
-          {(isPodManager || isAdmin) && (
-            <MenuTooltip title={t("POD")}>
-              <ListItem button component="a" href="https://model19-b49f4.web.app/login" target="_blank">
-                <ListItemIcon><Home sx={{ color: 'white' }} /></ListItemIcon>
-                {!collapsed && <ListItemText primary={t("POD")} />}
-              </ListItem>
-            </MenuTooltip>
-          )}
-
-          {(isPodManager || isAdmin || isCreditManager || jobTitle === "Customer Service Officer" ) && (
-          <MenuTooltip title={t("Org Profile")}>
-            <ListItem button onClick={handleOrgProfileToggle}>
-              <ListItemIcon><Settings sx={{ color: 'white' }} /></ListItemIcon>
-              {!collapsed && <ListItemText primary={t("Org Profile")} />}
-              {!collapsed && (orgProfileOpen ? <ExpandLess /> : <ExpandMore />)}
-            </ListItem>
-          </MenuTooltip>
-          )}
-
-          <Collapse in={orgProfileOpen && !collapsed} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding sx={{ pl: 4 }}>
-              <ListItem button component={Link} to="/facility-profile">
-                <ListItemText primary={t("Facility Profile")} />
-              </ListItem>
-              <ListItem button component={Link} to="/viewWoreda">
-                <ListItemText primary={t("Woreda")} />
-              </ListItem>
-              <ListItem button component={Link} to="/viewZone">
-                <ListItemText primary={t("Zone")} />
-              </ListItem>
-              <ListItem button component={Link} to="/viewRegion">
-                <ListItemText primary={t("Region")} />
-              </ListItem>
-            </List>
-          </Collapse>
-            {/*
-          <MenuTooltip title={t("Language")}>
-            <ListItem>
-              <ListItemIcon><Settings sx={{ color: 'white' }} /></ListItemIcon>
-              {!collapsed && (
-                <select
-                  value={i18n.language}
-                  onChange={(e) => handleChangeLanguage(e.target.value)}
-                  style={{
-                    background: 'black',
-                    color: 'white',
-                    border: 'none',
-                    outline: 'none',
-                    fontSize: '16px',
-                  }}
-                >
-                  <option value="en">English</option>
-                  <option value="am">አማርኛ</option>
-                </select>
-              )}
-            </ListItem>
-          </MenuTooltip>*/}
         </List>
 
         <Divider sx={{ my: 2, bgcolor: '#333' }} />
@@ -288,36 +721,32 @@ const Sidebar = () => {
         <List sx={{ mt: 'auto' }}>
           <ListItem>
             <ListItemIcon><AccountCircle sx={{ color: 'white' }} /></ListItemIcon>
-            {!collapsed && <ListItemText primary={fullName} />}
+            <ListItemText primary={fullName} />
           </ListItem>
 
           {isAdmin && (
             <>
               <ListItem button component={Link} to="/users">
                 <ListItemIcon><Group sx={{ color: 'white' }} /></ListItemIcon>
-                <ListItemText primary={t("Users")} />
-              </ListItem>
-              <ListItem button component={Link} to="/task-list">
-                <ListItemIcon><AddCircleOutline sx={{ color: 'white' }} /></ListItemIcon>
-                <ListItemText primary={t("Tasks")} />
+                <ListItemText primary={"Users"} />
               </ListItem>
               <ListItem button component={Link} to="/reset-password">
                 <ListItemIcon><VpnKey sx={{ color: 'white' }} /></ListItemIcon>
-                <ListItemText primary={t("Reset Password")} />
+                <ListItemText primary={"Reset Password"} />
               </ListItem>
             </>
           )}
 
-          {!collapsed && token !== "guest" && (
+          {token !== "guest" && (
             <ListItem button component={Link} to="/change-password">
               <ListItemIcon><VpnKey sx={{ color: 'white' }} /></ListItemIcon>
-              <ListItemText primary={t("Change Password")} />
+              <ListItemText primary={"Change Password"} />
             </ListItem>
           )}
 
           <ListItem button onClick={signOut}>
             <ListItemIcon><ExitToApp sx={{ color: 'white' }} /></ListItemIcon>
-            {!collapsed && <ListItemText primary={token !== "guest" ? t("Log Out") : t("Log In")} />}
+            <ListItemText primary={token !== "guest" ? "Log Out" : "Log In"} />
           </ListItem>
         </List>
       </Drawer>

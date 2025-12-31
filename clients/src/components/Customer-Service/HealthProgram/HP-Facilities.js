@@ -905,7 +905,7 @@ const HpFacilities = () => {
                     return (
                       <TableRow key={item.uniqueId} hover sx={{ '&:hover': { bgcolor: 'grey.50' } }}>
                         <TableCell>
-                          <Chip 
+                          <Chip   
                             label={(page * rowsPerPage) + index + 1} 
                             size="small" 
                             color="primary" 

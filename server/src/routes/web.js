@@ -3,38 +3,6 @@ const cors = require('cors');
 const app = express();
 const router = express.Router();
 
-// Organization profile controller path
-const addRegion = require('../controllers/FacilityProfile-Controller/Region/addRegion')
-const showRegions = require('../controllers/FacilityProfile-Controller/Region/showRegions')
-const addZone = require('../controllers/FacilityProfile-Controller/Zone/addZone')
-const showZone = require('../controllers/FacilityProfile-Controller/Zone/showZone')
-const addWoreda = require('../controllers/FacilityProfile-Controller/Woreda/addWoreda')
-const showWoreda = require('../controllers/FacilityProfile-Controller/Woreda/showWoreda')
-const addFacility = require('../controllers/FacilityProfile-Controller/Facility/addFacility')
-const showFacility = require('../controllers/FacilityProfile-Controller/Facility/showFacility')
-const manageFacility = require('../controllers/FacilityProfile-Controller/Facility/manageFacilities')
-
-// contract controller path
-const deleteContract = require('../controllers/CreaditController/DeleteCreditController')
-const findOne = require('../controllers/CreaditController/fineOne')
-const updateContract = require('../controllers/CreaditController/UpdateCredit')
-const addContract = require("../controllers/upload");
-const retriveController = require("../controllers/retrive");
-const addCreaditPdfPage = require("../controllers/CreaditController/AddPdfPage");
-
-// Pod 
-const AddPod = require('../controllers/PodController/addPod')
-const ViewPod = require('../controllers/PodController/viewPod')
-const findOnePod = require('../controllers/PodController/fineOne')
-const updatePod = require('../controllers/PodController/UpdatePod')
-const deletePod = require('../controllers/PodController/DeletePodController')
-
-// Pod Handler
-const AddPodReceiver = require('../controllers/PodController/PodHandler/addReceiver')
-const ViewPodReceiver = require('../controllers/PodController/PodHandler/showReceiver')
-const AddPodRegisterer = require('../controllers/PodController/PodHandler/addRegisterer')
-const ViewPodRegisterer = require('../controllers/PodController/PodHandler/showRegisterer')
-
 //user Account
 const Login = require('../controllers/UserAccount/login')
 const ChangePassword = require('../controllers/UserAccount/changePassword')
@@ -43,28 +11,13 @@ const AddUser = require('../controllers/UserAccount/AddUsers')
 const ResetPassword = require('../controllers/UserAccount/ResetPassword')
 const DeleteUser = require('../controllers/UserAccount/DeleteUser')
 
-//performance tracking
-const addTask = require('../controllers/PerformanceTracking-Controller/addTask')
-const ViewTask = require('../controllers/PerformanceTracking-Controller/viewTask')
-const addAssignedTask = require('../controllers/PerformanceTracking-Controller/AssignTask')
-const viewAssignedTask = require('../controllers/PerformanceTracking-Controller/viewAssignedTask')
-const AddAchivment = require('../controllers/PerformanceTracking-Controller/Achivment')
-const getAchivment = require('../controllers/PerformanceTracking-Controller/viewAchivment')
-const updateAchivment = require('../controllers/PerformanceTracking-Controller/updateAchivment')
+//performance tracking (Employee management only)
 const getEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
 const addEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
 const updateEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
 const deleteEmployee = require('../controllers/PerformanceTracking-Controller/Employee')
 
-
-//Plan
-const addOrgPlan = require('../controllers/PlanController/addOrgCatagory')
-const addBranchPlan = require('../controllers/PlanController/addBranchCatagory')
-const addmeasure = require('../controllers/PlanController/planMeasurement')
-const getmeasure = require('../controllers/PlanController/getMeasurement')
-
 //customer service
-
 const addCustomerQueue = require('../controllers/CustomerService/customerQueueController')
 const viewCustomerQueue = require('../controllers/CustomerService/getQueue')
 const updateQueue = require('../controllers/CustomerService/firstUpdate')
@@ -74,6 +27,8 @@ const deletePicklist= require("../controllers/CustomerService/picklistController
 const processController = require('../controllers/CustomerService/processController');
 const processQueryController = require('../controllers/CustomerService/processQueryController');
 const odnController = require('../controllers/CustomerService/odnController');
+const facilityController = require('../controllers/CustomerService/facilityController');
+const locationController = require('../controllers/CustomerService/locationController');
 
 const upload = require("../middleware/upload");
 const uploadPicklist = require("../middleware/uploadPicklist");
@@ -82,36 +37,7 @@ const uploadPicklist = require("../middleware/uploadPicklist");
 app.use(cors());
 let routes =  (app) => {
 
-  router.post("/api/addregion", upload.none(), addRegion.addRegion);
-  router.get('/api/regions', showRegions.retriveRegions);
-  router.post("/api/addzone", upload.none(), addZone.addZone);
-  router.get('/api/zones', showZone.retriveZone);
-  router.post("/api/addworeda", upload.none(), addWoreda.addWoreda);
-  router.get('/api/woredas', showWoreda.retriveWoreda);
-  router.post("/api/addfacility", upload.none(), addFacility.addFacility);
-  router.get('/api/facilities', showFacility.retriveFacility);
-  router.put('/api/update-facilities/:id', manageFacility.updateFacility);
-
-  router.delete('/api/deleteContract/:id', deleteContract.deleteFiles);
-  router.get('/api/find/:id', findOne.findFiles);
-  router.put('/api/updateContract/:id', upload.none(), updateContract.updateFiles);
-  router.get('/api/all',retriveController.retriveFiles)
-  router.post("/api/upload", upload.single('file'), addContract.uploadFiles);
-  router.post("/api/addCreditPdf", upload.single('file'), addCreaditPdfPage.addPdf);
-
-  router.post("/api/addPod", upload.single('file'), AddPod.addPod);
-  router.get('/api/viewPod',ViewPod.retrivePods)
-  router.get('/api/findPod/:id', findOnePod.findPod);
-  router.put('/api/updatePod/:id', upload.none(), updatePod.updatePod);
-  router.delete('/api/deletePod/:id', deletePod.deletePod);
-
-
-  router.post("/api/addReceivedBy", upload.none(), AddPodReceiver.addReceiver);
-  router.get('/api/receivedBy', ViewPodReceiver.retriveReceiver);
-  router.post("/api/addRegisteredBy", upload.none(), AddPodRegisterer.addRegisterer);
-  router.get('/api/registeredBy', ViewPodRegisterer.retriveRegisterer);
-
-
+  // User Account routes
   router.post("/api/addUser", AddUser.AddUser);
   router.post("/api/login", Login.login);
   router.post("/api/changePassword", ChangePassword.changePassword);
@@ -119,22 +45,11 @@ let routes =  (app) => {
   router.post("/api/resetPassword", ResetPassword.ResetPassword);
   router.delete('/api/deleteUser/:id', DeleteUser.deleteUser);
 
-  router.post("/api/addTask", addTask.AddTask)
-  router.get("/api/tasks", ViewTask.retriveTasks)
-  router.post("/api/addAssignedTask", addAssignedTask.AssignedTask)
-  router.get("/api/viewAssignedTask", viewAssignedTask.retriveAssignedTasks)
-  router.post("/api/add-achievement", AddAchivment.AddAchivment)
-  router.get("/api/get-achievements", getAchivment.retriveAchievement)
-  router.put('/api/update-achievement/:id', updateAchivment.updateFiles);
+  // Employee management routes (Performance tracking)
   router.get('/api/get-employee', getEmployee.getEmployees);
   router.put('/api/update-employee/:id', updateEmployee.updateEmployee);
 
-  router.post("/api/add-Orgplan", addOrgPlan.AddOrgPlan)
-  router.post("/api/add-Branchplan", addBranchPlan.AddBranchPlan)
-  router.post("/api/add-measure", addmeasure.AddMeasurement)
-  router.get("/api/get-measure", getmeasure.retriveMeasurements)
-
-  
+  // Customer Service routes
   router.post("/api/customer-queue", addCustomerQueue.AddCustomerQueue)
   router.get("/api/serviceList", viewCustomerQueue.retriveQueue)
   router.put('/api/update-service-point', updateQueue.updateQueue);
@@ -153,6 +68,19 @@ let routes =  (app) => {
   router.post('/api/ewm-complete-process', odnController.ewmCompleteProcess);
   router.post('/api/ewm-revert-process', odnController.ewmRevertProcess);
   router.post('/api/complete-odn', odnController.completeODN);
+
+  // Facility and Location routes
+  router.get('/api/facilities', facilityController.getFacilities);
+  router.get('/api/facilities/:id', facilityController.getFacilityById);
+  router.post('/api/facilities', facilityController.createFacility);
+  router.put('/api/facilities/:id', facilityController.updateFacility);
+  router.delete('/api/facilities/:id', facilityController.deleteFacility);
+  router.get('/api/regions', locationController.getRegions);
+  router.get('/api/zones', locationController.getZones);
+  router.get('/api/woredas', locationController.getWoredas);
+  router.post('/api/regions', locationController.createRegion);
+  router.post('/api/zones', locationController.createZone);
+  router.post('/api/woredas', locationController.createWoreda);
 
   return app.use("/", router);
 };

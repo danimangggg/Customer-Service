@@ -19,26 +19,21 @@ const db = {};
 db.Sequelize = Sequelize;
 db.sequelize = sequelize;
 
-db.creadit = require("./creadit.model.js")(sequelize, Sequelize);
-db.region = require("./FacilityProfile-Model/regionModel.js")(sequelize, Sequelize);
-db.zone = require("./FacilityProfile-Model/zone_subcityModel.js")(sequelize, Sequelize);
-db.woreda = require("./FacilityProfile-Model/woredaModel.js")(sequelize, Sequelize);
-db.facility = require("./FacilityProfile-Model/facilityModel.js")(sequelize, Sequelize);
-db.pod = require("./pod.model.js")(sequelize, Sequelize);
-db.registerer = require("./podHandler/registerer.js")(sequelize, Sequelize);
-db.receiver = require("./podHandler/receiver.js")(sequelize, Sequelize);
+// User Account models
 db.user = require("./UserAccount/user.js")(sequelize, Sequelize);
 db.accountType = require("./UserAccount/accountType.js")(sequelize, Sequelize);
-db.task = require("./PerformanceTracking/taskModel.js")(sequelize, Sequelize);
-db.assignedTask = require("./PerformanceTracking/assignTaskModel.js")(sequelize, Sequelize);
-db.achivement = require("./PerformanceTracking/achivementModel.js")(sequelize, Sequelize);
+
+// Performance Tracking models (Employee management only)
 db.employee = require("./PerformanceTracking/employeeModel.js")(sequelize, Sequelize);
-db.orgPlanCatagory = require("./Plan/planCatagoryModel.js")(sequelize, Sequelize);
-db.branchPlanCatagory = require("./Plan/planBranchCatagoryModel.js")(sequelize, Sequelize);
-db.measurement = require("./Plan/measurementModel.js")(sequelize, Sequelize);
+
+// Customer Service models
 db.customerService = require("./CustomerService/customerQueue.js")(sequelize, Sequelize);
 db.picklist = require("./CustomerService/picklist.js")(sequelize, Sequelize);
 db.process = require("./CustomerService/process.js")(sequelize, Sequelize);
 db.odn = require("./CustomerService/odn.js")(sequelize, Sequelize);
+db.facility = require("./CustomerService/facility.js")(sequelize, Sequelize);
+db.region = require("./CustomerService/region.js")(sequelize, Sequelize);
+db.zone = require("./CustomerService/zone.js")(sequelize, Sequelize);
+db.woreda = require("./CustomerService/woreda.js")(sequelize, Sequelize);
 
 module.exports = db;

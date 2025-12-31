@@ -20,7 +20,7 @@ const JOB_TITLES = [
   "EWM Officer - HP", "EWM Officer - RDF", "EWM Officer - Vaccine", 
   "O2C Officer - HP", "O2C Officer - RDF", 
   "O2C Officer - V", "Customer Service Officer", 
-  "Warehouse Operative", "Queue Manager", "Finance"
+  "Warehouse Operator", "Queue Manager", "Finance"
 ];
 
 const EmployeeManager = () => {

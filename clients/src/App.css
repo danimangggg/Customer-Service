@@ -7,12 +7,56 @@
   font-family: 'Lato', sans-serif;
 }
 
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
 .home,
 .reports,
 .products {
   display: flex;
   height: 90vh;
   align-items: center;
-  justify-content: right;
+  justify-content: center;
   font-size: 3rem;
+}
+
+/* Main content area for pages with sidebar */
+.main-content {
+  margin-left: 260px;
+  min-height: 100vh;
+  padding: 20px;
+  background-color: #f5f5f5;
+  width: calc(100% - 260px);
+  position: relative;
+  z-index: 1;
+}
+
+/* Public pages without sidebar */
+.public-content {
+  margin-left: 0;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure all page content is properly positioned */
+.main-content > *,
+.public-content > * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Fix for any existing containers that might have fixed positioning */
+.container,
+.content,
+.page-container {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
