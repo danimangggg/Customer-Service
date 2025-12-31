@@ -53,6 +53,7 @@ import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
 import facilityManager from './pages/Customer-Service/HealthProgram/FacilityManagerPage';
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
 import HpFacilities from './pages/Customer-Service/HealthProgram/HP-FacilitiesPage';
+import HPPicklist from './pages/Customer-Service/HealthProgram/HP-PicklistPage';
 
 import {BrowserRouter as Router, Routes, Route} from 'react-router-dom'
 const App = () => {
@@ -107,6 +108,7 @@ const App = () => {
             <Route path = '/outstanding' Component={Outstanding} />
             <Route path = '/customer-dashboard' Component={DashboardCustomer} />
             <Route path = '/picklist/:processId' Component={Picklist} />
+            <Route path = '/hp-picklist/:processId' Component={HPPicklist} />
             <Route path = '/all-picklists' Component={AllPicklist} />
             <Route path = '/completed-picklists' Component={CompletedPicklists} />
             <Route path = '/tv-dispatch' Component={TvDispatch} />

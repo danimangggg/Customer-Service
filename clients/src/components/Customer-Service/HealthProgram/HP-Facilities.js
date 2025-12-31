@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Typography, TextField, Card, CardContent, CardHeader,
@@ -27,6 +28,7 @@ import withReactContent from 'sweetalert2-react-content';
 const MySwal = withReactContent(Swal);
 
 const HpFacilities = () => {
+  const navigate = useNavigate();
   const [facilities, setFacilities] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeProcesses, setActiveProcesses] = useState([]);
@@ -300,114 +302,10 @@ const HpFacilities = () => {
       }
     }
   };
-  // --- VIEW ODN DETAILS FOR EWM ---
-  const handleViewODNDetails = async (processId, facilityName, facility) => {
-    try {
-      const response = await axios.get(`${api_url}/api/odns/${processId}`);
-      const odns = response.data.data || [];
-      
-      if (odns.length === 0) {
-        Swal.fire('No ODNs', 'No ODN numbers found for this process.', 'info');
-        return;
-      }
-
-      // Get process details
-      const process = activeProcesses.find(p => p.id === processId);
-      
-      const odnList = odns.map((odn, index) => 
-        `<div style="padding: 12px; border: 1px solid #e0e0e0; margin-bottom: 10px; border-radius: 8px; background: ${odn.status === 'ewm_completed' ? '#e8f5e8' : '#fff8e1'};">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <strong style="color: #1976d2; font-size: 16px;">ODN ${index + 1}:</strong> 
-              <span style="font-size: 18px; font-weight: bold; color: #333; margin-left: 8px;">${odn.odn_number}</span>
-            </div>
-            <div style="text-align: right;">
-              <div style="background: ${odn.status === 'ewm_completed' ? '#4caf50' : '#ff9800'}; color: white; padding: 4px 12px; border-radius: 16px; font-size: 12px; font-weight: bold; margin-bottom: 4px;">
-                ${odn.status === 'ewm_completed' ? 'EWM COMPLETED' : 'PENDING'}
-              </div>
-              <small style="color: #666; display: block;">Created: ${new Date(odn.created_at).toLocaleString()}</small>
-            </div>
-          </div>
-        </div>`
-      ).join('');
-
-      const completedCount = odns.filter(odn => odn.status === 'ewm_completed').length;
-      const pendingCount = odns.length - completedCount;
-
-      MySwal.fire({
-        title: `Facility Process Details`,
-        html: `
-          <div style="text-align: left;">
-            <!-- Facility Header -->
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
-              <h2 style="margin: 0; font-size: 20px; display: flex; align-items: center;">
-                <span style="background: rgba(255,255,255,0.2); padding: 8px; border-radius: 8px; margin-right: 12px;">🏥</span>
-                ${facilityName}
-              </h2>
-              <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 14px;">
-                <div><strong>Region:</strong> ${facility.region_name || 'N/A'}</div>
-                <div><strong>Route:</strong> ${facility.route || 'N/A'}</div>
-                <div><strong>Process ID:</strong> #${processId}</div>
-                <div><strong>Reporting Month:</strong> ${process?.reporting_month || 'N/A'}</div>
-              </div>
-            </div>
-
-            <!-- Statistics -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-              <div style="background: #e3f2fd; padding: 16px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #1976d2;">${odns.length}</div>
-                <div style="color: #666; font-size: 12px;">Total ODNs</div>
-              </div>
-              <div style="background: #fff3e0; padding: 16px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #ff9800;">${pendingCount}</div>
-                <div style="color: #666; font-size: 12px;">Pending</div>
-              </div>
-              <div style="background: #e8f5e8; padding: 16px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #4caf50;">${completedCount}</div>
-                <div style="color: #666; font-size: 12px;">Completed</div>
-              </div>
-            </div>
-
-            <!-- Progress Bar -->
-            <div style="margin-bottom: 20px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                <span style="font-size: 14px; font-weight: bold;">Progress</span>
-                <span style="font-size: 14px;">${completedCount}/${odns.length} ODNs Completed</span>
-              </div>
-              <div style="background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden;">
-                <div style="background: linear-gradient(90deg, #4caf50, #66bb6a); height: 100%; width: ${odns.length > 0 ? (completedCount / odns.length) * 100 : 0}%; transition: width 0.3s ease;"></div>
-              </div>
-            </div>
-
-            <!-- ODN List -->
-            <div style="max-height: 400px; overflow-y: auto;">
-              <h3 style="margin: 0 0 16px 0; color: #333; font-size: 16px;">ODN Details</h3>
-              ${odnList}
-            </div>
-
-            <!-- Officer Information -->
-            ${process?.o2c_officer_name ? `
-              <div style="background: #f5f5f5; padding: 16px; border-radius: 8px; margin-top: 20px;">
-                <h4 style="margin: 0 0 8px 0; color: #333; font-size: 14px;">Process Information</h4>
-                <div style="font-size: 13px; color: #666;">
-                  <div><strong>O2C Officer:</strong> ${process.o2c_officer_name}</div>
-                  <div><strong>Status:</strong> <span style="color: #4caf50; font-weight: bold;">${process.status?.toUpperCase() || 'N/A'}</span></div>
-                </div>
-              </div>
-            ` : ''}
-          </div>
-        `,
-        confirmButtonText: 'Close',
-        width: '700px',
-        customClass: {
-          htmlContainer: 'swal-facility-details'
-        }
-      });
-      
-    } catch (err) {
-      console.error('View facility details error:', err);
-      Swal.fire('Error', 'Failed to load facility details.', 'error');
-    }
+  // --- NAVIGATE TO HP PICKLIST PAGE ---
+  const handleViewODNDetails = (processId, facilityName, facility, odnNumber) => {
+    // Navigate to HP picklist page with the process ID and ODN number
+    navigate(`/hp-picklist/${processId}?odn=${encodeURIComponent(odnNumber)}`);
   };
   const handleEditODN = async (odnId, currentValue, processId) => {
     const { value: newOdnNumber } = await MySwal.fire({
@@ -711,29 +609,6 @@ const HpFacilities = () => {
           <Typography>
             <strong>Expected values:</strong> "O2C Officer - HP" or "EWM Officer - HP"
           </Typography>
-          <Box sx={{ mt: 2 }}>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              sx={{ mr: 1 }}
-              onClick={() => {
-                localStorage.setItem('JobTitle', 'O2C Officer - HP');
-                window.location.reload();
-              }}
-            >
-              Set as O2C Officer
-            </Button>
-            <Button 
-              variant="contained" 
-              color="secondary"
-              onClick={() => {
-                localStorage.setItem('JobTitle', 'EWM Officer - HP');
-                window.location.reload();
-              }}
-            >
-              Set as EWM Officer
-            </Button>
-          </Box>
         </Alert>
       </Container>
     );
@@ -1010,14 +885,6 @@ const HpFacilities = () => {
                       </Stack>
                     </TableCell>
                   )}
-                  {isEWMOfficer && (
-                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <CheckCircleIcon fontSize="small" />
-                        <span>Status</span>
-                      </Stack>
-                    </TableCell>
-                  )}
                   <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                     <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
                       <AssignmentIcon fontSize="small" />
@@ -1072,14 +939,6 @@ const HpFacilities = () => {
                             variant="outlined"
                           />
                         </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={isODNCompleted ? 'EWM Completed' : 'Pending'}
-                            size="small"
-                            color={isODNCompleted ? 'success' : 'warning'}
-                            icon={isODNCompleted ? <CheckCircleIcon /> : undefined}
-                          />
-                        </TableCell>
                         <TableCell align="center">
                           <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
                             {!isODNCompleted && (
@@ -1103,7 +962,7 @@ const HpFacilities = () => {
                                 color="info" 
                                 size="small" 
                                 startIcon={<VisibilityIcon />} 
-                                onClick={() => handleViewODNDetails(proc.id, f.facility_name, f)}
+                                onClick={() => handleViewODNDetails(proc.id, f.facility_name, f, odn.odn_number)}
                                 className="action-button"
                                 sx={{ borderRadius: 2 }}
                               >
