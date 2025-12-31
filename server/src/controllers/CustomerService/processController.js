@@ -1,6 +1,7 @@
 const db = require('../../models');
 const Process = db.process;
 const Employee = db.employee;
+const ODN = db.odn;
 
 const startProcess = async (req, res) => {
   try {
@@ -39,8 +40,13 @@ const revertProcess = async (req, res) => {
   try {
     const pid = req.params.id || req.body.process_id;
     if (!pid) return res.status(400).send({ message: 'process id required' });
+    
+    // First delete all ODNs associated with this process
+    await ODN.destroy({ where: { process_id: pid } });
+    
+    // Then delete the process
     const deleted = await Process.destroy({ where: { id: pid } });
-    if (deleted) return res.status(200).send({ message: 'Process removed', process_id: pid });
+    if (deleted) return res.status(200).send({ message: 'Process and associated ODNs removed', process_id: pid });
     return res.status(404).send({ message: 'Process not found' });
   } catch (err) {
     console.error('revertProcess error:', err);

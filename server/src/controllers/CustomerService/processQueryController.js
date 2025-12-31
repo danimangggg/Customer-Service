@@ -4,8 +4,8 @@ const Employee = db.employee;
 
 const getActiveProcesses = async (req, res) => {
   try {
-    // return all process records (optionally filter by status)
-    const processes = await Process.findAll({ where: { status: 'o2c_started' } });
+    // Return all process records (not just o2c_started)
+    const processes = await Process.findAll();
 
     // collect officer ids and fetch employee names
     const officerIds = [...new Set(processes.map(p => p.o2c_officer_id).filter(Boolean))];

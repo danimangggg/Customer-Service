@@ -73,6 +73,7 @@ const viewPicklist= require("../controllers/CustomerService/picklistController")
 const deletePicklist= require("../controllers/CustomerService/picklistController");
 const processController = require('../controllers/CustomerService/processController');
 const processQueryController = require('../controllers/CustomerService/processQueryController');
+const odnController = require('../controllers/CustomerService/odnController');
 
 const upload = require("../middleware/upload");
 const uploadPicklist = require("../middleware/uploadPicklist");
@@ -144,6 +145,14 @@ let routes =  (app) => {
   router.post('/api/start-process', processController.startProcess);
   router.get('/api/active-processes', processQueryController.getActiveProcesses);
   router.delete('/api/process/:id', processController.revertProcess);
+  router.post('/api/save-odn', odnController.saveODN);
+  router.get('/api/odns/:process_id', odnController.getODNsByProcess);
+  router.put('/api/odn/:id', odnController.updateODN);
+  router.delete('/api/odn/:id', odnController.deleteODN);
+  router.post('/api/complete-process', odnController.completeProcess);
+  router.post('/api/ewm-complete-process', odnController.ewmCompleteProcess);
+  router.post('/api/ewm-revert-process', odnController.ewmRevertProcess);
+  router.post('/api/complete-odn', odnController.completeODN);
 
   return app.use("/", router);
 };

@@ -39,5 +39,6 @@ db.measurement = require("./Plan/measurementModel.js")(sequelize, Sequelize);
 db.customerService = require("./CustomerService/customerQueue.js")(sequelize, Sequelize);
 db.picklist = require("./CustomerService/picklist.js")(sequelize, Sequelize);
 db.process = require("./CustomerService/process.js")(sequelize, Sequelize);
+db.odn = require("./CustomerService/odn.js")(sequelize, Sequelize);
 
 module.exports = db;
