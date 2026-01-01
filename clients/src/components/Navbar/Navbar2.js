@@ -34,15 +34,19 @@ import {
   PieChart,
   ShowChart,
   TrendingUp,
-  Analytics
+  Analytics,
+  Settings,
+  Business
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
 
 const Sidebar = () => {
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleReportsToggle = () => setReportsOpen(!reportsOpen);
+  const handleSettingsToggle = () => setSettingsOpen(!settingsOpen);
 
   const signOut = () => {
     localStorage.clear();
@@ -124,37 +128,9 @@ const Sidebar = () => {
                 EPSS - Hub 1
               </Typography>
               <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.75rem' }}>
-                Health Management System
+                Customer Service System
               </Typography>
             </Box>
-          </Stack>
-        </Box>
-
-        {/* Quick Stats Section */}
-        <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip 
-              icon={<Dashboard />} 
-              label="Active" 
-              size="small" 
-              sx={{ 
-                bgcolor: 'rgba(76, 175, 80, 0.2)', 
-                color: '#4caf50',
-                border: '1px solid rgba(76, 175, 80, 0.3)',
-                fontWeight: 500
-              }} 
-            />
-            <Chip 
-              icon={<Assessment />} 
-              label="Online" 
-              size="small" 
-              sx={{ 
-                bgcolor: 'rgba(33, 150, 243, 0.2)', 
-                color: '#2196f3',
-                border: '1px solid rgba(33, 150, 243, 0.3)',
-                fontWeight: 500
-              }} 
-            />
           </Stack>
         </Box>
 
@@ -229,41 +205,6 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Customer Process - for all users */}
-         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "Queue Manager") && (
-           <MenuTooltip title={"Customer Process"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/register-list"
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
-                 transition: 'all 0.2s ease'
-               }}
-             >
-               <ListItemIcon>
-                 <FormatListBulleted sx={{ color: '#4caf50' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"Customer Process"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
          {/* Dashboard - for all users */}
          {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
            <MenuTooltip title={"Dashboard"}>
@@ -288,41 +229,6 @@ const Sidebar = () => {
                </ListItemIcon>
                <ListItemText 
                  primary={"Dashboard"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
-         {/* Outstanding Process - for non-HP officers */}
-         {!(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (isAdmin || position === "manager" || position === "coordinator" || jobTitle === "Queue Manager" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
-           <MenuTooltip title={"Outstanding Process"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/outstanding"
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
-                 transition: 'all 0.2s ease'
-               }}
-             >
-               <ListItemIcon>
-                 <Assessment sx={{ color: '#ff9800' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"Outstanding Process"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
@@ -438,6 +344,80 @@ const Sidebar = () => {
              </ListItem>
            </MenuTooltip>
          )}
+
+         {/* Settings Menu - for admins, managers, coordinators, and customer service officers */}
+         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "Customer Service Officer") && (
+           <MenuTooltip title={"Settings"}>
+             <ListItem 
+               button 
+               onClick={handleSettingsToggle}
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 bgcolor: settingsOpen ? 'rgba(25, 118, 210, 0.1)' : 'transparent',
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Settings sx={{ color: '#607d8b' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Settings"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+               {settingsOpen ? <ExpandLess /> : <ExpandMore />}
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Settings Sub-menu */}
+         <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
+           <List component="div" disablePadding sx={{ pl: 2 }}>
+             {/* Organization Profile */}
+             <MenuTooltip title={"Organization Profile"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/settings/organization-profile"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <Business sx={{ color: '#795548', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Organization Profile"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+           </List>
+         </Collapse>
 
          {/* Reports Menu - for all users */}
          {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (

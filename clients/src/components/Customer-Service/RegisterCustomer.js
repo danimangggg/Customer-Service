@@ -9,7 +9,20 @@ import {
   Paper,
   Snackbar,
   Alert,
+  Avatar,
+  Stack,
+  Fade,
+  Zoom,
+  Card,
+  CardContent,
 } from '@mui/material';
+import {
+  PersonAdd,
+  LocationOn,
+  Business,
+  Phone,
+  Email,
+} from '@mui/icons-material';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -221,244 +234,453 @@ const RegisterCustomer = () => {
   };
 
   return (
-    <Box sx={{ py: 5, px: 2 }}>
-      <Paper
-        elevation={3}
-        sx={{
-          maxWidth: 700,
-          mx: 'auto',
-          p: 4,
-          borderRadius: 3,
-        }}
-      >
-        <Typography variant="h4" align="center" fontWeight={600} gutterBottom>
-          Register Customer
-        </Typography>
+    <>
+      <style>
+        {`
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-fade-in {
+            animation: fadeInUp 0.6s ease-out;
+          }
+          .registration-card {
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            border: 1px solid rgba(25, 118, 210, 0.1);
+          }
+          .registration-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+          }
+          .header-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 32px;
+            border-radius: 20px 20px 0 0;
+            position: relative;
+            overflow: hidden;
+          }
+          .header-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+          }
+          .enhanced-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 16px 32px;
+            font-weight: 600;
+            text-transform: none;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            border: none;
+            color: white;
+          }
+          .enhanced-button:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #667eea 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
+          }
+          .form-field {
+            transition: all 0.3s ease;
+          }
+          .form-field:hover {
+            transform: translateY(-1px);
+          }
+        `}
+      </style>
+      <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', py: 4, px: 2 }}>
+        <Box className="registration-card animate-fade-in" sx={{ maxWidth: 800, mx: 'auto' }}>
+          {/* Header Section */}
+          <Box className="header-gradient">
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Stack direction="row" alignItems="center" spacing={3}>
+                <Avatar sx={{ 
+                  bgcolor: 'rgba(255,255,255,0.2)', 
+                  width: 64, 
+                  height: 64,
+                  backdropFilter: 'blur(10px)',
+                  border: '2px solid rgba(255,255,255,0.3)'
+                }}>
+                  <PersonAdd sx={{ fontSize: 32 }} />
+                </Avatar>
+                <Box>
+                  <Typography variant="h3" fontWeight="bold" sx={{ 
+                    textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    mb: 1
+                  }}>
+                    Register Customer
+                  </Typography>
+                  <Typography variant="h6" sx={{ 
+                    opacity: 0.9, 
+                    fontWeight: 300,
+                    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                  }}>
+                    Add new customer to the service queue
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+          </Box>
 
-        <Grid container spacing={2}>
-          {/* Region / Zone */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              select
-              fullWidth
-              label="Region"
-              value={selectedRegion}
-              onChange={e => setSelectedRegion(e.target.value)}
-            >
-              {regions.map(r => (
-                <MenuItem key={r.id} value={r.region_name}>
-                  {r.region_name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              select
-              fullWidth
-              label="Zone"
-              value={selectedZone}
-              onChange={e => setSelectedZone(e.target.value)}
-            >
-              {zones.map(z => (
-                <MenuItem key={z.id} value={z.zone_name}>
-                  {z.zone_name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
+          {/* Form Section */}
+          <Box sx={{ p: 4 }}>
+            <Grid container spacing={3}>
+              {/* Location Section */}
+              <Grid item xs={12}>
+                <Card sx={{ mb: 3, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                      <LocationOn color="primary" />
+                      <Typography variant="h6" fontWeight="bold">
+                        Location Information
+                      </Typography>
+                    </Stack>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          select
+                          fullWidth
+                          label="Region"
+                          value={selectedRegion}
+                          onChange={e => setSelectedRegion(e.target.value)}
+                          className="form-field"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }
+                            }
+                          }}
+                        >
+                          {regions.map(r => (
+                            <MenuItem key={r.id} value={r.region_name}>
+                              {r.region_name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          select
+                          fullWidth
+                          label="Zone"
+                          value={selectedZone}
+                          onChange={e => setSelectedZone(e.target.value)}
+                          className="form-field"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }
+                            }
+                          }}
+                        >
+                          {zones.map(z => (
+                            <MenuItem key={z.id} value={z.zone_name}>
+                              {z.zone_name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          select
+                          fullWidth
+                          label="Woreda"
+                          value={selectedWoreda}
+                          onChange={e => setSelectedWoreda(e.target.value)}
+                          className="form-field"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }
+                            }
+                          }}
+                        >
+                          {woredas.map(w => (
+                            <MenuItem key={w.id} value={w.woreda_name}>
+                              {w.woreda_name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          select
+                          fullWidth
+                          label="Facility"
+                          value={selectedFacility}
+                          onChange={e => setSelectedFacility(e.target.value)}
+                          className="form-field"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }
+                            }
+                          }}
+                        >
+                          {facilities.map(f => (
+                            <MenuItem key={f.id} value={f.id}>
+                              {f.facility_name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-          {/* Woreda / Facility */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              select
-              fullWidth
-              label="Woreda"
-              value={selectedWoreda}
-              onChange={e => setSelectedWoreda(e.target.value)}
-            >
-              {woredas.map(w => (
-                <MenuItem key={w.id} value={w.woreda_name}>
-                  {w.woreda_name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              select
-              fullWidth
-              label="Facility"
-              value={selectedFacility}
-              onChange={e => setSelectedFacility(e.target.value)}
-            >
-              {facilities.map(f => (
-                <MenuItem key={f.id} value={f.id}>
-                  {f.facility_name}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
+              {/* Delegate Information */}
+              <Grid item xs={12}>
+                <Card sx={{ mb: 3, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+                  <CardContent>
+                    <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                      <Business color="primary" />
+                      <Typography variant="h6" fontWeight="bold">
+                        Delegate Information
+                      </Typography>
+                    </Stack>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          label="Delegate Name"
+                          value={delegate}
+                          onChange={e => setDelegate(e.target.value)}
+                          className="form-field"
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          label="Delegate Phone"
+                          value={delegatePhone}
+                          onChange={e => setDelegatePhone(e.target.value)}
+                          className="form-field"
+                          InputProps={{
+                            startAdornment: <Phone color="action" sx={{ mr: 1 }} />
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <TextField
+                          fullWidth
+                          label="Letter Number"
+                          value={letterNumber}
+                          onChange={e => setLetterNumber(e.target.value)}
+                          className="form-field"
+                          InputProps={{
+                            startAdornment: <Email color="action" sx={{ mr: 1 }} />
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2,
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                              }
+                            }
+                          }}
+                        />
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Grid>
 
-          {/* New Date and Time Picker - COMMENTED OUT
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Registration Date"
-              type="datetime-local"
-              value={startedAt}
-              onChange={e => setStartedAt(e.target.value)}
-              InputLabelProps={{
-                shrink: true,
-              }}
-            />
-          </Grid>
-          */}
-          
-          {/* Delegate / Delegate Phone */}
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Delegate Name"
-              value={delegate}
-              onChange={e => setDelegate(e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Delegate Phone"
-              value={delegatePhone}
-              onChange={e => setDelegatePhone(e.target.value)}
-            />
-          </Grid>
-
-          {/* Letter Number */}
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Letter Number"
-              value={letterNumber}
-              onChange={e => setLetterNumber(e.target.value)}
-            />
-          </Grid>
-
-          {/* Customer Type (spans full) */}
-          <Grid item xs={12}>
-            <TextField
-              select
-              fullWidth
-              label="Customer Type"
-              value={customerType}
-              onChange={handleCustomerTypeChange}
-            >
-              <MenuItem value="Cash">Cash Sale</MenuItem>
-              <MenuItem value="Credit">Credit Sale</MenuItem>
-            </TextField>
-          </Grid>
-
-          {/* Dynamic Buttons and Fields based on Customer Type */}
-          {customerType === 'Cash' && (
-            <>
+              {/* Customer Type */}
               <Grid item xs={12}>
                 <TextField
                   select
                   fullWidth
-                  label="Assign O2C Officer"
-                  value={selectedOfficer}
-                  onChange={e => setSelectedOfficer(e.target.value)}
+                  label="Customer Type"
+                  value={customerType}
+                  onChange={handleCustomerTypeChange}
+                  className="form-field"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                      }
+                    }
+                  }}
                 >
-                  {filteredO2cOfficers.map(officer => (
-                    <MenuItem key={officer.id} value={officer.id}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{officer.full_name}</span>
-                        <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                          ({assignedCustomerCounts[officer.id] || 0})
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
+                  <MenuItem value="Cash">Cash Sale</MenuItem>
+                  <MenuItem value="Credit">Credit Sale</MenuItem>
                 </TextField>
               </Grid>
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  size="large"
-                  onClick={() => handleSubmit('O2C')}
-                >
-                  Register & Forward to O2C Officer
-                </Button>
-              </Grid>
-            </>
-          )}
 
-          {customerType === 'Credit' && !showCreditO2cSelect && (
-            <>
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  size="large"
-                  onClick={() => setShowCreditO2cSelect(true)}
-                >
-                  Register & Forward to O2C Officer
-                </Button>
-              </Grid>
-            </>
-          )}
+              {/* Dynamic Officer Selection and Buttons */}
+              {customerType === 'Cash' && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Assign O2C Officer"
+                      value={selectedOfficer}
+                      onChange={e => setSelectedOfficer(e.target.value)}
+                      className="form-field"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          }
+                        }
+                      }}
+                    >
+                      {filteredO2cOfficers.map(officer => (
+                        <MenuItem key={officer.id} value={officer.id}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                            <span>{officer.full_name}</span>
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                              ({assignedCustomerCounts[officer.id] || 0})
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      onClick={() => handleSubmit('O2C')}
+                      className="enhanced-button"
+                      sx={{ py: 2 }}
+                    >
+                      Register & Forward to O2C Officer
+                    </Button>
+                  </Grid>
+                </>
+              )}
 
-          {customerType === 'Credit' && showCreditO2cSelect && (
-            <>
-              <Grid item xs={12}>
-                <TextField
-                  select
-                  fullWidth
-                  label="Choose O2C Officer"
-                  value={selectedOfficer}
-                  onChange={e => setSelectedOfficer(e.target.value)}
-                >
-                  {filteredO2cOfficers.map(officer => (
-                    <MenuItem key={officer.id} value={officer.id}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                        <span>{officer.full_name}</span>
-                        <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
-                          ({assignedCustomerCounts[officer.id] || 0})
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  size="large"
-                  onClick={() => handleSubmit('O2C')}
-                >
-                  Finalize Registration
-                </Button>
-              </Grid>
-            </>
-          )}
-        </Grid>
-      </Paper>
-      
-      <Snackbar
-        open={snackbarOpen}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
-    </Box>
+              {customerType === 'Credit' && !showCreditO2cSelect && (
+                <Grid item xs={12}>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    size="large"
+                    onClick={() => setShowCreditO2cSelect(true)}
+                    className="enhanced-button"
+                    sx={{ py: 2 }}
+                  >
+                    Register & Forward to O2C Officer
+                  </Button>
+                </Grid>
+              )}
+
+              {customerType === 'Credit' && showCreditO2cSelect && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Choose O2C Officer"
+                      value={selectedOfficer}
+                      onChange={e => setSelectedOfficer(e.target.value)}
+                      className="form-field"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                          }
+                        }
+                      }}
+                    >
+                      {filteredO2cOfficers.map(officer => (
+                        <MenuItem key={officer.id} value={officer.id}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                            <span>{officer.full_name}</span>
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                              ({assignedCustomerCounts[officer.id] || 0})
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      onClick={() => handleSubmit('O2C')}
+                      className="enhanced-button"
+                      sx={{ py: 2 }}
+                    >
+                      Finalize Registration
+                    </Button>
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          </Box>
+        </Box>
+        
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </>
   );
 };
 

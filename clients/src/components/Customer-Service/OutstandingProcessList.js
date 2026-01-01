@@ -3,10 +3,16 @@ import axios from 'axios';
 import Swal from 'sweetalert2';
 import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-    Button, Typography, CircularProgress, Box, Chip, Checkbox, IconButton
+    Button, Typography, CircularProgress, Box, Chip, Checkbox, IconButton,
+    Container, Card, CardHeader, Avatar, Stack, Divider, Fade, Tooltip,
+    LinearProgress, Grid
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import PeopleIcon from '@mui/icons-material/People';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { useNavigate } from 'react-router-dom';
  
 const OutstandingCustomers = () => {
@@ -911,58 +917,199 @@ const OutstandingCustomers = () => {
     };
 
     return (
-        <Box p={3}>
-            <Typography variant="h5" gutterBottom>
-                Outstanding Customers
-            </Typography>
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                        <TableRow>
-                            <TableCell>Facility</TableCell>
-                            {jobTitle === 'Queue Manager' && <TableCell>Woreda</TableCell>}
-                            <TableCell>Customer Type</TableCell>
-                            <TableCell>Waiting</TableCell>
-                            {jobTitle === 'EWM Officer' && <TableCell>My ODN</TableCell>}
-                            {jobTitle === 'EWM Officer' && <TableCell>Action</TableCell>}
-                            {jobTitle === 'EWM Officer' && <TableCell>Availability</TableCell>}
+        <>
+            <style>
+                {`
+                    @keyframes fadeInUp {
+                        from {
+                            opacity: 0;
+                            transform: translateY(20px);
+                        }
+                        to {
+                            opacity: 1;
+                            transform: translateY(0);
+                        }
+                    }
+                    .animate-fade-in {
+                        animation: fadeInUp 0.6s ease-out;
+                    }
+                    .outstanding-card {
+                        transition: all 0.3s ease;
+                        backdrop-filter: blur(10px);
+                        background: rgba(255, 255, 255, 0.95);
+                        border-radius: 20px;
+                        border: 1px solid rgba(25, 118, 210, 0.1);
+                    }
+                    .outstanding-card:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+                    }
+                    .header-gradient {
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        padding: 32px;
+                        border-radius: 20px 20px 0 0;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    .header-gradient::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+                        pointer-events: none;
+                    }
+                    .enhanced-table {
+                        border-radius: 16px;
+                        overflow: hidden;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+                    }
+                    .table-header {
+                        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                        border-bottom: 2px solid #e2e8f0;
+                    }
+                    .table-row {
+                        transition: all 0.2s ease;
+                        border-bottom: 1px solid rgba(0,0,0,0.05);
+                    }
+                    .table-row:hover {
+                        background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+                        transform: translateX(4px);
+                    }
+                    .action-button {
+                        border-radius: 12px;
+                        font-weight: 600;
+                        text-transform: none;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    }
+                    .action-button:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+                    }
+                `}
+            </style>
+            <Container maxWidth="xl" sx={{ py: 4 }}>
+                <Card className="outstanding-card animate-fade-in" elevation={0}>
+                    {/* Header Section */}
+                    <Box className="header-gradient">
+                        <Stack direction="row" alignItems="center" spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
+                            <Avatar sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.2)', 
+                                width: 64, 
+                                height: 64,
+                                backdropFilter: 'blur(10px)',
+                                border: '2px solid rgba(255,255,255,0.3)'
+                            }}>
+                                <AssignmentIcon fontSize="large" />
+                            </Avatar>
+                            <Box>
+                                <Typography variant="h3" fontWeight="bold" sx={{ 
+                                    textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                    mb: 1
+                                }}>
+                                    Outstanding Customers
+                                </Typography>
+                                <Typography variant="h6" sx={{ 
+                                    opacity: 0.9, 
+                                    fontWeight: 300,
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                }}>
+                                    Manage and track customer service requests
+                                </Typography>
+                            </Box>
+                        </Stack>
+                    </Box>
 
-                            {/* START: Queue Manager Column Headers */}
-                            {jobTitle === 'Queue Manager' && <TableCell>Current Service Point</TableCell>}
-                            {jobTitle === 'Queue Manager' && <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>My ODN</TableCell>}
-                            {jobTitle === 'Queue Manager' && <TableCell>Availability</TableCell>}
-                            {/* END: Queue Manager Column Headers */}
-
-                            {jobTitle === 'O2C Officer' && <TableCell>Action</TableCell>}
-
-                            {jobTitle === 'Manager' && <TableCell>Current Service Point</TableCell>}
-                            {jobTitle === 'Manager' && <TableCell>Status</TableCell>}
-                            {jobTitle === 'Manager' && <TableCell>Action</TableCell>}
-
-                            {jobTitle === 'Customer Service Officer' && <TableCell>Current Service Point</TableCell>}
-                            {jobTitle === 'Customer Service Officer' && <TableCell>Status</TableCell>}
-                            {jobTitle === 'Customer Service Officer' && <TableCell>Action</TableCell>}
-
-                            {jobTitle === 'Finance' && <TableCell>Current Service Point</TableCell>}
-                            {jobTitle === 'Finance' && <TableCell>Status</TableCell>}
-                            {jobTitle === 'Finance' && <TableCell>Action</TableCell>}
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
+                    {/* Content Section */}
+                    <Box sx={{ p: 4 }}>
                         {loading ? (
-                            <TableRow>
-                                <TableCell colSpan={8} align="center">
-                                    <CircularProgress />
-                                </TableCell>
-                            </TableRow>
-                        ) : filterAndSortCustomers.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={8} align="center">
-                                    No outstanding customers found.
-                                </TableCell>
-                            </TableRow>
+                            <Fade in={loading}>
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    py: 8,
+                                    gap: 3
+                                }}>
+                                    <CircularProgress size={60} thickness={4} />
+                                    <Typography variant="h6" color="text.secondary">
+                                        Loading customer data...
+                                    </Typography>
+                                </Box>
+                            </Fade>
                         ) : (
-                            filterAndSortCustomers.map((customer) => {
+                            <TableContainer component={Paper} className="enhanced-table">
+                                <Table>
+                                    <TableHead className="table-header">
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                                <Stack direction="row" alignItems="center" spacing={1}>
+                                                    <PeopleIcon fontSize="small" />
+                                                    <span>Facility</span>
+                                                </Stack>
+                                            </TableCell>
+                                            {jobTitle === 'Queue Manager' && (
+                                                <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                                    Woreda
+                                                </TableCell>
+                                            )}
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                                Customer Type
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                                <Stack direction="row" alignItems="center" spacing={1}>
+                                                    <TrendingUpIcon fontSize="small" />
+                                                    <span>Waiting</span>
+                                                </Stack>
+                                            </TableCell>
+                                            {jobTitle === 'EWM Officer' && (
+                                                <>
+                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>My ODN</TableCell>
+                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }} align="center">Action</TableCell>
+                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }} align="center">Availability</TableCell>
+                                                </>
+                                            )}
+
+                                            {/* Queue Manager Columns */}
+                                            {jobTitle === 'Queue Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
+                                            {jobTitle === 'Queue Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>My ODN</TableCell>}
+                                            {jobTitle === 'Queue Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Availability</TableCell>}
+
+                                            {jobTitle === 'O2C Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+
+                                            {jobTitle === 'Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
+                                            {jobTitle === 'Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Status</TableCell>}
+                                            {jobTitle === 'Manager' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+
+                                            {jobTitle === 'Customer Service Officer' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
+                                            {jobTitle === 'Customer Service Officer' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Status</TableCell>}
+                                            {jobTitle === 'Customer Service Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+
+                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
+                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Status</TableCell>}
+                                            {jobTitle === 'Finance' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={8} align="center">
+                                                    <CircularProgress />
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : filterAndSortCustomers.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={8} align="center">
+                                                    No outstanding customers found.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            filterAndSortCustomers.map((customer) => {
                                 const { name, woreda } = getFacilityDetails(customer.facility_id);
                                 const normalizedStatus = customer.status ? String(customer.status).trim().toLowerCase() : null;
                                 const isO2CCompleted = customer.next_service_point?.toLowerCase() === 'ewm';
@@ -1230,12 +1377,16 @@ const OutstandingCustomers = () => {
                                         )}
                                     </TableRow>
                                 );
-                            })
-                        )}
-                    </TableBody>
+                                            })
+                                        )}
+                                    </TableBody>
                 </Table>
-            </TableContainer>
-        </Box>
+                            </TableContainer>
+                        )}
+                    </Box>
+                </Card>
+            </Container>
+        </>
     );
 };
 

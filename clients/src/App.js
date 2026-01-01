@@ -10,9 +10,7 @@ import EmployeePage from './pages/Performance-tracking/EmployeePage';
 import EmployeeDetailPage from './pages/Performance-tracking/EmployeeDetailPage';
 import LandingPage2 from './landingPage';
 import RegisterCustomer from './pages/Customer-Service/RegisterCustomerPage';
-import RegisterList from './pages/Customer-Service/RegistrationList';
 import TvRegisterList from './pages/Customer-Service/TvRegistrationListPage';
-import Outstanding from './pages/Customer-Service/OustandingPage';
 import DashboardCustomer from './pages/Customer-Service/DashboardCS';
 import Picklist from './pages/Customer-Service/Picklist';
 import AllPicklist from './pages/Customer-Service/AllPicklists';
@@ -31,6 +29,7 @@ import CustomerAnalytics from './pages/Reports/CustomerAnalytics';
 import FinancialReports from './pages/Reports/FinancialReports';
 import InventoryReports from './pages/Reports/InventoryReports';
 import HealthProgramReports from './pages/Reports/HealthProgramReports';
+import OrganizationProfilePage from './pages/Settings/OrganizationProfilePage';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -54,9 +53,7 @@ const AppContent = () => {
             <Route path = '/all-employee' Component={EmployeePage} />
             <Route path = '/employee-detail/:id' Component={EmployeeDetailPage} />
             <Route path = '/register-customer' Component={RegisterCustomer} />
-            <Route path = '/register-list' Component={RegisterList} />
             <Route path = '/customer-slide' Component={TvRegisterList} />
-            <Route path = '/outstanding' Component={Outstanding} />
             <Route path = '/customer-dashboard' Component={DashboardCustomer} />
             <Route path = '/picklist/:processId' Component={Picklist} />
             <Route path = '/hp-picklist/:processId' Component={HPPicklist} />
@@ -75,6 +72,7 @@ const AppContent = () => {
             <Route path = '/reports/financial' Component={FinancialReports} />
             <Route path = '/reports/inventory' Component={InventoryReports} />
             <Route path = '/reports/health-program' Component={HealthProgramReports} />
+            <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
         </Route>
         
       </Routes>
