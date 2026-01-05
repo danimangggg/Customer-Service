@@ -30,6 +30,16 @@ const odnController = require('../controllers/CustomerService/odnController');
 const facilityController = require('../controllers/CustomerService/facilityController');
 const locationController = require('../controllers/CustomerService/locationController');
 
+//settings
+const vehicleController = require('../controllers/Settings/vehicleController');
+const userManagementController = require('../controllers/Settings/userManagementController');
+
+//reports
+const picklistReportsController = require('../controllers/Reports/picklistReportsController');
+
+//transportation
+const routeManagementController = require('../controllers/Transportation/routeManagementController');
+
 const upload = require("../middleware/upload");
 const uploadPicklist = require("../middleware/uploadPicklist");
 
@@ -81,6 +91,49 @@ let routes =  (app) => {
   router.post('/api/regions', locationController.createRegion);
   router.post('/api/zones', locationController.createZone);
   router.post('/api/woredas', locationController.createWoreda);
+
+  // Vehicle Management routes
+  router.get('/api/vehicles', vehicleController.getAllVehicles);
+  router.get('/api/vehicles/stats', vehicleController.getVehicleStats);
+  router.get('/api/vehicles/available', routeManagementController.getAvailableVehicles);
+  router.get('/api/vehicles/:id', vehicleController.getVehicleById);
+  router.post('/api/vehicles', vehicleController.createVehicle);
+  router.put('/api/vehicles/:id', vehicleController.updateVehicle);
+  router.delete('/api/vehicles/:id', vehicleController.deleteVehicle);
+
+  // User Management routes
+  router.get('/api/users-management', userManagementController.getAllUsers);
+  router.get('/api/users-management/stats', userManagementController.getUserStats);
+  router.get('/api/users-management/:id', userManagementController.getUserById);
+  router.post('/api/users-management', userManagementController.createUser);
+  router.put('/api/users-management/:id', userManagementController.updateUser);
+  router.delete('/api/users-management/:id', userManagementController.deleteUser);
+  router.patch('/api/users-management/:id/status', userManagementController.toggleUserStatus);
+  router.patch('/api/users-management/:id/reset-password', userManagementController.resetUserPassword);
+
+  // Picklist Reports routes
+  router.get('/api/reports/picklists/stats', picklistReportsController.getPicklistStats);
+  router.get('/api/reports/picklists', picklistReportsController.getPicklistReports);
+  router.get('/api/reports/picklists/operators', picklistReportsController.getOperatorPerformance);
+  router.get('/api/reports/picklists/export', picklistReportsController.exportPicklistData);
+
+  // Route Management routes
+  router.get('/api/routes', routeManagementController.getAllRoutes);
+  router.get('/api/drivers/available', routeManagementController.getAvailableDrivers);
+  router.get('/api/deliverers/available', routeManagementController.getAvailableDeliverers);
+  router.post('/api/route-assignments', routeManagementController.createRouteAssignment);
+  router.get('/api/route-assignments', routeManagementController.getRouteAssignments);
+  router.put('/api/route-assignments/:id/status', routeManagementController.updateAssignmentStatus);
+  router.get('/api/route-assignments/stats', routeManagementController.getAssignmentStats);
+
+  // Route CRUD routes
+  const routeController = require('../controllers/Transportation/routeController');
+  router.get('/api/routes-crud', routeController.getAllRoutes);
+  router.get('/api/routes-crud/stats', routeController.getRouteStats);
+  router.get('/api/routes-crud/:id', routeController.getRouteById);
+  router.post('/api/routes-crud', routeController.createRoute);
+  router.put('/api/routes-crud/:id', routeController.updateRoute);
+  router.delete('/api/routes-crud/:id', routeController.deleteRoute);
 
   return app.use("/", router);
 };

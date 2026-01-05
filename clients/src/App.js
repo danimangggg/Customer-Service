@@ -18,6 +18,7 @@ import CompletedPicklists from './pages/Customer-Service/CompletedPicklists';
 import TvDispatch from './pages/Customer-Service/Dispatch/TvDispatchPage';
 import Dispatch from './pages/Customer-Service/Dispatch/DispatchPage';
 import TvCustomer from './pages/Customer-Service/Dispatch/TvCustomerPage';
+import TvMainMenu from './pages/Customer-Service/TvMainMenuPage';
 import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
 import facilityManager from './pages/Customer-Service/HealthProgram/FacilityManagerPage';
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
@@ -29,7 +30,12 @@ import CustomerAnalytics from './pages/Reports/CustomerAnalytics';
 import FinancialReports from './pages/Reports/FinancialReports';
 import InventoryReports from './pages/Reports/InventoryReports';
 import HealthProgramReports from './pages/Reports/HealthProgramReports';
+import PicklistReportsPage from './pages/Reports/PicklistReportsPage';
 import OrganizationProfilePage from './pages/Settings/OrganizationProfilePage';
+import VehicleManagementPage from './pages/Settings/VehicleManagementPage';
+import UserManagementPage from './pages/Settings/UserManagementPage';
+import RouteManagementPage from './pages/Transportation/RouteManagementPage';
+import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -62,6 +68,7 @@ const AppContent = () => {
             <Route path = '/tv-dispatch' Component={TvDispatch} />
             <Route path = '/dispatch' Component={Dispatch} />
             <Route path = '/tvcustomer' Component={TvCustomer} />
+            <Route path = '/tv-main-menu' Component={TvMainMenu} />
             <Route path = '/exit-permit' Component={ExitPermit} />
             <Route path = '/update-facility' Component={facilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
@@ -72,7 +79,12 @@ const AppContent = () => {
             <Route path = '/reports/financial' Component={FinancialReports} />
             <Route path = '/reports/inventory' Component={InventoryReports} />
             <Route path = '/reports/health-program' Component={HealthProgramReports} />
+            <Route path = '/reports/picklists' Component={PicklistReportsPage} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
+            <Route path = '/settings/vehicle-management' Component={VehicleManagementPage} />
+            <Route path = '/settings/user-management' Component={UserManagementPage} />
+            <Route path = '/transportation/route-management' Component={RouteManagementPage} />
+            <Route path = '/transportation/routes' Component={RouteManagementCRUDPage} />
         </Route>
         
       </Routes>

@@ -36,7 +36,12 @@ import {
   TrendingUp,
   Analytics,
   Settings,
-  Business
+  Business,
+  Tv,
+  DirectionsCar,
+  ManageAccounts,
+  LocalShipping,
+  Route
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -44,9 +49,11 @@ const drawerWidth = 260;
 const Sidebar = () => {
   const [reportsOpen, setReportsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [transportationOpen, setTransportationOpen] = useState(false);
 
   const handleReportsToggle = () => setReportsOpen(!reportsOpen);
   const handleSettingsToggle = () => setSettingsOpen(!settingsOpen);
+  const handleTransportationToggle = () => setTransportationOpen(!transportationOpen);
 
   const signOut = () => {
     localStorage.clear();
@@ -275,40 +282,38 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* TV Slide - for all users */}
-         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
-           <MenuTooltip title={"TV Slide"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/customer-slide"
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
+         {/* TV Main Menu - for all authenticated users */}
+         <MenuTooltip title={"TV Main Menu"}>
+           <ListItem 
+             button 
+             component={Link} 
+             to="/tv-main-menu"
+             sx={{
+               borderRadius: 2,
+               mx: 1,
+               mb: 1,
+               '&:hover': {
+                 bgcolor: 'rgba(25, 118, 210, 0.1)',
+                 transform: 'translateX(4px)',
                  transition: 'all 0.2s ease'
-               }}
-             >
-               <ListItemIcon>
-                 <Task sx={{ color: '#f44336' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"TV Slide"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
+               },
+               transition: 'all 0.2s ease'
+             }}
+           >
+             <ListItemIcon>
+               <Tv sx={{ color: '#2196f3' }} />
+             </ListItemIcon>
+             <ListItemText 
+               primary={"TV Main Menu"} 
+               sx={{ 
+                 '& .MuiListItemText-primary': { 
+                   fontWeight: 500,
+                   fontSize: '0.95rem'
+                 } 
+               }} 
+             />
+           </ListItem>
+         </MenuTooltip>
 
          {/* Customer Registration - for all users */}
          {(isAdmin || jobTitle === "Customer Service Officer") && (
@@ -411,6 +416,176 @@ const Sidebar = () => {
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,
                        fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Vehicle Management */}
+             <MenuTooltip title={"Vehicle Management"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/settings/vehicle-management"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <DirectionsCar sx={{ color: '#2196f3', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Vehicle Management"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* User Management */}
+             <MenuTooltip title={"User Management"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/settings/user-management"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <ManageAccounts sx={{ color: '#9c27b0', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"User Management"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+           </List>
+         </Collapse>
+
+         {/* Transportation Menu - for TM Managers */}
+         {(jobTitle === "TM Manager") && (
+           <MenuTooltip title={"Transportation"}>
+             <ListItem 
+               button 
+               onClick={handleTransportationToggle}
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 bgcolor: transportationOpen ? 'rgba(25, 118, 210, 0.1)' : 'transparent',
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                 },
+                 transition: 'all 0.2s ease-in-out',
+               }}
+             >
+               <ListItemIcon>
+                 <LocalShipping sx={{ color: '#607d8b' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Transportation"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontSize: '0.875rem',
+                     fontWeight: 500,
+                   } 
+                 }} 
+               />
+               {transportationOpen ? <ExpandLess /> : <ExpandMore />}
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Transportation Sub-menu */}
+         <Collapse in={transportationOpen} timeout="auto" unmountOnExit>
+           <List component="div" disablePadding sx={{ pl: 2 }}>
+             {/* Route Management */}
+             <MenuTooltip title={"Route Management"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/transportation/route-management"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.08)',
+                     transform: 'translateX(4px)',
+                   },
+                   transition: 'all 0.2s ease-in-out',
+                 }}
+               >
+                 <ListItemIcon>
+                   <Assignment sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Route Assignment"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontSize: '0.8rem',
+                       fontWeight: 400,
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Routes CRUD */}
+             <MenuTooltip title={"Routes"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/transportation/routes"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.08)',
+                     transform: 'translateX(4px)',
+                   },
+                   transition: 'all 0.2s ease-in-out',
+                 }}
+               >
+                 <ListItemIcon>
+                   <Route sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Routes"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontSize: '0.8rem',
+                       fontWeight: 400,
                      } 
                    }} 
                  />
@@ -657,6 +832,39 @@ const Sidebar = () => {
                  </ListItem>
                </MenuTooltip>
              )}
+
+             {/* Picklist Reports */}
+             <MenuTooltip title={"Picklist Reports"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/picklists"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <Assignment sx={{ color: '#9c27b0', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Picklist Reports"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
            </List>
          </Collapse>
 
