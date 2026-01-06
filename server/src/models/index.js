@@ -36,7 +36,7 @@ db.region = require("./CustomerService/region.js")(sequelize, Sequelize);
 db.zone = require("./CustomerService/zone.js")(sequelize, Sequelize);
 db.woreda = require("./CustomerService/woreda.js")(sequelize, Sequelize);
 
-// Settings models
+// Settings models (includes vehicle)
 db.vehicle = require("./Settings/vehicle.js")(sequelize, Sequelize);
 
 // Transportation models

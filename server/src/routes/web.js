@@ -84,6 +84,7 @@ let routes =  (app) => {
   router.get('/api/facilities/:id', facilityController.getFacilityById);
   router.post('/api/facilities', facilityController.createFacility);
   router.put('/api/facilities/:id', facilityController.updateFacility);
+  router.put('/api/update-facilities/:id', facilityController.updateFacility); // Alternative endpoint for FacilityManager
   router.delete('/api/facilities/:id', facilityController.deleteFacility);
   router.get('/api/regions', locationController.getRegions);
   router.get('/api/zones', locationController.getZones);
@@ -94,6 +95,10 @@ let routes =  (app) => {
 
   // Vehicle Management routes
   router.get('/api/vehicles', vehicleController.getAllVehicles);
+  router.get('/api/vehicles/:id', vehicleController.getVehicleById);
+  router.post('/api/vehicles', vehicleController.createVehicle);
+  router.put('/api/vehicles/:id', vehicleController.updateVehicle);
+  router.delete('/api/vehicles/:id', vehicleController.deleteVehicle);
   router.get('/api/vehicles/stats', vehicleController.getVehicleStats);
   router.get('/api/vehicles/available', routeManagementController.getAvailableVehicles);
   router.get('/api/vehicles/:id', vehicleController.getVehicleById);

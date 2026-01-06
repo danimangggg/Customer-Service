@@ -38,8 +38,6 @@ import {
   Assignment as AssignmentIcon,
   Search as SearchIcon,
   Edit as EditIcon,
-  LocationOn as LocationIcon,
-  Flag as PriorityIcon,
   CheckCircle as CompletedIcon,
   PlayArrow as InProgressIcon,
   Pause as AssignedIcon,
@@ -47,7 +45,6 @@ import {
   AccessTime as DelayedIcon
 } from '@mui/icons-material';
 import axios from 'axios';
-import dayjs from 'dayjs';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -67,7 +64,6 @@ const RouteManagement = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -75,13 +71,10 @@ const RouteManagement = () => {
     vehicle_id: '',
     driver_id: '',
     deliverer_id: '',
-    scheduled_date: '',
-    priority: 'Medium',
     notes: ''
   });
 
   const statusOptions = ['Assigned', 'In Progress', 'Completed', 'Cancelled', 'Delayed'];
-  const priorityOptions = ['Low', 'Medium', 'High', 'Urgent'];
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -90,7 +83,7 @@ const RouteManagement = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [page, rowsPerPage, searchTerm, filterStatus, filterPriority]);
+  }, [page, rowsPerPage, searchTerm, filterStatus]);
 
   useEffect(() => {
     fetchRoutes();
@@ -101,20 +94,32 @@ const RouteManagement = () => {
 
   const fetchAssignments = async () => {
     try {
+      console.log('Fetching assignments with params:', {
+        page: page + 1,
+        limit: rowsPerPage,
+        search: searchTerm,
+        status: filterStatus
+      });
+      
       const response = await axios.get(`${API_URL}/api/route-assignments`, {
         params: {
           page: page + 1,
           limit: rowsPerPage,
           search: searchTerm,
-          status: filterStatus,
-          priority: filterPriority
+          status: filterStatus
         }
       });
-      setAssignments(response.data.assignments);
-      setTotalCount(response.data.totalCount);
+      
+      console.log('Assignments response:', response.data);
+      setAssignments(response.data.assignments || []);
+      setTotalCount(response.data.totalCount || 0);
     } catch (error) {
       console.error('Error fetching assignments:', error);
+      console.error('Error details:', error.response?.data);
       showSnackbar('Failed to fetch route assignments', 'error');
+      // Set empty arrays to prevent UI issues
+      setAssignments([]);
+      setTotalCount(0);
     }
   };
 
@@ -150,9 +155,15 @@ const RouteManagement = () => {
 
   const fetchVehicles = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/vehicles/available`);
+      const response = await axios.get(`${API_URL}/api/vehicles`);
       console.log('Vehicles fetched:', response.data);
-      setVehicles(response.data);
+      // Handle both response formats: direct array or { vehicles: [...] }
+      const vehiclesData = response.data.vehicles || response.data;
+      // Filter for active vehicles only
+      const activeVehicles = Array.isArray(vehiclesData) 
+        ? vehiclesData.filter(vehicle => vehicle.status === 'Active')
+        : [];
+      setVehicles(activeVehicles);
     } catch (error) {
       console.error('Error fetching vehicles:', error);
     }
@@ -200,8 +211,6 @@ const RouteManagement = () => {
       vehicle_id: '',
       driver_id: '',
       deliverer_id: '',
-      scheduled_date: '',
-      priority: 'Medium',
       notes: ''
     });
     setOpenDialog(true);
@@ -234,16 +243,6 @@ const RouteManagement = () => {
       case 'Cancelled': return <CancelledIcon />;
       case 'Delayed': return <DelayedIcon />;
       default: return <AssignmentIcon />;
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'Low': return 'success';
-      case 'Medium': return 'info';
-      case 'High': return 'warning';
-      case 'Urgent': return 'error';
-      default: return 'default';
     }
   };
 
@@ -449,7 +448,7 @@ const RouteManagement = () => {
 
             {/* Filters */}
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
                   placeholder="Search routes, locations..."
@@ -464,7 +463,7 @@ const RouteManagement = () => {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>Status</InputLabel>
                   <Select
@@ -475,21 +474,6 @@ const RouteManagement = () => {
                     <MenuItem value="">All Status</MenuItem>
                     {statusOptions.map((status) => (
                       <MenuItem key={status} value={status}>{status}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth>
-                  <InputLabel>Priority</InputLabel>
-                  <Select
-                    value={filterPriority}
-                    label="Priority"
-                    onChange={(e) => setFilterPriority(e.target.value)}
-                  >
-                    <MenuItem value="">All Priorities</MenuItem>
-                    {priorityOptions.map((priority) => (
-                      <MenuItem key={priority} value={priority}>{priority}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -514,9 +498,7 @@ const RouteManagement = () => {
                     <TableCell>Vehicle</TableCell>
                     <TableCell>Driver</TableCell>
                     <TableCell>Deliverer</TableCell>
-                    <TableCell>Priority</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell>Scheduled</TableCell>
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
@@ -562,25 +544,11 @@ const RouteManagement = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          icon={<PriorityIcon />}
-                          label={assignment.priority}
-                          color={getPriorityColor(assignment.priority)}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
                           icon={getStatusIcon(assignment.status)}
                           label={assignment.status}
                           color={getStatusColor(assignment.status)}
                           size="small"
                         />
-                      </TableCell>
-                      <TableCell>
-                        {assignment.scheduled_date ? 
-                          dayjs(assignment.scheduled_date).format('MMM DD, YYYY') : 
-                          'Not scheduled'
-                        }
                       </TableCell>
                       <TableCell align="center">
                         <IconButton
@@ -717,32 +685,6 @@ const RouteManagement = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Scheduled Date"
-                  type="datetime-local"
-                  value={formData.scheduled_date}
-                  onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Priority</InputLabel>
-                  <Select
-                    value={formData.priority}
-                    label="Priority"
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  >
-                    {priorityOptions.map((priority) => (
-                      <MenuItem key={priority} value={priority}>{priority}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -768,8 +710,24 @@ const RouteManagement = () => {
           open={snackbar.open}
           autoHideDuration={6000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          sx={{ 
+            '& .MuiSnackbarContent-root': {
+              marginRight: '20px',
+              marginBottom: '20px'
+            },
+            '& .MuiAlert-root': {
+              marginRight: '20px',
+              marginBottom: '20px'
+            },
+            zIndex: 9999
+          }}
         >
-          <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          <Alert 
+            severity={snackbar.severity} 
+            onClose={() => setSnackbar({ ...snackbar, open: false })}
+            sx={{ minWidth: '300px' }}
+          >
             {snackbar.message}
           </Alert>
         </Snackbar>

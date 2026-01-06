@@ -236,7 +236,7 @@ const getRouteAssignments = async (req, res) => {
         {
           model: Route,
           as: 'route',
-          attributes: ['id', 'route_name', 'start_location', 'end_location']
+          attributes: ['id', 'route_name']
         },
         {
           model: Vehicle,
@@ -246,12 +246,12 @@ const getRouteAssignments = async (req, res) => {
         {
           model: Employee,
           as: 'driver',
-          attributes: ['id', 'full_name', 'phone']
+          attributes: ['id', 'full_name']
         },
         {
           model: Employee,
           as: 'deliverer',
-          attributes: ['id', 'full_name', 'phone']
+          attributes: ['id', 'full_name']
         },
         {
           model: Employee,

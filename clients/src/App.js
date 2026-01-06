@@ -32,10 +32,10 @@ import InventoryReports from './pages/Reports/InventoryReports';
 import HealthProgramReports from './pages/Reports/HealthProgramReports';
 import PicklistReportsPage from './pages/Reports/PicklistReportsPage';
 import OrganizationProfilePage from './pages/Settings/OrganizationProfilePage';
-import VehicleManagementPage from './pages/Settings/VehicleManagementPage';
 import UserManagementPage from './pages/Settings/UserManagementPage';
 import RouteManagementPage from './pages/Transportation/RouteManagementPage';
 import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
+import VehicleManagement from './components/Transportation/VehicleManagement';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -81,10 +81,10 @@ const AppContent = () => {
             <Route path = '/reports/health-program' Component={HealthProgramReports} />
             <Route path = '/reports/picklists' Component={PicklistReportsPage} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
-            <Route path = '/settings/vehicle-management' Component={VehicleManagementPage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />
             <Route path = '/transportation/route-management' Component={RouteManagementPage} />
             <Route path = '/transportation/routes' Component={RouteManagementCRUDPage} />
+            <Route path = '/transportation/vehicle-management' Component={VehicleManagement} />
         </Route>
         
       </Routes>

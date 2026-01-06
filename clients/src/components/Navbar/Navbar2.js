@@ -422,39 +422,6 @@ const Sidebar = () => {
                </ListItem>
              </MenuTooltip>
 
-             {/* Vehicle Management */}
-             <MenuTooltip title={"Vehicle Management"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/settings/vehicle-management"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <DirectionsCar sx={{ color: '#2196f3', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Vehicle Management"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.9rem'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
-
              {/* User Management */}
              <MenuTooltip title={"User Management"}>
                <ListItem 
@@ -582,6 +549,38 @@ const Sidebar = () => {
                  </ListItemIcon>
                  <ListItemText 
                    primary={"Routes"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontSize: '0.8rem',
+                       fontWeight: 400,
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Vehicle Management */}
+             <MenuTooltip title={"Vehicle Management"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/transportation/vehicle-management"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.08)',
+                     transform: 'translateX(4px)',
+                   },
+                   transition: 'all 0.2s ease-in-out',
+                 }}
+               >
+                 <ListItemIcon>
+                   <DirectionsCar sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Vehicle Management"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontSize: '0.8rem',
