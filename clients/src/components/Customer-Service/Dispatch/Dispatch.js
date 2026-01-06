@@ -3,9 +3,8 @@ import axios from 'axios';
 import { 
     Box, Typography, CircularProgress, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button, Chip, Snackbar, Alert,
-    Container, Card, Avatar, Stack, Divider, Fade, Grid
+    Container, Card, Avatar, Stack, Fade
 } from '@mui/material';
-import dayjs from 'dayjs';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import NotificationsIcon from '@mui/icons-material/Notifications';
@@ -13,7 +12,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const DispatcherAccount = () => {
     const [dispatchList, setDispatchList] = useState([]);
@@ -32,6 +31,8 @@ const DispatcherAccount = () => {
     // 1. Initialize Store Info and dynamic column keys
     useEffect(() => {
         const storedStore = localStorage.getItem('store'); 
+        console.log('Stored store from localStorage:', storedStore);
+        
         if (storedStore) {
             const storeId = storedStore.toUpperCase().trim();
             setStore(storeId); 
@@ -40,9 +41,19 @@ const DispatcherAccount = () => {
             if (match) {
                 setStoreCompletionField(`store_completed_${match[1]}`);
                 setOdnKey(`${storeId.toLowerCase()}_odn`); // Sets 'aa1_odn', etc.
+                console.log('Store configuration set:', { storeId, storeCompletionField: `store_completed_${match[1]}`, odnKey: `${storeId.toLowerCase()}_odn` });
+            } else {
+                console.error('Store ID format not recognized:', storeId);
+                setError(`Invalid store format: ${storeId}. Expected format: AA1, AA2, or AA3`);
             }
         } else {
-            setError("Configuration Error: Store ID not found in Local Storage.");
+            console.error('No store found in localStorage');
+            // Set a default store for testing
+            const defaultStore = 'AA1';
+            setStore(defaultStore);
+            setStoreCompletionField('store_completed_1');
+            setOdnKey('aa1_odn');
+            console.log('Using default store configuration:', defaultStore);
         }
     }, []);
 
@@ -50,14 +61,18 @@ const DispatcherAccount = () => {
     useEffect(() => {
         const fetchFacilities = async () => {
             try {
+                console.log('Fetching facilities from:', `${API_URL}/api/facilities`);
                 const response = await axios.get(`${API_URL}/api/facilities`);
+                console.log('Facilities response:', response.data);
                 const map = response.data.reduce((acc, facility) => {
                     acc[facility.id] = facility;
                     return acc;
                 }, {});
                 setFacilitiesMap(map);
+                console.log('Facilities map created:', map);
             } catch (err) {
                 console.error('Error fetching facilities:', err);
+                setError(`Failed to load facilities: ${err.message}`);
             }
         };
         fetchFacilities();
@@ -65,11 +80,21 @@ const DispatcherAccount = () => {
 
     // 3. Fetch and Filter List
     const fetchDispatchList = useCallback(async () => {
-        if (Object.keys(facilitiesMap).length === 0 || !storeCompletionField) return; 
+        console.log('fetchDispatchList called with:', { 
+            facilitiesMapLength: Object.keys(facilitiesMap).length, 
+            storeCompletionField 
+        });
+        
+        if (Object.keys(facilitiesMap).length === 0 || !storeCompletionField) {
+            console.log('Skipping fetch - missing dependencies');
+            return; 
+        }
         
         try {
+            console.log('Fetching service list from:', `${API_URL}/api/serviceList`);
             const response = await axios.get(`${API_URL}/api/serviceList`);
             const allItems = response.data;
+            console.log('Service list response:', allItems);
             
             const filteredItems = allItems.filter(item => {
                 const primaryStatus = (item.status || "").toLowerCase().trim();
@@ -82,21 +107,44 @@ const DispatcherAccount = () => {
                 return isNotDone && (isReadyToStart || isInProgress);
             }).sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
 
+            console.log('Filtered dispatch items:', filteredItems);
             setDispatchList(filteredItems);
         } catch (err) {
             console.error('Error fetching dispatch list:', err);
+            setError(`Failed to load dispatch list: ${err.message}`);
         } finally {
             setLoading(false);
         }
     }, [facilitiesMap, storeCompletionField, TARGET_PRIMARY_STATUSES]);
 
     useEffect(() => {
+        console.log('Main effect triggered with:', { 
+            facilitiesMapLength: Object.keys(facilitiesMap).length, 
+            storeCompletionField 
+        });
+        
         if (Object.keys(facilitiesMap).length > 0 && storeCompletionField) {
             fetchDispatchList();
             const interval = setInterval(fetchDispatchList, 10000);
             return () => clearInterval(interval);
+        } else {
+            // Set a timeout to prevent infinite loading
+            const timeout = setTimeout(() => {
+                if (loading) {
+                    console.log('Loading timeout reached, stopping loading state');
+                    setLoading(false);
+                    if (Object.keys(facilitiesMap).length === 0) {
+                        setError('Failed to load facilities data');
+                    }
+                    if (!storeCompletionField) {
+                        setError('Store configuration not available');
+                    }
+                }
+            }, 10000); // 10 second timeout
+            
+            return () => clearTimeout(timeout);
         }
-    }, [fetchDispatchList, facilitiesMap, storeCompletionField]);
+    }, [fetchDispatchList, facilitiesMap, storeCompletionField, loading]);
 
     // 4. Update Status Logic
     const handleStatusUpdate = async (item, newStatus) => {

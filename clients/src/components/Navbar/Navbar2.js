@@ -144,7 +144,7 @@ const Sidebar = () => {
        <List sx={{ pt: 2, px: 1 }}>
          {/* Outstanding Process (HP Facilities) - for HP Officers */}
          {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
-           <MenuTooltip title={"Outstanding Process"}>
+           <MenuTooltip title={"Outstanding Process (HP)"}>
              <ListItem 
                button 
                component={Link} 
@@ -163,6 +163,76 @@ const Sidebar = () => {
              >
                <ListItemIcon>
                  <Assignment sx={{ color: '#4caf50' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Outstanding Process (HP)"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Outstanding Process (Cash & Credit) - for O2C Officers and EWM Officers */}
+         {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer") && (
+           <MenuTooltip title={"Outstanding Process"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/outstandingProcess"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#ff9800' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Outstanding Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Outstanding Process (Dispatch) - for Dispatchers */}
+         {jobTitle === "Dispatcher" && (
+           <MenuTooltip title={"Outstanding Process"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/dispatch"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#ff9800' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 

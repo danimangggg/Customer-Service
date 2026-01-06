@@ -110,7 +110,7 @@ const UserManagement = () => {
   const departments = ['IT', 'HR', 'Finance', 'Operations', 'Customer Service', 'Logistics', 'Pharmacy', 'Administration'];
   const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
-  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager'];
+  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher'];
   const stores = ['AA1', 'AA2', 'AA3', 'AA4', 'AA5'];
 
   useEffect(() => {

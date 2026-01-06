@@ -36,6 +36,7 @@ import UserManagementPage from './pages/Settings/UserManagementPage';
 import RouteManagementPage from './pages/Transportation/RouteManagementPage';
 import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
 import VehicleManagement from './components/Transportation/VehicleManagement';
+import OutstandingProcessPage from './pages/Customer-Service/OutstandingProcessPage';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -73,6 +74,7 @@ const AppContent = () => {
             <Route path = '/update-facility' Component={facilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
             <Route path = '/hp-facilities' Component={HpFacilities} />
+            <Route path = '/outstandingProcess' Component={OutstandingProcessPage} />
             <Route path = '/reports/dashboard' Component={DashboardAnalytics} />
             <Route path = '/reports/performance' Component={PerformanceReports} />
             <Route path = '/reports/customer-analytics' Component={CustomerAnalytics} />
