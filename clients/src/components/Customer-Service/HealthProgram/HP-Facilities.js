@@ -40,7 +40,8 @@ const HpFacilities = () => {
   const [error, setError] = useState(null);
   
   // Filtering States
-  const [filterRegion, setFilterRegion] = useState("All");
+  const [filterType, setFilterType] = useState("Regular");
+  const [filterRoute, setFilterRoute] = useState("All");
 
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
@@ -53,26 +54,75 @@ const HpFacilities = () => {
   ];
 
   const getCurrentEthiopianMonth = (gDate = new Date()) => {
+    // Ethiopian New Year starts on September 11 (or 12 in leap years)
     const gy = gDate.getFullYear();
+    const gm = gDate.getMonth(); // 0-based (0 = January, 8 = September)
+    const gd = gDate.getDate();
+    
+    // Determine if current Gregorian year is a leap year
     const isLeap = (gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0);
-    const newYear = new Date(gy, 8, isLeap ? 12 : 11);
-    let ethYear, diffDays;
-    if (gDate >= newYear) {
-      ethYear = gy - 7;
-      diffDays = Math.floor((gDate - newYear) / (24 * 60 * 60 * 1000));
+    
+    // Ethiopian New Year date for current Gregorian year
+    const newYearDay = isLeap ? 12 : 11; // September 12 in leap years, September 11 otherwise
+    
+    let ethYear, ethMonthIndex;
+    
+    // Check if we're before or after Ethiopian New Year
+    if (gm > 8 || (gm === 8 && gd >= newYearDay)) {
+      // After Ethiopian New Year - we're in the new Ethiopian year
+      ethYear = gy - 7; // Ethiopian year is 7 years behind after New Year
+      
+      // Calculate days since Ethiopian New Year
+      const newYearDate = new Date(gy, 8, newYearDay); // September 11/12
+      const diffDays = Math.floor((gDate - newYearDate) / (24 * 60 * 60 * 1000));
+      
+      // Each Ethiopian month has 30 days (except Pagume which has 5/6 days)
+      if (diffDays < 360) {
+        ethMonthIndex = Math.floor(diffDays / 30);
+      } else {
+        ethMonthIndex = 12; // Pagume (13th month)
+      }
     } else {
+      // Before Ethiopian New Year - we're still in the previous Ethiopian year
+      ethYear = gy - 8; // Ethiopian year is 8 years behind before New Year
+      
+      // Calculate from previous year's Ethiopian New Year
       const prevIsLeap = ((gy - 1) % 4 === 0 && (gy - 1) % 100 !== 0) || ((gy - 1) % 400 === 0);
-      const prevNewYear = new Date(gy - 1, 8, prevIsLeap ? 12 : 11);
-      ethYear = gy - 8;
-      diffDays = Math.floor((gDate - prevNewYear) / (24 * 60 * 60 * 1000));
+      const prevNewYearDay = prevIsLeap ? 12 : 11;
+      const prevNewYearDate = new Date(gy - 1, 8, prevNewYearDay);
+      const diffDays = Math.floor((gDate - prevNewYearDate) / (24 * 60 * 60 * 1000));
+      
+      if (diffDays < 360) {
+        ethMonthIndex = Math.floor(diffDays / 30);
+      } else {
+        ethMonthIndex = 12; // Pagume
+      }
     }
-    const monthIndex = Math.floor(diffDays / 30);
-    return { year: ethYear, monthIndex: Math.max(0, Math.min(monthIndex, 12)) };
+    
+    // Ensure month index is within valid range
+    ethMonthIndex = Math.max(0, Math.min(ethMonthIndex, 12));
+    
+    const result = { year: ethYear, monthIndex: ethMonthIndex };
+    
+    // Debug logging with actual values
+    console.log('Ethiopian Calendar Debug:', {
+      gregorianDate: gDate.toDateString(),
+      gregorianYear: gy,
+      gregorianMonth: gm + 1, // Convert to 1-based for readability
+      gregorianDay: gd,
+      ethiopianYear: ethYear,
+      ethiopianMonth: ethiopianMonths[ethMonthIndex],
+      ethiopianMonthIndex: ethMonthIndex,
+      isLeapYear: isLeap,
+      newYearDay: newYearDay
+    });
+    
+    return result;
   };
 
   const initialEth = getCurrentEthiopianMonth();
-  const [selectedYear, setSelectedYear] = useState(initialEth.year);
-  const [selectedMonthIndex, setSelectedMonthIndex] = useState(initialEth.monthIndex);
+  const currentEthiopianMonth = ethiopianMonths[initialEth.monthIndex];
+  const currentEthiopianYear = initialEth.year;
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -83,8 +133,8 @@ const HpFacilities = () => {
           axios.get(`${api_url}/api/facilities`),
           axios.get(`${api_url}/api/active-processes`)
         ]);
-        const assigned = (facRes.data || []).filter(f => f.route && f.route.toString().trim().length > 0);
-        setFacilities(assigned);
+        const allFacilities = facRes.data || [];
+        setFacilities(allFacilities); // Store all facilities, not just those with routes
         const processes = procRes.data || [];
         setActiveProcesses(processes);
         
@@ -144,7 +194,7 @@ const HpFacilities = () => {
   // --- START PROCESS ---
   const handleStartProcess = async (facilityId) => {
     try {
-      const reportingMonthStr = `${ethiopianMonths[selectedMonthIndex]} ${selectedYear}`;
+      const reportingMonthStr = `${currentEthiopianMonth} ${currentEthiopianYear}`;
       const payload = {
         facility_id: facilityId,
         service_point: "o2c",
@@ -374,36 +424,96 @@ const HpFacilities = () => {
   };
   // --- COMPLETE PROCESS ---
   const handleCompleteProcess = async (processId) => {
-    const result = await Swal.fire({
-      title: 'Complete Process?',
-      text: 'This will mark the process as completed. You can still manage ODNs after completion.',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Complete',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#4caf50'
-    });
+    // Check if process has any ODNs
+    const odnCount = processODNCounts[processId] || 0;
+    
+    if (odnCount === 0) {
+      // No ODNs added - show alert with options
+      const result = await Swal.fire({
+        title: 'No ODN Numbers Added',
+        text: 'This process has no ODN numbers. How would you like to proceed?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'RRF Not Sent',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#ff9800',
+        cancelButtonColor: '#6c757d'
+      });
 
-    if (result.isConfirmed) {
-      try {
-        await axios.post(`${api_url}/api/complete-process`, { 
-          process_id: processId
-        });
-        
-        // Update the process status in local state
-        setActiveProcesses(prev => 
-          prev.map(p => 
-            p.id === processId 
-              ? { ...p, status: 'o2c_completed' }
-              : p
-          )
-        );
-        
-        Swal.fire('Completed!', 'Process has been marked as completed.', 'success');
-        
-      } catch (err) {
-        console.error('Complete process error:', err);
-        Swal.fire('Error', 'Failed to complete process.', 'error');
+      if (result.isDismissed || !result.isConfirmed) {
+        // User cancelled - do nothing
+        return;
+      }
+
+      if (result.isConfirmed) {
+        // User selected "RRF Not Sent" - add this as ODN and complete
+        try {
+          // First add "RRF not sent" as ODN
+          await axios.post(`${api_url}/api/save-odn`, { 
+            process_id: processId, 
+            odn_number: 'RRF not sent'
+          });
+          
+          // Update ODN count for this process
+          setProcessODNCounts(prev => ({
+            ...prev,
+            [processId]: 1
+          }));
+          
+          // Then complete the process
+          await axios.post(`${api_url}/api/complete-process`, { 
+            process_id: processId
+          });
+          
+          // Update the process status in local state
+          setActiveProcesses(prev => 
+            prev.map(p => 
+              p.id === processId 
+                ? { ...p, status: 'o2c_completed' }
+                : p
+            )
+          );
+          
+          Swal.fire('Completed!', 'Process completed with "RRF not sent" status.', 'success');
+          
+        } catch (err) {
+          console.error('Complete process with RRF error:', err);
+          Swal.fire('Error', 'Failed to complete process.', 'error');
+        }
+      }
+    } else {
+      // Normal completion flow - has ODNs
+      const result = await Swal.fire({
+        title: 'Complete Process?',
+        text: 'This will mark the process as completed. You can still manage ODNs after completion.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Complete',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#4caf50'
+      });
+
+      if (result.isConfirmed) {
+        try {
+          await axios.post(`${api_url}/api/complete-process`, { 
+            process_id: processId
+          });
+          
+          // Update the process status in local state
+          setActiveProcesses(prev => 
+            prev.map(p => 
+              p.id === processId 
+                ? { ...p, status: 'o2c_completed' }
+                : p
+            )
+          );
+          
+          Swal.fire('Completed!', 'Process has been marked as completed.', 'success');
+          
+        } catch (err) {
+          console.error('Complete process error:', err);
+          Swal.fire('Error', 'Failed to complete process.', 'error');
+        }
       }
     }
   };
@@ -519,17 +629,85 @@ const HpFacilities = () => {
   };
 
   // --- FILTERING LOGIC ---
+  // Helper function to determine if current month is even or odd
+  const getCurrentPeriod = () => {
+    const monthIndex = initialEth.monthIndex; // 0-based index
+    const monthNumber = monthIndex + 1; // Convert to 1-based for period calculation
+    return monthNumber % 2 === 0 ? 'even' : 'odd';
+  };
+
+  const currentPeriod = getCurrentPeriod();
+
+  // Helper function to check if facility is HP
+  const isHPFacility = (facility) => {
+    const hasRoute = facility.route && facility.route.toString().trim().length > 0;
+    const hasPeriod = facility.period && facility.period.toString().trim().length > 0;
+    return hasRoute && hasPeriod;
+  };
+
+  // Helper function to check if facility should be visible based on period and type
+  const shouldShowFacility = (facility) => {
+    console.log('Checking facility:', facility.facility_name, {
+      route: facility.route,
+      period: facility.period,
+      isHP: isHPFacility(facility),
+      filterType: filterType
+    });
+
+    if (filterType === "Emergency") {
+      // Emergency: show only HP facilities regardless of period
+      return isHPFacility(facility);
+    }
+    
+    // Regular: apply period-based filtering AND require route assignment
+    if (!facility.route || facility.route.toString().trim().length === 0) {
+      return false; // Regular mode requires route assignment
+    }
+    
+    if (!facility.period) {
+      return false; // Don't show facilities without period set
+    }
+    
+    const facilityPeriod = facility.period.toLowerCase();
+    
+    // Monthly facilities are always shown
+    if (facilityPeriod === 'monthly') {
+      return true;
+    }
+    
+    // Show even period facilities only in even months (Tikimt=2, Tahsas=4, etc.)
+    if (facilityPeriod === 'even' && currentPeriod === 'even') {
+      return true;
+    }
+    
+    // Show odd period facilities only in odd months (Meskerem=1, Hidar=3, etc.)
+    if (facilityPeriod === 'odd' && currentPeriod === 'odd') {
+      return true;
+    }
+    
+    return false;
+  };
+
   // For EWM Officers: Create rows for each ODN instead of each facility
   let filteredData = []; // Initialize as empty array
+  
+  console.log('Debug Info:', {
+    totalFacilities: facilities.length,
+    currentPeriod: currentPeriod,
+    filterType: filterType,
+    currentEthiopianMonth: currentEthiopianMonth,
+    currentEthiopianYear: currentEthiopianYear
+  });
   
   if (isEWMOfficer) {
     // Create a row for each ODN
     facilities.forEach(f => {
       const matchesSearch = (f.facility_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (f.route || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRegion = filterRegion === "All" || f.region_name === filterRegion;
+      const matchesRoute = filterRoute === "All" || f.route === filterRoute;
+      const shouldShow = shouldShowFacility(f);
       
-      if (matchesSearch && matchesRegion) {
+      if (matchesSearch && matchesRoute && shouldShow) {
         const proc = activeProcesses.find(a => a.facility_id === f.id && a.status === 'o2c_completed');
         
         if (proc) {
@@ -555,34 +733,35 @@ const HpFacilities = () => {
     console.log('Total Processes:', activeProcesses.length);
     console.log('O2C Completed Processes:', activeProcesses.filter(p => p.status === 'o2c_completed').length);
     console.log('Filtered Facilities:', filteredData.length);
-    console.log('O2C Completed Processes:', activeProcesses.filter(p => p.status === 'o2c_completed'));
-    console.log('Available Facilities (first 5):', facilities.slice(0, 5).map(f => `Facility ID ${f.id}: ${f.facility_name}`));
-    console.log('Facility-Process Matches:');
-    facilities.slice(0, 5).forEach(f => {
-      const proc = activeProcesses.find(a => a.facility_id === f.id && a.status === 'o2c_completed');
-      console.log(`Facility ${f.id} (${f.facility_name}) - Route: "${f.route}" ${proc ? '✓ Has O2C completed process' : '✗ No O2C completed process'}`);
-    });
-    console.log('Facilities with O2C processes but no route:');
-    activeProcesses.filter(p => p.status === 'o2c_completed').forEach(proc => {
-      const facility = facilities.find(f => f.id === proc.facility_id);
-      if (facility && (!facility.route || facility.route.trim() === '')) {
-        console.log(`Process ${proc.id} - Facility ${facility.id} (${facility.facility_name}) has no route`);
-      }
-    });
+    console.log('Current Period:', currentPeriod);
+    console.log('Filter Type:', filterType);
   } else {
     // O2C Officers: Original facility-based filtering
     filteredData = facilities.filter(f => {
       const matchesSearch = (f.facility_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (f.route || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRegion = filterRegion === "All" || f.region_name === filterRegion;
+      const matchesRoute = filterRoute === "All" || f.route === filterRoute;
+      const shouldShow = shouldShowFacility(f);
       
-      const selReporting = `${ethiopianMonths[selectedMonthIndex]} ${selectedYear}`;
+      const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
       const proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
-      return matchesSearch && matchesRegion && (!proc || proc.status !== 'o2c_completed');
+      return matchesSearch && matchesRoute && shouldShow && (!proc || proc.status !== 'o2c_completed');
+    });
+    
+    console.log('O2C Debug Info:', {
+      totalFacilitiesAfterFilter: filteredData.length,
+      filterRoute: filterRoute,
+      sampleFacilities: facilities.slice(0, 3).map(f => ({
+        name: f.facility_name,
+        route: f.route,
+        period: f.period,
+        shouldShow: shouldShowFacility(f)
+      }))
     });
   }
 
-  const regions = ["All", ...new Set(facilities.map(f => f.region_name).filter(Boolean))];
+  // Get unique routes for filter dropdown
+  const routes = ["All", ...new Set(facilities.map(f => f.route).filter(Boolean))];
 
   // Calculate statistics based on user role
   const totalFacilities = filteredData.length;
@@ -759,14 +938,14 @@ const HpFacilities = () => {
             title={
               <Stack direction="row" alignItems="center" spacing={1}>
                 <FilterListIcon color="primary" />
-                <Typography variant="h6">Filters & Search</Typography>
+                <Typography variant="h6">Filters & Current Period</Typography>
               </Stack>
             }
             sx={{ pb: 1 }}
           />
           <CardContent>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
+            <Grid container spacing={3} alignItems="center">
+              <Grid item xs={12} md={3}>
                 <TextField 
                   placeholder="Search facilities or routes..." 
                   size="small" 
@@ -786,53 +965,54 @@ const HpFacilities = () => {
               <Grid item xs={12} md={2}>
                 <TextField 
                   select 
-                  label="Region" 
+                  label="Route" 
                   size="small" 
                   fullWidth 
-                  value={filterRegion} 
-                  onChange={(e) => setFilterRegion(e.target.value)}
+                  value={filterRoute} 
+                  onChange={(e) => setFilterRoute(e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 >
-                  {regions.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
+                  {routes.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
                 </TextField>
               </Grid>
               <Grid item xs={12} md={2}>
                 <TextField 
                   select 
-                  label="Year" 
+                  label="Type" 
                   size="small" 
                   fullWidth 
-                  value={selectedYear} 
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
+                  value={filterType} 
+                  onChange={(e) => setFilterType(e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 >
-                  {[initialEth.year, initialEth.year - 1, initialEth.year - 2].map(y => 
-                    <MenuItem key={y} value={y}>{y}</MenuItem>
-                  )}
+                  <MenuItem value="Regular">Regular</MenuItem>
+                  <MenuItem value="Emergency">Emergency</MenuItem>
                 </TextField>
               </Grid>
               <Grid item xs={12} md={2}>
-                <TextField 
-                  select 
-                  label="Month" 
-                  size="small" 
-                  fullWidth 
-                  value={selectedMonthIndex} 
-                  onChange={(e) => setSelectedMonthIndex(parseInt(e.target.value, 10))}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                >
-                  {ethiopianMonths.map((m, idx) => 
-                    <MenuItem key={m} value={idx}>{m}</MenuItem>
-                  )}
-                </TextField>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Current Period
+                  </Typography>
+                  <Chip 
+                    label={currentPeriod.toUpperCase()}
+                    color={currentPeriod === 'even' ? 'primary' : 'secondary'}
+                    variant="filled"
+                    sx={{ fontWeight: 'bold', minWidth: 80 }}
+                  />
+                </Box>
               </Grid>
-              <Grid item xs={12} md={2}>
-                <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+              <Grid item xs={12} md={3}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Ethiopian Calendar
+                  </Typography>
                   <Chip 
                     icon={<CalendarTodayIcon />}
-                    label={`${ethiopianMonths[selectedMonthIndex]} ${selectedYear}`}
+                    label={`${currentEthiopianMonth} ${currentEthiopianYear}`}
                     color="primary"
                     variant="outlined"
+                    sx={{ fontWeight: 'bold' }}
                   />
                 </Box>
               </Grid>
@@ -976,7 +1156,7 @@ const HpFacilities = () => {
                   } else {
                     // O2C Officer: Each row is a facility (original logic)
                     const f = item;
-                    const selReporting = `${ethiopianMonths[selectedMonthIndex]} ${selectedYear}`;
+                    const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
                     const proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
                     const isOwner = proc && String(proc.o2c_officer_id) === String(loggedInUserId);
                     const hasODNs = proc && (processODNCounts[proc.id] || 0) > 0;
@@ -1103,7 +1283,7 @@ const HpFacilities = () => {
                                 size="small" 
                                 startIcon={<PlayArrowIcon />} 
                                 onClick={() => handleStartProcess(f.id)} 
-                                disabled={!f.route}
+                                disabled={filterType === "Regular" && !f.route}
                                 className="action-button"
                                 sx={{ borderRadius: 2 }}
                               >

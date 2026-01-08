@@ -128,8 +128,14 @@ let routes =  (app) => {
   router.get('/api/deliverers/available', routeManagementController.getAvailableDeliverers);
   router.post('/api/route-assignments', routeManagementController.createRouteAssignment);
   router.get('/api/route-assignments', routeManagementController.getRouteAssignments);
+  router.put('/api/route-assignments/:id', routeManagementController.updateRouteAssignment);
+  router.delete('/api/route-assignments/:id', routeManagementController.deleteRouteAssignment);
   router.put('/api/route-assignments/:id/status', routeManagementController.updateAssignmentStatus);
   router.get('/api/route-assignments/stats', routeManagementController.getAssignmentStats);
+  
+  // Ready routes (EWM completed routes ready for assignment)
+  router.get('/api/ready-routes', routeManagementController.getReadyRoutes);
+  router.get('/api/ready-routes/stats', routeManagementController.getReadyRoutesStats);
 
   // Route CRUD routes
   const routeController = require('../controllers/Transportation/routeController');
@@ -139,6 +145,38 @@ let routes =  (app) => {
   router.post('/api/routes-crud', routeController.createRoute);
   router.put('/api/routes-crud/:id', routeController.updateRoute);
   router.delete('/api/routes-crud/:id', routeController.deleteRoute);
+
+  // PI Vehicle Request routes
+  const piVehicleRequestController = require('../controllers/CustomerService/piVehicleRequestController');
+  router.get('/api/pi-vehicle-requests', piVehicleRequestController.getPIVehicleRequests);
+  router.get('/api/pi-vehicle-requests/stats', piVehicleRequestController.getPIVehicleRequestStats);
+  router.post('/api/pi-vehicle-requests/request', piVehicleRequestController.submitVehicleRequest);
+  router.delete('/api/pi-vehicle-requests/:route_id', piVehicleRequestController.deleteVehicleRequest);
+
+  // Dispatch Management routes
+  const dispatchController = require('../controllers/Transportation/dispatchController');
+  router.get('/api/dispatch-routes', dispatchController.getDispatchRoutes);
+  router.get('/api/dispatch-routes/stats', dispatchController.getDispatchStats);
+  router.put('/api/route-assignments/:id/complete-dispatch', dispatchController.completeDispatch);
+
+  // Documentation Management routes
+  const documentationController = require('../controllers/Documentation/documentationController');
+  const documentFollowupController = require('../controllers/Documentation/documentFollowupController');
+  router.get('/api/dispatched-odns', documentationController.getDispatchedODNs);
+  router.get('/api/documentation/stats', documentationController.getDocumentationStats);
+  router.put('/api/odns/:id/pod-confirmation', documentationController.updatePODConfirmation);
+  router.put('/api/odns/bulk-pod-confirmation', documentationController.bulkUpdatePODConfirmation);
+
+  // Document Follow-up routes
+  router.get('/api/followup-odns', documentFollowupController.getODNsForFollowup);
+  router.get('/api/followup/stats', documentFollowupController.getFollowupStats);
+  router.put('/api/odns/bulk-followup', documentFollowupController.updateDocumentFollowup);
+
+  // Quality Evaluation routes
+  const qualityEvaluationController = require('../controllers/Quality/qualityEvaluationController');
+  router.get('/api/quality-evaluation-odns', qualityEvaluationController.getODNsForQualityEvaluation);
+  router.get('/api/quality-evaluation/stats', qualityEvaluationController.getQualityEvaluationStats);
+  router.put('/api/odns/bulk-quality-evaluation', qualityEvaluationController.updateQualityEvaluation);
 
   return app.use("/", router);
 };

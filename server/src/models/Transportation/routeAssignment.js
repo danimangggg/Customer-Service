@@ -56,6 +56,15 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'When the route should be executed'
     },
+    ethiopian_month: {
+      type: DataTypes.ENUM(
+        'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
+        'Megabit', 'Miazia', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
+      ),
+      allowNull: false,
+      defaultValue: 'Tir', // Current Ethiopian month (January 2026 = Tir)
+      comment: 'Ethiopian calendar month for the assignment'
+    },
     status: {
       type: DataTypes.ENUM('Assigned', 'In Progress', 'Completed', 'Cancelled', 'Delayed'),
       allowNull: false,

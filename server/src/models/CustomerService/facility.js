@@ -29,6 +29,10 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.STRING,
       allowNull: true,
     },
+    period: {
+      type: Sequelize.ENUM('Odd', 'Even', 'Monthly'),
+      allowNull: true,
+    },
   }, {
     tableName: 'facilities',
     timestamps: true,

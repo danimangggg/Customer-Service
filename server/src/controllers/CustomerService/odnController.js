@@ -2,6 +2,48 @@ const db = require('../../models');
 const ODN = db.odn;
 const Process = db.process;
 
+// Helper function to check and update process status based on ODN completion
+const checkAndUpdateProcessStatus = async (processId) => {
+  try {
+    const allODNs = await ODN.findAll({
+      where: { process_id: processId }
+    });
+
+    const process = await Process.findByPk(processId);
+    if (!process) {
+      return false;
+    }
+
+    if (allODNs.length === 0) {
+      // No ODNs, revert to o2c_completed if currently ewm_completed
+      if (process.status === 'ewm_completed') {
+        await process.update({ status: 'o2c_completed' });
+        console.log(`Process ${processId} reverted from ewm_completed - no ODNs remaining`);
+      }
+      return false;
+    }
+
+    const allCompleted = allODNs.every(odnItem => odnItem.status === 'ewm_completed');
+
+    if (allCompleted && process.status !== 'ewm_completed') {
+      // All ODNs completed, update process to ewm_completed
+      await process.update({ status: 'ewm_completed' });
+      console.log(`Process ${processId} automatically updated to ewm_completed - all ODNs completed`);
+      return true;
+    } else if (!allCompleted && process.status === 'ewm_completed') {
+      // Not all ODNs completed, revert process from ewm_completed
+      await process.update({ status: 'o2c_completed' });
+      console.log(`Process ${processId} reverted from ewm_completed - not all ODNs completed`);
+      return false;
+    }
+
+    return allCompleted;
+  } catch (error) {
+    console.error('Error checking and updating process status:', error);
+    return false;
+  }
+};
+
 const saveODN = async (req, res) => {
   try {
     const { process_id, odn_number } = req.body;
@@ -71,7 +113,7 @@ const getODNsByProcess = async (req, res) => {
 const updateODN = async (req, res) => {
   try {
     const { id } = req.params;
-    const { odn_number } = req.body;
+    const { odn_number, status } = req.body;
     
     if (!id || !odn_number) {
       return res.status(400).send({ 
@@ -86,7 +128,17 @@ const updateODN = async (req, res) => {
       });
     }
 
-    await odn.update({ odn_number: odn_number.trim() });
+    const updateData = { odn_number: odn_number.trim() };
+    if (status !== undefined) {
+      updateData.status = status;
+    }
+
+    await odn.update(updateData);
+
+    // If status was updated, check and update process status
+    if (status !== undefined) {
+      await checkAndUpdateProcessStatus(odn.process_id);
+    }
 
     return res.status(200).send({ 
       message: 'ODN updated successfully',
@@ -112,9 +164,22 @@ const deleteODN = async (req, res) => {
       });
     }
 
+    // Get the ODN before deleting to know which process it belongs to
+    const odn = await ODN.findByPk(id);
+    if (!odn) {
+      return res.status(404).send({ 
+        message: 'ODN not found' 
+      });
+    }
+
+    const processId = odn.process_id;
+    
     const deleted = await ODN.destroy({ where: { id } });
     
     if (deleted) {
+      // Check and update process status after deletion
+      await checkAndUpdateProcessStatus(processId);
+
       return res.status(200).send({ 
         message: 'ODN deleted successfully',
         odn_id: id 
@@ -265,9 +330,13 @@ const completeODN = async (req, res) => {
     // Update ODN status to ewm_completed
     await odn.update({ status: 'ewm_completed' });
 
+    // Check and update process status if needed
+    const processAutoCompleted = await checkAndUpdateProcessStatus(odn.process_id);
+
     return res.status(200).send({ 
       message: 'ODN completed successfully',
-      data: odn 
+      data: odn,
+      processAutoCompleted
     });
 
   } catch (err) {

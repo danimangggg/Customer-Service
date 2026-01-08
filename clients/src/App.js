@@ -22,7 +22,13 @@ import TvMainMenu from './pages/Customer-Service/TvMainMenuPage';
 import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
 import facilityManager from './pages/Customer-Service/HealthProgram/FacilityManagerPage';
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
-import HpFacilities from './pages/Customer-Service/HealthProgram/HP-FacilitiesPage';
+import HPFacilitiesCS from './components/Customer-Service/HealthProgram/HP-Facilities';
+import PIVehicleRequests from './components/Customer-Service/HealthProgram/PIVehicleRequests';
+import DispatchManagement from './components/Transportation/DispatchManagement';
+import DocumentationManagement from './components/Documentation/DocumentationManagement';
+import DocumentFollowup from './components/Documentation/DocumentFollowup';
+import QualityEvaluation from './components/Quality/QualityEvaluation';
+import HPFacilitiesTransport from './components/Transportation/HPFacilities';
 import HPPicklist from './pages/Customer-Service/HealthProgram/HP-PicklistPage';
 import DashboardAnalytics from './pages/Reports/DashboardAnalytics';
 import PerformanceReports from './pages/Reports/PerformanceReports';
@@ -31,6 +37,7 @@ import FinancialReports from './pages/Reports/FinancialReports';
 import InventoryReports from './pages/Reports/InventoryReports';
 import HealthProgramReports from './pages/Reports/HealthProgramReports';
 import PicklistReportsPage from './pages/Reports/PicklistReportsPage';
+import OrganizationProfileView from './components/Reports/OrganizationProfileView';
 import OrganizationProfilePage from './pages/Settings/OrganizationProfilePage';
 import UserManagementPage from './pages/Settings/UserManagementPage';
 import RouteManagementPage from './pages/Transportation/RouteManagementPage';
@@ -73,7 +80,13 @@ const AppContent = () => {
             <Route path = '/exit-permit' Component={ExitPermit} />
             <Route path = '/update-facility' Component={facilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
-            <Route path = '/hp-facilities' Component={HpFacilities} />
+            <Route path = '/hp-facilities' Component={HPFacilitiesCS} />
+            <Route path = '/pi-vehicle-requests' Component={PIVehicleRequests} />
+            <Route path = '/dispatch-management' Component={DispatchManagement} />
+            <Route path = '/documentation-management' Component={DocumentationManagement} />
+            <Route path = '/document-followup' Component={DocumentFollowup} />
+            <Route path = '/quality-evaluation' Component={QualityEvaluation} />
+            <Route path = '/transportation/hp-facilities' Component={HPFacilitiesTransport} />
             <Route path = '/outstandingProcess' Component={OutstandingProcessPage} />
             <Route path = '/reports/dashboard' Component={DashboardAnalytics} />
             <Route path = '/reports/performance' Component={PerformanceReports} />
@@ -82,6 +95,7 @@ const AppContent = () => {
             <Route path = '/reports/inventory' Component={InventoryReports} />
             <Route path = '/reports/health-program' Component={HealthProgramReports} />
             <Route path = '/reports/picklists' Component={PicklistReportsPage} />
+            <Route path = '/reports/organization-profile' Component={OrganizationProfileView} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />
             <Route path = '/transportation/route-management' Component={RouteManagementPage} />

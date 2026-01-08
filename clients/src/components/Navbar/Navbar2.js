@@ -41,7 +41,8 @@ import {
   DirectionsCar,
   ManageAccounts,
   LocalShipping,
-  Route
+  Route,
+  Description
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -177,6 +178,7 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
+
          {/* Outstanding Process (Cash & Credit) - for O2C Officers and EWM Officers */}
          {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer") && (
            <MenuTooltip title={"Outstanding Process"}>
@@ -201,6 +203,181 @@ const Sidebar = () => {
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Outstanding Process (PI Vehicle Requests) - for PI Officer HP */}
+         {jobTitle === "PI Officer-HP" && (
+           <MenuTooltip title={"Outstanding Process"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/pi-vehicle-requests"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#ff9800' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Outstanding Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Dispatch Management - for Dispatcher HP */}
+         {jobTitle === "Dispatcher - HP" && (
+           <MenuTooltip title={"Dispatch Management"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/dispatch-management"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <LocalShipping sx={{ color: '#4caf50' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Dispatch Management"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Documentation Management - for Documentation Officer */}
+         {jobTitle === "Documentation Officer" && (
+           <MenuTooltip title={"Documentation Management"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/documentation-management"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Description sx={{ color: '#9c27b0' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Documentation Management"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Document Follow-up - for Documentation Follower */}
+         {jobTitle === "Documentation Follower" && (
+           <MenuTooltip title={"Document Follow-up"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/document-followup"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#2196f3' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Document Follow-up"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Quality Evaluation - for Quality Evaluator */}
+         {jobTitle === "Quality Evaluator" && (
+           <MenuTooltip title={"Quality Evaluation"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/quality-evaluation"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#4caf50' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Quality Evaluation"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
@@ -317,8 +494,8 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Picklists - for non-HP officers */}
-         {!(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (jobTitle === "WIM Operator" || jobTitle === "Queue Manager" || isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
+         {/* Picklists - for WIM Operator only */}
+         {jobTitle === "WIM Operator" && (
            <MenuTooltip title={"Picklists"}>
              <ListItem 
                button 
@@ -420,8 +597,8 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Settings Menu - for admins, managers, coordinators, and customer service officers */}
-         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "Customer Service Officer") && (
+         {/* Settings Menu - for Admin users only */}
+         {isAdmin && (
            <MenuTooltip title={"Settings"}>
              <ListItem 
                button 
@@ -651,6 +828,38 @@ const Sidebar = () => {
                  </ListItemIcon>
                  <ListItemText 
                    primary={"Vehicle Management"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontSize: '0.8rem',
+                       fontWeight: 400,
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* HP Facilities */}
+             <MenuTooltip title={"HP Facilities"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/transportation/hp-facilities"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.08)',
+                     transform: 'translateX(4px)',
+                   },
+                   transition: 'all 0.2s ease-in-out',
+                 }}
+               >
+                 <ListItemIcon>
+                   <LocalHospital sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"HP Facilities"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontSize: '0.8rem',
@@ -925,6 +1134,39 @@ const Sidebar = () => {
                  </ListItemIcon>
                  <ListItemText 
                    primary={"Picklist Reports"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Organization Profile - View Only for all users */}
+             <MenuTooltip title={"Organization Profile"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/organization-profile"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <Business sx={{ color: '#795548', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Organization Profile"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,
