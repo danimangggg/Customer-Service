@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -16,114 +17,149 @@ import {
   TableHead,
   TableRow,
   Paper,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Divider
+  CircularProgress,
+  Alert,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  TextField
 } from '@mui/material';
 import {
   LocalHospital,
   TrendingUp,
   TrendingDown,
-  People,
+  Business,
   Assignment,
   CheckCircle,
-  Schedule,
+  Description,
   LocationOn,
-  MedicalServices,
-  Healing,
   HealthAndSafety
 } from '@mui/icons-material';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
 
 const HealthProgramReports = () => {
-  // Sample health program data
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [analytics, setAnalytics] = useState({});
+  const [facilities, setFacilities] = useState([]);
+  const [filters, setFilters] = useState({
+    month: '',
+    year: new Date().getFullYear().toString(),
+    region: ''
+  });
+
+  const ethiopianMonths = [
+    'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
+  ];
+
+  const colors = ['#f44336', '#2196f3', '#4caf50', '#ff9800', '#9c27b0', '#00bcd4'];
+
+  useEffect(() => {
+    fetchData();
+  }, [filters]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [analyticsResponse, facilitiesResponse] = await Promise.all([
+        axios.get(`${API_URL}/api/reports/health-program/analytics`, { params: filters }),
+        axios.get(`${API_URL}/api/reports/health-program/facilities`, { params: filters })
+      ]);
+      
+      setAnalytics(analyticsResponse.data);
+      setFacilities(facilitiesResponse.data);
+    } catch (err) {
+      console.error('Error fetching health program data:', err);
+      setError('Failed to load health program data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress size={60} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="xl" sx={{ mt: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
+    );
+  }
+
   const healthMetrics = [
     {
-      title: 'Active Programs',
-      value: '127',
-      change: '+8.3%',
-      trend: 'up',
+      title: 'HP Facilities',
+      value: analytics.summary?.totalFacilities || 0,
+      change: '+0%',
+      trend: 'neutral',
       icon: <LocalHospital />,
       color: '#f44336'
     },
     {
-      title: 'Enrolled Patients',
-      value: '3,456',
-      change: '+15.7%',
+      title: 'Active Processes',
+      value: analytics.summary?.totalProcesses || 0,
+      change: `${analytics.summary?.processCompletionRate || 0}% completed`,
       trend: 'up',
-      icon: <People />,
+      icon: <Assignment />,
       color: '#2196f3'
     },
     {
-      title: 'Completed Treatments',
-      value: '892',
-      change: '+12.4%',
+      title: 'Total ODNs',
+      value: analytics.summary?.totalODNs || 0,
+      change: `${analytics.summary?.odnCompletionRate || 0}% completed`,
       trend: 'up',
-      icon: <CheckCircle />,
+      icon: <Description />,
       color: '#4caf50'
     },
     {
-      title: 'Success Rate',
-      value: '94.2%',
-      change: '+2.1%',
+      title: 'Completed Processes',
+      value: analytics.summary?.completedProcesses || 0,
+      change: `${analytics.summary?.processCompletionRate || 0}% rate`,
       trend: 'up',
       icon: <HealthAndSafety />,
       color: '#9c27b0'
     }
   ];
 
-  const programTypes = [
-    { type: 'Maternal Health', patients: 1245, percentage: 36.0, color: '#e91e63' },
-    { type: 'Child Immunization', patients: 892, percentage: 25.8, color: '#2196f3' },
-    { type: 'Chronic Disease Management', patients: 567, percentage: 16.4, color: '#4caf50' },
-    { type: 'Mental Health Support', patients: 423, percentage: 12.2, color: '#ff9800' },
-    { type: 'Nutrition Programs', patients: 329, percentage: 9.6, color: '#9c27b0' }
-  ];
-
-  const facilityPerformance = [
-    { facility: 'Black Lion Hospital', programs: 23, patients: 567, completion: 96.2, rating: 'Excellent' },
-    { facility: 'Bethel Medical Center', programs: 18, patients: 423, completion: 94.1, rating: 'Very Good' },
-    { facility: 'St. Paul Hospital', programs: 21, patients: 512, completion: 92.8, rating: 'Very Good' },
-    { facility: 'Tikur Anbessa Hospital', programs: 19, patients: 445, completion: 91.5, rating: 'Good' },
-    { facility: 'Yekatit 12 Hospital', programs: 16, patients: 389, completion: 89.7, rating: 'Good' }
-  ];
-
-  const monthlyProgress = [
-    { month: 'Jan', enrolled: 234, completed: 189, success: 80.8 },
-    { month: 'Feb', enrolled: 267, completed: 223, success: 83.5 },
-    { month: 'Mar', enrolled: 298, completed: 245, success: 82.2 },
-    { month: 'Apr', enrolled: 312, completed: 267, success: 85.6 },
-    { month: 'May', enrolled: 289, completed: 234, success: 81.0 },
-    { month: 'Jun', enrolled: 345, completed: 298, success: 86.4 }
-  ];
-
-  const recentActivities = [
-    { activity: 'New maternal health program launched', facility: 'Black Lion Hospital', time: '2 hours ago', type: 'program' },
-    { activity: 'Immunization campaign completed', facility: 'Bethel Medical Center', time: '4 hours ago', type: 'completion' },
-    { activity: 'Mental health screening started', facility: 'St. Paul Hospital', time: '6 hours ago', type: 'screening' },
-    { activity: 'Nutrition program enrollment opened', facility: 'Tikur Anbessa Hospital', time: '8 hours ago', type: 'enrollment' },
-    { activity: 'Chronic disease follow-up scheduled', facility: 'Yekatit 12 Hospital', time: '1 day ago', type: 'followup' }
-  ];
-
-  const getRatingColor = (rating) => {
-    switch (rating) {
-      case 'Excellent': return 'success';
-      case 'Very Good': return 'info';
-      case 'Good': return 'warning';
-      default: return 'default';
-    }
+  const getRatingColor = (rate) => {
+    if (rate >= 95) return 'success';
+    if (rate >= 85) return 'info';
+    if (rate >= 70) return 'warning';
+    return 'error';
   };
 
-  const getActivityIcon = (type) => {
-    switch (type) {
-      case 'program': return <LocalHospital color="error" />;
-      case 'completion': return <CheckCircle color="success" />;
-      case 'screening': return <MedicalServices color="info" />;
-      case 'enrollment': return <People color="primary" />;
-      case 'followup': return <Schedule color="warning" />;
-      default: return <Assignment color="action" />;
-    }
+  const getRatingText = (rate) => {
+    if (rate >= 95) return 'Excellent';
+    if (rate >= 85) return 'Very Good';
+    if (rate >= 70) return 'Good';
+    return 'Needs Improvement';
   };
 
   return (
@@ -134,9 +170,47 @@ const HealthProgramReports = () => {
           Health Program Reports
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
-          Comprehensive analysis of health programs, patient outcomes, and facility performance
+          Real-time analysis of health program facilities, processes, and performance metrics
         </Typography>
       </Box>
+
+      {/* Filters */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={3}>
+          <FormControl fullWidth>
+            <InputLabel>Ethiopian Month</InputLabel>
+            <Select
+              value={filters.month}
+              label="Ethiopian Month"
+              onChange={(e) => handleFilterChange('month', e.target.value)}
+            >
+              <MenuItem value="">All Months</MenuItem>
+              {ethiopianMonths.map((month) => (
+                <MenuItem key={month} value={month}>{month}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <TextField
+            fullWidth
+            label="Year"
+            type="number"
+            value={filters.year}
+            onChange={(e) => handleFilterChange('year', e.target.value)}
+            inputProps={{ min: 2010, max: 2030 }}
+          />
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <TextField
+            fullWidth
+            label="Region"
+            value={filters.region}
+            onChange={(e) => handleFilterChange('region', e.target.value)}
+            placeholder="Filter by region..."
+          />
+        </Grid>
+      </Grid>
 
       {/* Health Metrics Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -160,16 +234,16 @@ const HealthProgramReports = () => {
                   </Avatar>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="h4" fontWeight="bold">
-                      {metric.value}
+                      {metric.value.toLocaleString()}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       {metric.title}
                     </Typography>
                     <Chip
-                      icon={metric.trend === 'up' ? <TrendingUp /> : <TrendingDown />}
+                      icon={metric.trend === 'up' ? <TrendingUp /> : metric.trend === 'down' ? <TrendingDown /> : <CheckCircle />}
                       label={metric.change}
                       size="small"
-                      color={metric.trend === 'up' ? 'success' : 'error'}
+                      color={metric.trend === 'up' ? 'success' : metric.trend === 'down' ? 'error' : 'info'}
                       variant="outlined"
                     />
                   </Box>
@@ -181,151 +255,97 @@ const HealthProgramReports = () => {
       </Grid>
 
       <Grid container spacing={3}>
-        {/* Program Types Distribution */}
+        {/* Facilities by Region */}
         <Grid item xs={12} md={6}>
-          <Card sx={{ height: 500 }}>
+          <Card sx={{ height: 400 }}>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
-                <Healing color="primary" />
+                <Business color="primary" />
                 <Typography variant="h6" fontWeight="bold">
-                  Program Types Distribution
+                  HP Facilities by Region
                 </Typography>
               </Stack>
               
-              <Box sx={{ mt: 2 }}>
-                {programTypes.map((program, index) => (
-                  <Box key={index} sx={{ mb: 3 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                      <Typography variant="body1" fontWeight="medium">
-                        {program.type}
-                      </Typography>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="body2" color="text.secondary">
-                          {program.patients}
-                        </Typography>
-                        <Typography variant="body2" fontWeight="bold">
-                          {program.percentage}%
-                        </Typography>
-                      </Stack>
-                    </Stack>
-                    <LinearProgress
-                      variant="determinate"
-                      value={program.percentage}
-                      sx={{
-                        height: 12,
-                        borderRadius: 6,
-                        bgcolor: 'rgba(0,0,0,0.1)',
-                        '& .MuiLinearProgress-bar': {
-                          borderRadius: 6,
-                          bgcolor: program.color
-                        }
-                      }}
-                    />
-                  </Box>
-                ))}
-              </Box>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.distributions?.facilitiesByRegion || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="region_name" angle={-45} textAnchor="end" height={80} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#f44336" />
+                </BarChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Monthly Progress & Recent Activities */}
+        {/* Process Status Distribution */}
         <Grid item xs={12} md={6}>
-          <Stack spacing={3}>
-            {/* Monthly Progress */}
-            <Card>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
-                  <Assignment color="primary" />
-                  <Typography variant="h6" fontWeight="bold">
-                    Monthly Progress
-                  </Typography>
-                </Stack>
-                
-                <Box sx={{ mt: 2 }}>
-                  {monthlyProgress.slice(-3).map((month, index) => (
-                    <Box key={index} sx={{ mb: 2 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                        <Typography variant="body2" fontWeight="medium">
-                          {month.month}
-                        </Typography>
-                        <Typography variant="body2" fontWeight="bold" color="success.main">
-                          {month.success}%
-                        </Typography>
-                      </Stack>
-                      <LinearProgress
-                        variant="determinate"
-                        value={month.success}
-                        sx={{
-                          height: 8,
-                          borderRadius: 4,
-                          bgcolor: 'rgba(76, 175, 80, 0.1)',
-                          '& .MuiLinearProgress-bar': {
-                            borderRadius: 4,
-                            bgcolor: '#4caf50'
-                          }
-                        }}
-                      />
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                        {month.completed}/{month.enrolled} completed
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-
-            {/* Recent Activities */}
-            <Card>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                  <Schedule color="primary" />
-                  <Typography variant="h6" fontWeight="bold">
-                    Recent Activities
-                  </Typography>
-                </Stack>
-                
-                <List dense>
-                  {recentActivities.map((activity, index) => (
-                    <Box key={index}>
-                      <ListItem sx={{ px: 0 }}>
-                        <ListItemIcon sx={{ minWidth: 40 }}>
-                          {getActivityIcon(activity.type)}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={
-                            <Typography variant="body2" fontWeight="medium">
-                              {activity.activity}
-                            </Typography>
-                          }
-                          secondary={
-                            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                              <Typography variant="caption" color="primary">
-                                {activity.facility}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {activity.time}
-                              </Typography>
-                            </Stack>
-                          }
-                        />
-                      </ListItem>
-                      {index < recentActivities.length - 1 && <Divider />}
-                    </Box>
-                  ))}
-                </List>
-              </CardContent>
-            </Card>
-          </Stack>
+          <Card sx={{ height: 400 }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                <Assignment color="primary" />
+                <Typography variant="h6" fontWeight="bold">
+                  Process Status Distribution
+                </Typography>
+              </Stack>
+              
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={analytics.distributions?.processStatus || []}
+                    dataKey="count"
+                    nameKey="status"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    fill="#8884d8"
+                    label
+                  >
+                    {(analytics.distributions?.processStatus || []).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
         </Grid>
 
-        {/* Facility Performance Table */}
+        {/* Monthly Process Trend */}
+        <Grid item xs={12}>
+          <Card sx={{ height: 400 }}>
+            <CardContent>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                <TrendingUp color="primary" />
+                <Typography variant="h6" fontWeight="bold">
+                  Monthly HP Process Trend
+                </Typography>
+              </Stack>
+              
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={analytics.trends?.monthlyProcesses || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="reporting_month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#2196f3" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* HP Facility Performance Table */}
         <Grid item xs={12}>
           <Card>
             <CardContent>
               <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
                 <LocationOn color="primary" />
                 <Typography variant="h6" fontWeight="bold">
-                  Health Facility Performance
+                  Health Program Facility Performance
                 </Typography>
               </Stack>
               
@@ -334,41 +354,56 @@ const HealthProgramReports = () => {
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'rgba(244, 67, 54, 0.1)' }}>
                       <TableCell fontWeight="bold">Facility Name</TableCell>
-                      <TableCell align="center" fontWeight="bold">Active Programs</TableCell>
-                      <TableCell align="center" fontWeight="bold">Enrolled Patients</TableCell>
+                      <TableCell fontWeight="bold">Location</TableCell>
+                      <TableCell align="center" fontWeight="bold">Total Processes</TableCell>
+                      <TableCell align="center" fontWeight="bold">Completed</TableCell>
+                      <TableCell align="center" fontWeight="bold">Total ODNs</TableCell>
                       <TableCell align="center" fontWeight="bold">Completion Rate</TableCell>
-                      <TableCell align="center" fontWeight="bold">Performance Rating</TableCell>
+                      <TableCell align="center" fontWeight="bold">Performance</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {facilityPerformance.map((facility, index) => (
+                    {facilities.slice(0, 10).map((facility, index) => (
                       <TableRow key={index} hover>
                         <TableCell>
                           <Stack direction="row" alignItems="center" spacing={1}>
                             <LocalHospital color="action" />
                             <Typography variant="body2" fontWeight="medium">
-                              {facility.facility}
+                              {facility.facility_name}
                             </Typography>
                           </Stack>
                         </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {facility.region_name}, {facility.zone_name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {facility.woreda_name}
+                          </Typography>
+                        </TableCell>
                         <TableCell align="center">
                           <Chip 
-                            label={facility.programs} 
+                            label={facility.total_processes || 0} 
                             color="primary" 
                             variant="outlined" 
                             size="small" 
                           />
                         </TableCell>
                         <TableCell align="center">
+                          <Typography variant="body2" fontWeight="bold" color="success.main">
+                            {facility.completed_processes || 0}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
                           <Typography variant="body2" fontWeight="bold">
-                            {facility.patients}
+                            {facility.total_odns || 0}
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'center' }}>
                             <LinearProgress
                               variant="determinate"
-                              value={facility.completion}
+                              value={facility.completion_rate || 0}
                               sx={{
                                 width: 60,
                                 height: 6,
@@ -376,19 +411,19 @@ const HealthProgramReports = () => {
                                 bgcolor: 'rgba(76, 175, 80, 0.1)',
                                 '& .MuiLinearProgress-bar': {
                                   borderRadius: 3,
-                                  bgcolor: facility.completion > 95 ? '#4caf50' : facility.completion > 90 ? '#ff9800' : '#f44336'
+                                  bgcolor: facility.completion_rate >= 95 ? '#4caf50' : facility.completion_rate >= 85 ? '#2196f3' : facility.completion_rate >= 70 ? '#ff9800' : '#f44336'
                                 }
                               }}
                             />
                             <Typography variant="body2" fontWeight="bold">
-                              {facility.completion}%
+                              {facility.completion_rate || 0}%
                             </Typography>
                           </Box>
                         </TableCell>
                         <TableCell align="center">
                           <Chip 
-                            label={facility.rating} 
-                            color={getRatingColor(facility.rating)} 
+                            label={getRatingText(facility.completion_rate || 0)} 
+                            color={getRatingColor(facility.completion_rate || 0)} 
                             variant="outlined" 
                             size="small" 
                           />

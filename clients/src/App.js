@@ -31,10 +31,8 @@ import QualityEvaluation from './components/Quality/QualityEvaluation';
 import HPFacilitiesTransport from './components/Transportation/HPFacilities';
 import HPPicklist from './pages/Customer-Service/HealthProgram/HP-PicklistPage';
 import DashboardAnalytics from './pages/Reports/DashboardAnalytics';
-import PerformanceReports from './pages/Reports/PerformanceReports';
-import CustomerAnalytics from './pages/Reports/CustomerAnalytics';
-import FinancialReports from './pages/Reports/FinancialReports';
-import InventoryReports from './pages/Reports/InventoryReports';
+import WorkflowReports from './pages/Reports/WorkflowReports';
+import TransportationReports from './pages/Reports/TransportationReports';
 import HealthProgramReports from './pages/Reports/HealthProgramReports';
 import PicklistReportsPage from './pages/Reports/PicklistReportsPage';
 import OrganizationProfileView from './components/Reports/OrganizationProfileView';
@@ -43,6 +41,8 @@ import UserManagementPage from './pages/Settings/UserManagementPage';
 import RouteManagementPage from './pages/Transportation/RouteManagementPage';
 import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
 import VehicleManagement from './components/Transportation/VehicleManagement';
+import AccountTypesManagement from './pages/Admin/AccountTypesManagement';
+import ServiceTimeManagement from './components/ServiceTime/ServiceTimeManagement';
 import OutstandingProcessPage from './pages/Customer-Service/OutstandingProcessPage';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
@@ -88,16 +88,16 @@ const AppContent = () => {
             <Route path = '/quality-evaluation' Component={QualityEvaluation} />
             <Route path = '/transportation/hp-facilities' Component={HPFacilitiesTransport} />
             <Route path = '/outstandingProcess' Component={OutstandingProcessPage} />
+            <Route path = '/service-time-management' Component={ServiceTimeManagement} />
             <Route path = '/reports/dashboard' Component={DashboardAnalytics} />
-            <Route path = '/reports/performance' Component={PerformanceReports} />
-            <Route path = '/reports/customer-analytics' Component={CustomerAnalytics} />
-            <Route path = '/reports/financial' Component={FinancialReports} />
-            <Route path = '/reports/inventory' Component={InventoryReports} />
+            <Route path = '/reports/workflow' Component={WorkflowReports} />
+            <Route path = '/reports/transportation' Component={TransportationReports} />
             <Route path = '/reports/health-program' Component={HealthProgramReports} />
             <Route path = '/reports/picklists' Component={PicklistReportsPage} />
             <Route path = '/reports/organization-profile' Component={OrganizationProfileView} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />
+            <Route path = '/settings/account-types' Component={AccountTypesManagement} />
             <Route path = '/transportation/route-management' Component={RouteManagementPage} />
             <Route path = '/transportation/routes' Component={RouteManagementCRUDPage} />
             <Route path = '/transportation/vehicle-management' Component={VehicleManagement} />

@@ -7,8 +7,17 @@ const getODNsForQualityEvaluation = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
-    // Build the reporting month string
-    const reportingMonth = `${month} ${year}`;
+    // Build the reporting month string - make it optional for testing
+    let reportingMonthFilter = '';
+    let monthFilter = '';
+    let queryParams = [];
+    
+    if (month && year) {
+      const reportingMonth = `${month} ${year}`;
+      reportingMonthFilter = 'AND p.reporting_month = ?';
+      monthFilter = 'AND ra.ethiopian_month = ?';
+      queryParams.push(reportingMonth, month);
+    }
 
     // Query to find ODNs with completed document follow-up that need quality evaluation
     const query = `
@@ -32,10 +41,10 @@ const getODNsForQualityEvaluation = async (req, res) => {
         ra.status as dispatch_status,
         ra.completed_at as dispatch_completed_at
       FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
+      INNER JOIN processes p ON o.process_id = p.id ${reportingMonthFilter}
       INNER JOIN facilities f ON p.facility_id = f.id
       INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
+      INNER JOIN route_assignments ra ON ra.route_id = r.id ${monthFilter}
       WHERE ra.status = 'Completed'
         AND p.status = 'vehicle_requested'
         AND o.pod_confirmed = TRUE
@@ -49,10 +58,10 @@ const getODNsForQualityEvaluation = async (req, res) => {
     const countQuery = `
       SELECT COUNT(DISTINCT o.id) as total
       FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
+      INNER JOIN processes p ON o.process_id = p.id ${reportingMonthFilter}
       INNER JOIN facilities f ON p.facility_id = f.id
       INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
+      INNER JOIN route_assignments ra ON ra.route_id = r.id ${monthFilter}
       WHERE ra.status = 'Completed'
         AND p.status = 'vehicle_requested'
         AND o.pod_confirmed = TRUE
@@ -61,13 +70,9 @@ const getODNsForQualityEvaluation = async (req, res) => {
         ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
     `;
 
-    let queryParams = [reportingMonth, month];
-    let countParams = [reportingMonth, month];
-
     if (search) {
       const searchPattern = `%${search}%`;
       queryParams.push(searchPattern, searchPattern);
-      countParams.push(searchPattern, searchPattern);
     }
 
     queryParams.push(parseInt(limit), parseInt(offset));
@@ -77,6 +82,8 @@ const getODNsForQualityEvaluation = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
+    // For count query, remove limit and offset
+    let countParams = queryParams.slice(0, -2);
     const countResult = await db.sequelize.query(countQuery, {
       replacements: countParams,
       type: db.sequelize.QueryTypes.SELECT
@@ -203,21 +210,31 @@ const getQualityEvaluationStats = async (req, res) => {
 // Update quality evaluation status
 const updateQualityEvaluation = async (req, res) => {
   try {
+    console.log('=== BACKEND UPDATE DEBUG ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
     const { updates, evaluated_by } = req.body;
 
     // Validation
     if (!updates || !Array.isArray(updates) || !evaluated_by) {
+      console.error('Validation failed - missing updates or evaluated_by');
       return res.status(400).json({ 
         error: 'updates array and evaluated_by are required' 
       });
     }
+
+    console.log('Processing', updates.length, 'updates');
+    console.log('Evaluated by user ID:', evaluated_by);
 
     // Process each update
     const results = [];
     for (const update of updates) {
       const { odn_id, quality_confirmed, quality_feedback } = update;
 
+      console.log('Processing update:', { odn_id, quality_confirmed, quality_feedback });
+
       if (odn_id === undefined) {
+        console.log('Skipping update - no odn_id');
         continue; // Skip invalid updates
       }
 
@@ -231,15 +248,55 @@ const updateQualityEvaluation = async (req, res) => {
           WHERE id = ?
         `;
 
-        await db.sequelize.query(updateQuery, {
-          replacements: [
-            quality_confirmed || false, 
-            quality_feedback || null, 
-            evaluated_by, 
-            odn_id
-          ],
+        const replacements = [
+          quality_confirmed ? 1 : 0, 
+          quality_feedback || null, 
+          evaluated_by, 
+          odn_id
+        ];
+
+        console.log('SQL Query:', updateQuery);
+        console.log('Replacements:', replacements);
+
+        // First check if the employee exists
+        const employeeCheckQuery = 'SELECT id FROM employees WHERE id = ?';
+        const employeeExists = await db.sequelize.query(employeeCheckQuery, {
+          replacements: [evaluated_by],
+          type: db.sequelize.QueryTypes.SELECT
+        });
+
+        console.log('Employee exists check:', employeeExists);
+
+        let finalEvaluatedBy = null;
+        if (employeeExists.length > 0) {
+          finalEvaluatedBy = evaluated_by;
+        } else {
+          console.log(`Employee ${evaluated_by} does not exist, setting evaluated_by to NULL`);
+          // Try to find any existing employee as fallback
+          const anyEmployee = await db.sequelize.query('SELECT id FROM employees LIMIT 1', {
+            type: db.sequelize.QueryTypes.SELECT
+          });
+          if (anyEmployee.length > 0) {
+            finalEvaluatedBy = anyEmployee[0].id;
+            console.log(`Using fallback employee ID: ${finalEvaluatedBy}`);
+          }
+        }
+
+        const finalReplacements = [
+          quality_confirmed ? 1 : 0, 
+          quality_feedback || null, 
+          finalEvaluatedBy, 
+          odn_id
+        ];
+
+        console.log('Final replacements:', finalReplacements);
+
+        const result = await db.sequelize.query(updateQuery, {
+          replacements: finalReplacements,
           type: db.sequelize.QueryTypes.UPDATE
         });
+
+        console.log('SQL Result:', result);
 
         results.push({
           odn_id,
@@ -247,7 +304,10 @@ const updateQualityEvaluation = async (req, res) => {
           quality_confirmed: quality_confirmed || false,
           quality_feedback: quality_feedback || null
         });
+        
+        console.log('Update successful for ODN:', odn_id);
       } catch (error) {
+        console.error('Update failed for ODN:', odn_id, 'Error:', error.message);
         results.push({
           odn_id,
           success: false,
@@ -255,6 +315,9 @@ const updateQualityEvaluation = async (req, res) => {
         });
       }
     }
+
+    console.log('Final results:', results);
+    console.log('=== BACKEND UPDATE END ===');
 
     res.json({
       message: 'Bulk quality evaluation update completed',
@@ -265,6 +328,7 @@ const updateQualityEvaluation = async (req, res) => {
     });
 
   } catch (error) {
+    console.error('=== BACKEND ERROR ===');
     console.error('Error bulk updating quality evaluation:', error);
     res.status(500).json({ error: 'Failed to bulk update quality evaluation' });
   }

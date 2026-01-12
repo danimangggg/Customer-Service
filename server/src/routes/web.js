@@ -122,6 +122,24 @@ let routes =  (app) => {
   router.get('/api/reports/picklists/operators', picklistReportsController.getOperatorPerformance);
   router.get('/api/reports/picklists/export', picklistReportsController.exportPicklistData);
 
+  // Dashboard Analytics routes
+  const dashboardAnalyticsController = require('../controllers/Reports/dashboardAnalyticsController');
+  router.get('/api/reports/dashboard/analytics', dashboardAnalyticsController.getDashboardAnalytics);
+  router.get('/api/reports/dashboard/performance', dashboardAnalyticsController.getSystemPerformance);
+
+  // Health Program Reports routes
+  const healthProgramReportsController = require('../controllers/Reports/healthProgramReportsController');
+  router.get('/api/reports/health-program/analytics', healthProgramReportsController.getHealthProgramAnalytics);
+  router.get('/api/reports/health-program/facilities', healthProgramReportsController.getHPFacilityPerformance);
+
+  // Workflow Reports routes
+  const workflowReportsController = require('../controllers/Reports/workflowReportsController');
+  router.get('/api/reports/dispatch', workflowReportsController.getDispatchReports);
+  router.get('/api/reports/documentation', workflowReportsController.getDocumentationReports);
+  router.get('/api/reports/followup', workflowReportsController.getFollowupReports);
+  router.get('/api/reports/quality', workflowReportsController.getQualityReports);
+  router.get('/api/reports/workflow', workflowReportsController.getWorkflowReports);
+
   // Route Management routes
   router.get('/api/routes', routeManagementController.getAllRoutes);
   router.get('/api/drivers/available', routeManagementController.getAvailableDrivers);
@@ -177,6 +195,15 @@ let routes =  (app) => {
   router.get('/api/quality-evaluation-odns', qualityEvaluationController.getODNsForQualityEvaluation);
   router.get('/api/quality-evaluation/stats', qualityEvaluationController.getQualityEvaluationStats);
   router.put('/api/odns/bulk-quality-evaluation', qualityEvaluationController.updateQualityEvaluation);
+
+  // Service Time routes
+  const serviceTimeController = require('../controllers/ServiceTime/serviceTimeController');
+  router.get('/api/service-times', serviceTimeController.getAllServiceTimes);
+  router.get('/api/service-times/process/:process_id', serviceTimeController.getServiceTimesByProcess);
+  router.get('/api/service-times/stats', serviceTimeController.getServiceTimeStats);
+  router.post('/api/service-times', serviceTimeController.createServiceTime);
+  router.put('/api/service-times/:id', serviceTimeController.updateServiceTime);
+  router.delete('/api/service-times/:id', serviceTimeController.deleteServiceTime);
 
   return app.use("/", router);
 };

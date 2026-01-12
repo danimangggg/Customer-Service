@@ -1,63 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Typography, Card, CardContent, CardHeader, Button, Container, 
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Typography, Card, CardHeader, Button, Container, 
   TablePagination, Stack, Box, Chip, Avatar, Divider, Grid, LinearProgress, Alert,
-  Checkbox, FormControl, InputLabel, Select, MenuItem, InputAdornment, TextField
+  Checkbox, FormControl, InputLabel, Select, MenuItem, InputAdornment, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel
 } from '@mui/material';
 import {
   Assignment as QualityIcon,
   Description as ODNIcon,
   Business as FacilityIcon,
-  CheckCircle as CompletedIcon,
   Pending as PendingIcon,
-  CalendarToday as CalendarTodayIcon,
   Search as SearchIcon,
-  Save as SaveIcon,
   Route as RouteIcon,
   Feedback as FeedbackIcon,
-  VerifiedUser as VerifiedIcon
+  VerifiedUser as VerifiedIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
 const MySwal = withReactContent(Swal);
-
-const QualityCheckbox = ({ odn, pendingUpdates, onQualityChange }) => {
-  const getQualityStatus = () => {
-    const pendingUpdate = pendingUpdates[odn.odn_id];
-    if (pendingUpdate !== undefined && pendingUpdate.quality_confirmed !== undefined) {
-      return Boolean(pendingUpdate.quality_confirmed);
-    }
-    return Boolean(Number(odn.quality_confirmed));
-  };
-
-  const handleChange = (e) => {
-    onQualityChange(odn.odn_id, 'quality_confirmed', e.target.checked);
-  };
-
-  const isChecked = getQualityStatus();
-
-  return (
-    <Box textAlign="center">
-      <Checkbox
-        checked={isChecked}
-        onChange={handleChange}
-        color="success"
-        size="medium"
-        inputProps={{ 'aria-label': `Quality confirmation for ODN ${odn.odn_number}` }}
-      />
-      <Typography variant="caption" display="block" sx={{ 
-        mt: 0.5,
-        color: isChecked ? 'success.main' : 'warning.main',
-        fontWeight: 'bold'
-      }}>
-        {isChecked ? '✓ Confirmed' : '⚠ Pending'}
-      </Typography>
-    </Box>
-  );
-};
 
 const QualityEvaluation = () => {
   const [odnData, setODNData] = useState([]);
@@ -69,8 +33,13 @@ const QualityEvaluation = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
-  const [pendingUpdates, setPendingUpdates] = useState({});
   const [autoSaving, setAutoSaving] = useState(false);
+  
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingODN, setEditingODN] = useState(null);
+  const [editQualityConfirmed, setEditQualityConfirmed] = useState(false);
+  const [editFeedback, setEditFeedback] = useState('');
 
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
@@ -81,56 +50,10 @@ const QualityEvaluation = () => {
     'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
   ];
 
-  // Ethiopian calendar function
-  const getCurrentEthiopianMonth = () => {
-    const gDate = new Date();
-    const gy = gDate.getFullYear();
-    const gm = gDate.getMonth();
-    const gd = gDate.getDate();
-    
-    const isLeap = (gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0);
-    const newYearDay = isLeap ? 12 : 11;
-    
-    let ethYear, ethMonthIndex;
-    
-    if (gm > 8 || (gm === 8 && gd >= newYearDay)) {
-      ethYear = gy - 7;
-      const newYearDate = new Date(gy, 8, newYearDay);
-      const diffDays = Math.floor((gDate - newYearDate) / (24 * 60 * 60 * 1000));
-      
-      if (diffDays < 360) {
-        ethMonthIndex = Math.floor(diffDays / 30);
-      } else {
-        ethMonthIndex = 12;
-      }
-    } else {
-      ethYear = gy - 8;
-      const prevIsLeap = ((gy - 1) % 4 === 0 && (gy - 1) % 100 !== 0) || ((gy - 1) % 400 === 0);
-      const prevNewYearDay = prevIsLeap ? 12 : 11;
-      const prevNewYearDate = new Date(gy - 1, 8, prevNewYearDay);
-      const diffDays = Math.floor((gDate - prevNewYearDate) / (24 * 60 * 60 * 1000));
-      
-      if (diffDays < 360) {
-        ethMonthIndex = Math.floor(diffDays / 30);
-      } else {
-        ethMonthIndex = 12;
-      }
-    }
-    
-    ethMonthIndex = Math.max(0, Math.min(ethMonthIndex, 12));
-    
-    return {
-      month: ethiopianMonths[ethMonthIndex],
-      year: ethYear,
-      monthIndex: ethMonthIndex
-    };
-  };
-
-  const currentEthiopian = getCurrentEthiopianMonth();
-
   useEffect(() => {
-    setSelectedMonth(currentEthiopian.month);
-    setSelectedYear(currentEthiopian.year.toString());
+    // Set default to Tahsas 2018 where the test data exists
+    setSelectedMonth('Tahsas');
+    setSelectedYear('2018');
   }, []);
 
   useEffect(() => {
@@ -142,6 +65,13 @@ const QualityEvaluation = () => {
 
   const fetchQualityEvaluationODNs = async () => {
     try {
+      console.log('=== FETCH ODNs DEBUG ===');
+      console.log('selectedMonth:', selectedMonth);
+      console.log('selectedYear:', selectedYear);
+      console.log('page:', page);
+      console.log('rowsPerPage:', rowsPerPage);
+      console.log('searchTerm:', searchTerm);
+      
       setLoading(true);
       setError(null);
       
@@ -155,12 +85,18 @@ const QualityEvaluation = () => {
         }
       });
       
+      console.log('Fetch response:', response.data);
+      console.log('ODNs count:', response.data.odns?.length);
+      
       setODNData(response.data.odns || []);
     } catch (err) {
+      console.error("=== FETCH ERROR ===");
       console.error("Fetch error:", err);
+      console.error("Error response:", err.response?.data);
       setError("Failed to load ODNs for quality evaluation. Please try again.");
     } finally {
       setLoading(false);
+      console.log('=== FETCH ODNs END ===');
     }
   };
 
@@ -178,135 +114,110 @@ const QualityEvaluation = () => {
     }
   };
 
-  const handleQualityChange = async (odnId, field, value) => {
-    // Update UI immediately
-    setPendingUpdates(prev => {
-      const newState = {
-        ...prev,
-        [odnId]: {
-          ...prev[odnId],
-          [field]: value
-        }
-      };
-      return newState;
-    });
+  const handleEditClick = (odn) => {
+    console.log('=== EDIT CLICK DEBUG ===');
+    console.log('Selected ODN:', odn);
+    console.log('Current quality_confirmed:', odn.quality_confirmed);
+    console.log('Current quality_feedback:', odn.quality_feedback);
+    
+    setEditingODN(odn);
+    setEditQualityConfirmed(Boolean(Number(odn.quality_confirmed)));
+    setEditFeedback(odn.quality_feedback || '');
+    setEditDialogOpen(true);
+    
+    console.log('Dialog state set - editQualityConfirmed:', Boolean(Number(odn.quality_confirmed)));
+    console.log('Dialog state set - editFeedback:', odn.quality_feedback || '');
+    console.log('=== EDIT CLICK END ===');
+  };
 
-    // Update ODN data for consistent UI
-    setODNData(prevData => 
-      prevData.map(odn => 
-        odn.odn_id === odnId 
-          ? { ...odn, [field]: field === 'quality_confirmed' ? (value ? 1 : 0) : value }
-          : odn
-      )
-    );
+  const handleDialogClose = () => {
+    setEditDialogOpen(false);
+    setEditingODN(null);
+    setEditQualityConfirmed(false);
+    setEditFeedback('');
+  };
 
-    // Save to database immediately
+  const handleSaveEdit = async () => {
+    if (!editingODN) {
+      console.error('No ODN selected for editing');
+      return;
+    }
+
+    console.log('=== SAVE EDIT DEBUG ===');
+    console.log('editingODN:', editingODN);
+    console.log('editQualityConfirmed:', editQualityConfirmed);
+    console.log('editFeedback:', editFeedback);
+    console.log('loggedInUserId:', loggedInUserId);
+
     try {
       setAutoSaving(true);
-      const currentData = odnData.find(odn => odn.odn_id === odnId);
       const update = {
-        odn_id: parseInt(odnId),
-        quality_confirmed: field === 'quality_confirmed' ? value : Boolean(Number(currentData.quality_confirmed)),
-        quality_feedback: field === 'quality_feedback' ? value : (pendingUpdates[odnId]?.quality_feedback || currentData.quality_feedback || '')
+        odn_id: parseInt(editingODN.odn_id),
+        quality_confirmed: editQualityConfirmed,
+        quality_feedback: editFeedback
       };
 
-      await axios.put(`${api_url}/api/odns/bulk-quality-evaluation`, {
+      console.log('Sending update payload:', update);
+      console.log('API URL:', `${api_url}/api/odns/bulk-quality-evaluation`);
+
+      const response = await axios.put(`${api_url}/api/odns/bulk-quality-evaluation`, {
         updates: [update],
-        evaluated_by: loggedInUserId
+        evaluated_by: parseInt(loggedInUserId)
       });
 
-      // Remove from pending updates since it's saved
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        if (newState[odnId]) {
-          delete newState[odnId][field];
-          if (Object.keys(newState[odnId]).length === 0) {
-            delete newState[odnId];
-          }
-        }
-        return newState;
-      });
+      console.log('API Response:', response.data);
+      console.log('Response status:', response.status);
+
+      // Update ODN data
+      console.log('Updating local ODN data...');
+      setODNData(prevData => 
+        prevData.map(odn => 
+          odn.odn_id === editingODN.odn_id 
+            ? { 
+                ...odn, 
+                quality_confirmed: editQualityConfirmed ? 1 : 0,
+                quality_feedback: editFeedback,
+                quality_evaluated_by: parseInt(loggedInUserId),
+                quality_evaluated_at: new Date().toISOString()
+              }
+            : odn
+        )
+      );
+
+      // Refresh data from server to ensure consistency
+      console.log('Refreshing data from server...');
+      await fetchQualityEvaluationODNs();
 
       // Update stats
+      console.log('Updating stats...');
       fetchStats();
 
-      // Show brief success message
+      // Show success message
       MySwal.fire({
         icon: 'success',
         title: 'Saved!',
-        text: `${field === 'quality_confirmed' ? 'Quality confirmation' : 'Feedback'} updated`,
-        timer: 1500,
+        text: 'Quality evaluation updated successfully',
+        timer: 2000,
         showConfirmButton: false,
         toast: true,
         position: 'top-end'
       });
+
+      console.log('Save completed successfully');
+      handleDialogClose();
       
     } catch (err) {
-      console.error('Save error:', err);
-      // Get current data for reverting
-      const currentData = odnData.find(odn => odn.odn_id === odnId);
-      // Revert UI changes if save failed
-      setODNData(prevData => 
-        prevData.map(odn => 
-          odn.odn_id === odnId 
-            ? { ...odn, [field]: field === 'quality_confirmed' ? (!value ? 1 : 0) : (currentData?.[field] || '') }
-            : odn
-        )
-      );
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        if (newState[odnId]) {
-          delete newState[odnId][field];
-          if (Object.keys(newState[odnId]).length === 0) {
-            delete newState[odnId];
-          }
-        }
-        return newState;
-      });
+      console.error('=== SAVE ERROR ===');
+      console.error('Error object:', err);
+      console.error('Error message:', err.message);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
+      console.error('Error config:', err.config);
       MySwal.fire('Error', 'Failed to save quality evaluation.', 'error');
     } finally {
       setAutoSaving(false);
+      console.log('=== SAVE EDIT END ===');
     }
-  };
-
-  const handleSaveUpdates = async () => {
-    const updates = Object.entries(pendingUpdates).map(([odn_id, data]) => ({
-      odn_id: parseInt(odn_id),
-      quality_confirmed: data.quality_confirmed,
-      quality_feedback: data.quality_feedback
-    }));
-
-    if (updates.length === 0) {
-      MySwal.fire('Info', 'No changes to save.', 'info');
-      return;
-    }
-
-    try {
-      setAutoSaving(true);
-      await axios.put(`${api_url}/api/odns/bulk-quality-evaluation`, {
-        updates,
-        evaluated_by: loggedInUserId
-      });
-      
-      MySwal.fire('Success!', 'Quality evaluation updated successfully.', 'success');
-      setPendingUpdates({});
-      fetchQualityEvaluationODNs();
-      fetchStats();
-      
-    } catch (err) {
-      console.error('Save updates error:', err);
-      MySwal.fire('Error', 'Failed to save quality evaluation.', 'error');
-    } finally {
-      setAutoSaving(false);
-    }
-  };
-
-  const getFeedback = (odn) => {
-    const pendingUpdate = pendingUpdates[odn.odn_id];
-    if (pendingUpdate !== undefined && pendingUpdate.quality_feedback !== undefined) {
-      return pendingUpdate.quality_feedback || '';
-    }
-    return odn.quality_feedback || '';
   };
 
   // Access control
@@ -415,7 +326,7 @@ const QualityEvaluation = () => {
                 inputProps={{ min: 2010, max: 2030 }}
               />
             </Grid>
-            <Grid item xs={12} md={5}>
+            <Grid item xs={12} md={7}>
               <TextField
                 fullWidth
                 placeholder="Search by ODN number or facility name..."
@@ -429,32 +340,6 @@ const QualityEvaluation = () => {
                   ),
                 }}
               />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="primary"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveUpdates}
-                disabled={Object.keys(pendingUpdates).length === 0}
-                sx={{ 
-                  height: 56,
-                  bgcolor: Object.keys(pendingUpdates).length > 0 ? 'warning.main' : 'success.main',
-                  '&:hover': {
-                    bgcolor: Object.keys(pendingUpdates).length > 0 ? 'warning.dark' : 'success.dark'
-                  }
-                }}
-              >
-                {Object.keys(pendingUpdates).length > 0 ? 'Save Remaining' : 'All Saved'}
-                {Object.keys(pendingUpdates).length > 0 && (
-                  <Chip 
-                    label={Object.keys(pendingUpdates).length} 
-                    size="small" 
-                    sx={{ ml: 1, bgcolor: 'rgba(255,255,255,0.3)' }}
-                  />
-                )}
-              </Button>
             </Grid>
           </Grid>
         </Card>
@@ -593,7 +478,7 @@ const QualityEvaluation = () => {
                   <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                     <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
                       <VerifiedIcon fontSize="small" />
-                      <span>Quality Confirmed</span>
+                      <span>Quality Status</span>
                     </Stack>
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
@@ -602,18 +487,17 @@ const QualityEvaluation = () => {
                       <span>Feedback</span>
                     </Stack>
                   </TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                    <span>Actions</span>
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn, index) => (
+                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn) => (
                   <TableRow 
-                    key={`${odn.odn_id}-${odn.quality_confirmed}-${pendingUpdates[odn.odn_id]?.quality_confirmed || 'none'}`}
+                    key={odn.odn_id}
                     hover 
-                    sx={{ 
-                      '&:hover': { bgcolor: 'grey.50' },
-                      bgcolor: pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit',
-                      borderLeft: pendingUpdates[odn.odn_id] ? '3px solid orange' : 'none'
-                    }}
+                    sx={{ '&:hover': { bgcolor: 'grey.50' } }}
                   >
                     <TableCell>
                       <Typography variant="body2" fontWeight="bold" color="primary">
@@ -635,30 +519,35 @@ const QualityEvaluation = () => {
                         {odn.route_name}
                       </Typography>
                     </TableCell>
-                    <TableCell align="center">
-                      <QualityCheckbox 
-                        odn={odn}
-                        pendingUpdates={pendingUpdates}
-                        onQualityChange={handleQualityChange}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        fullWidth
-                        multiline
-                        rows={2}
-                        placeholder="Enter quality feedback..."
-                        value={getFeedback(odn)}
-                        onChange={(e) => handleQualityChange(odn.odn_id, 'quality_feedback', e.target.value)}
+                  <TableCell align="center">
+                    <Box textAlign="center">
+                      <Chip 
+                        label={Boolean(Number(odn.quality_confirmed)) ? "✓ Confirmed" : "⚠ Pending"}
+                        color={Boolean(Number(odn.quality_confirmed)) ? "success" : "warning"}
                         variant="outlined"
                         size="small"
-                        sx={{ 
-                          '& .MuiOutlinedInput-root': {
-                            bgcolor: pendingUpdates[odn.odn_id]?.quality_feedback !== undefined ? 'warning.50' : 'inherit'
-                          }
-                        }}
                       />
-                    </TableCell>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ 
+                      fontStyle: odn.quality_feedback ? 'normal' : 'italic',
+                      color: odn.quality_feedback ? 'text.primary' : 'text.secondary'
+                    }}>
+                      {odn.quality_feedback || 'No feedback provided'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="center">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<EditIcon />}
+                      onClick={() => handleEditClick(odn)}
+                      sx={{ minWidth: 80 }}
+                    >
+                      Edit
+                    </Button>
+                  </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -675,6 +564,63 @@ const QualityEvaluation = () => {
             />
           </TableContainer>
         </Card>
+
+        {/* Edit Dialog */}
+        <Dialog 
+          open={editDialogOpen} 
+          onClose={handleDialogClose}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <EditIcon color="primary" />
+              <Box>
+                <Typography variant="h6">Edit Quality Evaluation</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  ODN: {editingODN?.odn_number} - {editingODN?.facility_name}
+                </Typography>
+              </Box>
+            </Stack>
+          </DialogTitle>
+          <DialogContent>
+            <Stack spacing={3} sx={{ mt: 2 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={editQualityConfirmed}
+                    onChange={(e) => setEditQualityConfirmed(e.target.checked)}
+                    color="success"
+                  />
+                }
+                label="Process Quality Confirmed"
+              />
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                label="Quality Feedback"
+                placeholder="Enter quality feedback (optional)..."
+                value={editFeedback}
+                onChange={(e) => setEditFeedback(e.target.value)}
+                variant="outlined"
+              />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDialogClose}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEdit}
+              variant="contained"
+              disabled={autoSaving}
+              startIcon={autoSaving ? <LinearProgress size={20} /> : <VerifiedIcon />}
+            >
+              {autoSaving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </>
   );

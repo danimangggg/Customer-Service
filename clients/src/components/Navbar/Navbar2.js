@@ -214,6 +214,44 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
+         {/* Service Time Management - for O2C Officers, EWM Officers, and Customer Service Officers */}
+         {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer") && (
+           <MenuTooltip title={"Service Time Management"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/service-time-management"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#2196f3' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Service Time"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem',
+                     whiteSpace: 'nowrap',
+                     overflow: 'hidden',
+                     textOverflow: 'ellipsis'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
          {/* Outstanding Process (PI Vehicle Requests) - for PI Officer HP */}
          {jobTitle === "PI Officer-HP" && (
            <MenuTooltip title={"Outstanding Process"}>
@@ -307,11 +345,14 @@ const Sidebar = () => {
                  <Description sx={{ color: '#9c27b0' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Documentation Management"} 
+                 primary={"Doc Management"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
-                     fontSize: '0.95rem'
+                     fontSize: '0.95rem',
+                     whiteSpace: 'nowrap',
+                     overflow: 'hidden',
+                     textOverflow: 'ellipsis'
                    } 
                  }} 
                />
@@ -413,6 +454,41 @@ const Sidebar = () => {
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Picklists - for O2C and EWM Officers (Non-HP) */}
+         {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer") && (
+           <MenuTooltip title={"Picklists"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/all-picklists"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Inventory sx={{ color: '#9c27b0' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Picklists"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
@@ -529,38 +605,40 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* TV Main Menu - for all authenticated users */}
-         <MenuTooltip title={"TV Main Menu"}>
-           <ListItem 
-             button 
-             component={Link} 
-             to="/tv-main-menu"
-             sx={{
-               borderRadius: 2,
-               mx: 1,
-               mb: 1,
-               '&:hover': {
-                 bgcolor: 'rgba(25, 118, 210, 0.1)',
-                 transform: 'translateX(4px)',
+         {/* TV Main Menu - for TV Operator only */}
+         {jobTitle === "TV Operator" && (
+           <MenuTooltip title={"TV Main Menu"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/tv-main-menu"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
                  transition: 'all 0.2s ease'
-               },
-               transition: 'all 0.2s ease'
-             }}
-           >
-             <ListItemIcon>
-               <Tv sx={{ color: '#2196f3' }} />
-             </ListItemIcon>
-             <ListItemText 
-               primary={"TV Main Menu"} 
-               sx={{ 
-                 '& .MuiListItemText-primary': { 
-                   fontWeight: 500,
-                   fontSize: '0.95rem'
-                 } 
-               }} 
-             />
-           </ListItem>
-         </MenuTooltip>
+               }}
+             >
+               <ListItemIcon>
+                 <Tv sx={{ color: '#2196f3' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"TV Main Menu"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
 
          {/* Customer Registration - for all users */}
          {(isAdmin || jobTitle === "Customer Service Officer") && (
@@ -692,6 +770,39 @@ const Sidebar = () => {
                  </ListItemIcon>
                  <ListItemText 
                    primary={"User Management"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontWeight: 400,
+                       fontSize: '0.9rem'
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
+
+             {/* Account Types & Roles */}
+             <MenuTooltip title={"Account Types & Roles"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/settings/account-types"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     transform: 'translateX(4px)',
+                     transition: 'all 0.2s ease'
+                   },
+                   transition: 'all 0.2s ease'
+                 }}
+               >
+                 <ListItemIcon>
+                   <Group sx={{ color: '#f44336', fontSize: 20 }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Account Types & Roles"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,
@@ -869,6 +980,38 @@ const Sidebar = () => {
                  />
                </ListItem>
              </MenuTooltip>
+
+             {/* Transportation Reports */}
+             <MenuTooltip title={"Transportation Reports"}>
+               <ListItem 
+                 button 
+                 component={Link} 
+                 to="/reports/transportation"
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 0.5,
+                   '&:hover': {
+                     bgcolor: 'rgba(25, 118, 210, 0.08)',
+                     transform: 'translateX(4px)',
+                   },
+                   transition: 'all 0.2s ease-in-out',
+                 }}
+               >
+                 <ListItemIcon>
+                   <BarChart sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
+                 </ListItemIcon>
+                 <ListItemText 
+                   primary={"Transportation Reports"} 
+                   sx={{ 
+                     '& .MuiListItemText-primary': { 
+                       fontSize: '0.8rem',
+                       fontWeight: 400,
+                     } 
+                   }} 
+                 />
+               </ListItem>
+             </MenuTooltip>
            </List>
          </Collapse>
 
@@ -944,12 +1087,12 @@ const Sidebar = () => {
                </ListItem>
              </MenuTooltip>
 
-             {/* Performance Reports */}
-             <MenuTooltip title={"Performance Reports"}>
+             {/* Workflow Reports */}
+             <MenuTooltip title={"Workflow Reports"}>
                <ListItem 
                  button 
                  component={Link} 
-                 to="/reports/performance"
+                 to="/reports/workflow"
                  sx={{
                    borderRadius: 2,
                    mx: 1,
@@ -963,10 +1106,10 @@ const Sidebar = () => {
                  }}
                >
                  <ListItemIcon>
-                   <TrendingUp sx={{ color: '#4caf50', fontSize: 20 }} />
+                   <Assignment sx={{ color: '#4caf50', fontSize: 20 }} />
                  </ListItemIcon>
                  <ListItemText 
-                   primary={"Performance Reports"} 
+                   primary={"Workflow Reports"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,
@@ -977,12 +1120,12 @@ const Sidebar = () => {
                </ListItem>
              </MenuTooltip>
 
-             {/* Customer Analytics */}
-             <MenuTooltip title={"Customer Analytics"}>
+             {/* Picklist Reports */}
+             <MenuTooltip title={"Picklist Reports"}>
                <ListItem 
                  button 
                  component={Link} 
-                 to="/reports/customer-analytics"
+                 to="/reports/picklists"
                  sx={{
                    borderRadius: 2,
                    mx: 1,
@@ -996,76 +1139,10 @@ const Sidebar = () => {
                  }}
                >
                  <ListItemIcon>
-                   <PieChart sx={{ color: '#ff9800', fontSize: 20 }} />
+                   <Assignment sx={{ color: '#9c27b0', fontSize: 20 }} />
                  </ListItemIcon>
                  <ListItemText 
-                   primary={"Customer Analytics"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.9rem'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
-
-             {/* Financial Reports */}
-             <MenuTooltip title={"Financial Reports"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/reports/financial"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <ShowChart sx={{ color: '#9c27b0', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Financial Reports"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.9rem'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
-
-             {/* Inventory Reports */}
-             <MenuTooltip title={"Inventory Reports"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/reports/inventory"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <Inventory sx={{ color: '#607d8b', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Inventory Reports"} 
+                   primary={"Picklist Reports"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,
@@ -1110,39 +1187,6 @@ const Sidebar = () => {
                  </ListItem>
                </MenuTooltip>
              )}
-
-             {/* Picklist Reports */}
-             <MenuTooltip title={"Picklist Reports"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/reports/picklists"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <Assignment sx={{ color: '#9c27b0', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Picklist Reports"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.9rem'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
 
              {/* Organization Profile - View Only for all users */}
              <MenuTooltip title={"Organization Profile"}>
