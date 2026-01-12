@@ -35,8 +35,6 @@ const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const AllPicklists = () => {
   const [picklists, setPicklists] = useState([]);
-  const [services, setServices] = useState([]);
-  const [facilities, setFacilities] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [combinedPicklists, setCombinedPicklists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,10 +55,8 @@ const AllPicklists = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [pickRes, serviceRes, facilityRes, empRes] = await Promise.all([
+      const [pickRes, empRes] = await Promise.all([
         axios.get(`${api_url}/api/getPicklists`),
-        axios.get(`${api_url}/api/serviceList`),
-        axios.get(`${api_url}/api/facilities`),
         axios.get(`${api_url}/api/get-employee`),
       ]);
 
@@ -86,8 +82,6 @@ const AllPicklists = () => {
       }
 
       setPicklists(allPicklists);
-      setServices(serviceRes.data || []);
-      setFacilities(facilityRes.data || []);
       setEmployees(empRes.data || []);
       lastPicklistsCountRef.current = allPicklists.length;
     } catch (err) {
@@ -98,24 +92,22 @@ const AllPicklists = () => {
     }
   }, [jobTitle, userId, userStore]);
 
-  // 🔹 Combine picklist + facility + operator info
+  // 🔹 Combine picklist + operator info (facility info now comes from backend)
   useEffect(() => {
     const combined = picklists.map((p) => {
-      const service = services.find((s) => String(s.id) === String(p.process_id));
-      const facility = facilities.find(
-        (f) => service && String(f.id) === String(service.facility_id)
-      );
+      // Operator info (keep existing logic)
       const operator = employees.find(
         (e) => Number(e.id) === Number(p.operator_id)
       );
+      
       return {
         ...p,
-        facility,
+        // facility is now provided directly from backend
         operator,
       };
     });
     setCombinedPicklists(combined);
-  }, [picklists, services, facilities, employees]);
+  }, [picklists, employees]); // Removed services and facilities dependencies
 
   // 🔹 Audio setup
   useEffect(() => {

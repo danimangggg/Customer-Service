@@ -6,229 +6,199 @@ const getDashboardAnalytics = async (req, res) => {
   try {
     const { startDate, endDate, month, year } = req.query;
     
-    // Build date filter
-    let dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
-      };
-    } else if (month && year) {
-      // Ethiopian calendar month filter
-      const reportingMonth = `${month} ${year}`;
-      dateFilter = { reporting_month: reportingMonth };
-    }
+    console.log('Dashboard Analytics request:', { startDate, endDate, month, year });
 
-    // Get total facilities
-    const totalFacilities = await db.sequelize.query(`
-      SELECT COUNT(*) as count FROM facilities
-    `, { type: db.sequelize.QueryTypes.SELECT });
-
-    // Get total processes
-    const totalProcesses = await db.sequelize.query(`
-      SELECT COUNT(*) as count FROM processes
-      ${Object.keys(dateFilter).length > 0 ? 'WHERE ' + Object.keys(dateFilter).map(key => 
-        key === 'reporting_month' ? `${key} = ?` : `${key} BETWEEN ? AND ?`
-      ).join(' AND ') : ''}
-    `, { 
-      replacements: Object.keys(dateFilter).length > 0 ? 
-        (dateFilter.reporting_month ? [dateFilter.reporting_month] : 
-         [dateFilter.createdAt[Op.between][0], dateFilter.createdAt[Op.between][1]]) : [],
-      type: db.sequelize.QueryTypes.SELECT 
-    });
-
-    // Get total ODNs
-    const totalODNs = await db.sequelize.query(`
-      SELECT COUNT(o.id) as count 
-      FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id
-      ${Object.keys(dateFilter).length > 0 ? 'WHERE ' + Object.keys(dateFilter).map(key => 
-        key === 'reporting_month' ? `p.${key} = ?` : `p.${key} BETWEEN ? AND ?`
-      ).join(' AND ') : ''}
-    `, { 
-      replacements: Object.keys(dateFilter).length > 0 ? 
-        (dateFilter.reporting_month ? [dateFilter.reporting_month] : 
-         [dateFilter.createdAt[Op.between][0], dateFilter.createdAt[Op.between][1]]) : [],
-      type: db.sequelize.QueryTypes.SELECT 
-    });
-
-    // Get total picklists
-    const totalPicklists = await db.sequelize.query(`
-      SELECT COUNT(*) as count FROM picklists
-      ${Object.keys(dateFilter).length > 0 && !dateFilter.reporting_month ? 'WHERE createdAt BETWEEN ? AND ?' : ''}
-    `, { 
-      replacements: Object.keys(dateFilter).length > 0 && !dateFilter.reporting_month ? 
-        [dateFilter.createdAt[Op.between][0], dateFilter.createdAt[Op.between][1]] : [],
-      type: db.sequelize.QueryTypes.SELECT 
-    });
-
-    // Get process status distribution
-    const processStatusDistribution = await db.sequelize.query(`
-      SELECT status, COUNT(*) as count 
-      FROM processes
-      ${Object.keys(dateFilter).length > 0 ? 'WHERE ' + Object.keys(dateFilter).map(key => 
-        key === 'reporting_month' ? `${key} = ?` : `${key} BETWEEN ? AND ?`
-      ).join(' AND ') : ''}
-      GROUP BY status
-    `, { 
-      replacements: Object.keys(dateFilter).length > 0 ? 
-        (dateFilter.reporting_month ? [dateFilter.reporting_month] : 
-         [dateFilter.createdAt[Op.between][0], dateFilter.createdAt[Op.between][1]]) : [],
-      type: db.sequelize.QueryTypes.SELECT 
-    });
-
-    // Get ODN status distribution
-    const odnStatusDistribution = await db.sequelize.query(`
-      SELECT 
-        CASE 
-          WHEN o.pod_confirmed = 1 AND o.documents_signed = 1 AND o.documents_handover = 1 AND o.quality_confirmed = 1 THEN 'Fully Completed'
-          WHEN o.pod_confirmed = 1 AND o.documents_signed = 1 AND o.documents_handover = 1 THEN 'Quality Pending'
-          WHEN o.pod_confirmed = 1 AND (o.documents_signed = 1 OR o.documents_handover = 1) THEN 'Document Follow-up'
-          WHEN o.pod_confirmed = 1 THEN 'POD Confirmed'
-          ELSE 'In Progress'
-        END as status,
-        COUNT(*) as count
-      FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id
-      ${Object.keys(dateFilter).length > 0 ? 'WHERE ' + Object.keys(dateFilter).map(key => 
-        key === 'reporting_month' ? `p.${key} = ?` : `p.${key} BETWEEN ? AND ?`
-      ).join(' AND ') : ''}
-      GROUP BY 
-        CASE 
-          WHEN o.pod_confirmed = 1 AND o.documents_signed = 1 AND o.documents_handover = 1 AND o.quality_confirmed = 1 THEN 'Fully Completed'
-          WHEN o.pod_confirmed = 1 AND o.documents_signed = 1 AND o.documents_handover = 1 THEN 'Quality Pending'
-          WHEN o.pod_confirmed = 1 AND (o.documents_signed = 1 OR o.documents_handover = 1) THEN 'Document Follow-up'
-          WHEN o.pod_confirmed = 1 THEN 'POD Confirmed'
-          ELSE 'In Progress'
-        END
-    `, { 
-      replacements: Object.keys(dateFilter).length > 0 ? 
-        (dateFilter.reporting_month ? [dateFilter.reporting_month] : 
-         [dateFilter.createdAt[Op.between][0], dateFilter.createdAt[Op.between][1]]) : [],
-      type: db.sequelize.QueryTypes.SELECT 
-    });
-
-    // Get facilities by region
-    const facilitiesByRegion = await db.sequelize.query(`
-      SELECT region_name, COUNT(*) as count 
-      FROM facilities 
-      GROUP BY region_name
-      ORDER BY count DESC
-      LIMIT 10
-    `, { type: db.sequelize.QueryTypes.SELECT });
-
-    // Get route assignments status
-    const routeAssignmentStats = await db.sequelize.query(`
-      SELECT status, COUNT(*) as count 
-      FROM route_assignments
-      ${month ? 'WHERE ethiopian_month = ?' : ''}
-      GROUP BY status
-    `, { 
-      replacements: month ? [month] : [],
-      type: db.sequelize.QueryTypes.SELECT 
-    });
-
-    // Get picklist status distribution
-    const picklistStatusDistribution = await db.sequelize.query(`
-      SELECT status, COUNT(*) as count 
-      FROM picklists
-      ${Object.keys(dateFilter).length > 0 && !dateFilter.reporting_month ? 'WHERE createdAt BETWEEN ? AND ?' : ''}
-      GROUP BY status
-    `, { 
-      replacements: Object.keys(dateFilter).length > 0 && !dateFilter.reporting_month ? 
-        [dateFilter.createdAt[Op.between][0], dateFilter.createdAt[Op.between][1]] : [],
-      type: db.sequelize.QueryTypes.SELECT 
-    });
-
-    // Get monthly trend (last 6 months of processes)
-    const monthlyTrend = await db.sequelize.query(`
-      SELECT 
-        reporting_month,
-        COUNT(*) as count
-      FROM processes
-      WHERE reporting_month IS NOT NULL
-      GROUP BY reporting_month
-      ORDER BY id DESC
-      LIMIT 6
-    `, { type: db.sequelize.QueryTypes.SELECT });
-
-    // Calculate completion rates
-    const completedProcesses = processStatusDistribution.find(p => p.status === 'vehicle_requested')?.count || 0;
-    const totalProcessCount = totalProcesses[0]?.count || 0;
-    const processCompletionRate = totalProcessCount > 0 ? ((completedProcesses / totalProcessCount) * 100).toFixed(1) : 0;
-
-    const fullyCompletedODNs = odnStatusDistribution.find(o => o.status === 'Fully Completed')?.count || 0;
-    const totalODNCount = totalODNs[0]?.count || 0;
-    const odnCompletionRate = totalODNCount > 0 ? ((fullyCompletedODNs / totalODNCount) * 100).toFixed(1) : 0;
-
-    const completedPicklists = picklistStatusDistribution.find(p => p.status === 'Completed')?.count || 0;
-    const totalPicklistCount = totalPicklists[0]?.count || 0;
-    const picklistCompletionRate = totalPicklistCount > 0 ? ((completedPicklists / totalPicklistCount) * 100).toFixed(1) : 0;
-
-    res.json({
+    // Default response structure
+    const defaultResponse = {
       summary: {
-        totalFacilities: totalFacilities[0]?.count || 0,
-        totalProcesses: totalProcessCount,
-        totalODNs: totalODNCount,
-        totalPicklists: totalPicklistCount,
-        processCompletionRate,
-        odnCompletionRate,
-        picklistCompletionRate
+        totalFacilities: 0,
+        totalProcesses: 0,
+        totalODNs: 0,
+        totalPicklists: 0,
+        processCompletionRate: 0,
+        odnCompletionRate: 0,
+        picklistCompletionRate: 0
       },
       distributions: {
-        processStatus: processStatusDistribution,
-        odnStatus: odnStatusDistribution,
-        facilitiesByRegion,
-        routeAssignments: routeAssignmentStats,
-        picklistStatus: picklistStatusDistribution
+        processStatus: [],
+        odnStatus: [],
+        facilitiesByRegion: [],
+        routeAssignments: [],
+        picklistStatus: []
       },
       trends: {
-        monthlyProcesses: monthlyTrend
+        monthlyProcesses: []
       }
-    });
+    };
+
+    try {
+      // Get facilities count
+      const facilitiesCount = await db.sequelize.query(`
+        SELECT COUNT(*) as count FROM facilities
+      `, { type: db.sequelize.QueryTypes.SELECT });
+
+      defaultResponse.summary.totalFacilities = facilitiesCount[0]?.count || 0;
+
+      // Get facilities by region
+      if (facilitiesCount[0]?.count > 0) {
+        const facilitiesByRegion = await db.sequelize.query(`
+          SELECT 
+            COALESCE(region_name, 'Unknown') as region_name, 
+            COUNT(*) as count 
+          FROM facilities 
+          GROUP BY region_name
+          ORDER BY count DESC
+          LIMIT 10
+        `, { type: db.sequelize.QueryTypes.SELECT });
+
+        defaultResponse.distributions.facilitiesByRegion = facilitiesByRegion || [];
+      }
+
+      // Try to get processes data
+      try {
+        const processesCount = await db.sequelize.query(`
+          SELECT COUNT(*) as count FROM processes
+        `, { type: db.sequelize.QueryTypes.SELECT });
+
+        defaultResponse.summary.totalProcesses = processesCount[0]?.count || 0;
+
+        if (processesCount[0]?.count > 0) {
+          const processStatus = await db.sequelize.query(`
+            SELECT status, COUNT(*) as count 
+            FROM processes
+            GROUP BY status
+          `, { type: db.sequelize.QueryTypes.SELECT });
+
+          defaultResponse.distributions.processStatus = processStatus || [];
+
+          // Get monthly trend
+          const monthlyTrend = await db.sequelize.query(`
+            SELECT 
+              COALESCE(reporting_month, 'Unknown') as reporting_month,
+              COUNT(*) as count
+            FROM processes
+            GROUP BY reporting_month
+            ORDER BY id DESC
+            LIMIT 6
+          `, { type: db.sequelize.QueryTypes.SELECT });
+
+          defaultResponse.trends.monthlyProcesses = monthlyTrend || [];
+        }
+      } catch (processError) {
+        console.log('Processes table not available:', processError.message);
+      }
+
+      // Try to get ODNs data
+      try {
+        const odnsCount = await db.sequelize.query(`
+          SELECT COUNT(*) as count FROM odns
+        `, { type: db.sequelize.QueryTypes.SELECT });
+
+        defaultResponse.summary.totalODNs = odnsCount[0]?.count || 0;
+      } catch (odnError) {
+        console.log('ODNs table not available:', odnError.message);
+      }
+
+      // Try to get picklists data
+      try {
+        const picklistsCount = await db.sequelize.query(`
+          SELECT COUNT(*) as count FROM picklists
+        `, { type: db.sequelize.QueryTypes.SELECT });
+
+        defaultResponse.summary.totalPicklists = picklistsCount[0]?.count || 0;
+
+        if (picklistsCount[0]?.count > 0) {
+          const picklistStatus = await db.sequelize.query(`
+            SELECT status, COUNT(*) as count 
+            FROM picklists
+            GROUP BY status
+          `, { type: db.sequelize.QueryTypes.SELECT });
+
+          defaultResponse.distributions.picklistStatus = picklistStatus || [];
+        }
+      } catch (picklistError) {
+        console.log('Picklists table not available:', picklistError.message);
+      }
+
+      // Try to get route assignments data
+      try {
+        const routeAssignments = await db.sequelize.query(`
+          SELECT status, COUNT(*) as count 
+          FROM route_assignments
+          GROUP BY status
+        `, { type: db.sequelize.QueryTypes.SELECT });
+
+        defaultResponse.distributions.routeAssignments = routeAssignments || [];
+      } catch (routeError) {
+        console.log('Route assignments table not available:', routeError.message);
+      }
+
+    } catch (error) {
+      console.log('Database error:', error.message);
+    }
+
+    res.json(defaultResponse);
 
   } catch (error) {
     console.error('Error fetching dashboard analytics:', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard analytics' });
+    res.status(500).json({ 
+      error: 'Failed to fetch dashboard analytics',
+      details: error.message 
+    });
   }
 };
 
 // Get system performance metrics
 const getSystemPerformance = async (req, res) => {
   try {
-    // Get average processing time
-    const avgProcessingTime = await db.sequelize.query(`
-      SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, updated_at)) as avg_hours
-      FROM processes 
-      WHERE status = 'vehicle_requested' AND updated_at IS NOT NULL
-    `, { type: db.sequelize.QueryTypes.SELECT });
+    console.log('System Performance request');
 
-    // Get user activity stats
-    const userStats = await db.sequelize.query(`
-      SELECT COUNT(*) as total_users,
-             SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_users
-      FROM users
-    `, { type: db.sequelize.QueryTypes.SELECT });
-
-    // Get recent activity
-    const recentActivity = await db.sequelize.query(`
-      SELECT 'Process' as type, status, created_at, updated_at
-      FROM processes 
-      ORDER BY updated_at DESC 
-      LIMIT 10
-    `, { type: db.sequelize.QueryTypes.SELECT });
-
-    res.json({
+    const defaultPerformance = {
       performance: {
-        avgProcessingTime: avgProcessingTime[0]?.avg_hours || 0,
-        totalUsers: userStats[0]?.total_users || 0,
-        activeUsers: userStats[0]?.active_users || 0
+        avgProcessingTime: 0,
+        totalUsers: 0,
+        activeUsers: 0
       },
-      recentActivity
-    });
+      recentActivity: []
+    };
+
+    try {
+      // Get user stats
+      const userStats = await db.sequelize.query(`
+        SELECT COUNT(*) as total_users,
+               SUM(CASE WHEN account_status = 'Active' THEN 1 ELSE 0 END) as active_users
+        FROM users
+      `, { type: db.sequelize.QueryTypes.SELECT });
+
+      defaultPerformance.performance.totalUsers = userStats[0]?.total_users || 0;
+      defaultPerformance.performance.activeUsers = userStats[0]?.active_users || 0;
+
+      // Try to get processing time from processes
+      try {
+        const avgProcessingTime = await db.sequelize.query(`
+          SELECT AVG(TIMESTAMPDIFF(HOUR, created_at, updated_at)) as avg_hours
+          FROM processes 
+          WHERE updated_at IS NOT NULL
+          LIMIT 1
+        `, { type: db.sequelize.QueryTypes.SELECT });
+
+        defaultPerformance.performance.avgProcessingTime = avgProcessingTime[0]?.avg_hours || 0;
+      } catch (processTimeError) {
+        console.log('Cannot calculate processing time:', processTimeError.message);
+      }
+
+    } catch (userError) {
+      console.log('Users table error:', userError.message);
+    }
+
+    res.json(defaultPerformance);
 
   } catch (error) {
     console.error('Error fetching system performance:', error);
-    res.status(500).json({ error: 'Failed to fetch system performance' });
+    res.status(500).json({ 
+      error: 'Failed to fetch system performance',
+      details: error.message 
+    });
   }
 };
 

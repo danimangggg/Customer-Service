@@ -59,7 +59,7 @@ module.exports = (sequelize, DataTypes) => {
     ethiopian_month: {
       type: DataTypes.ENUM(
         'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
-        'Megabit', 'Miazia', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
+        'Megabit', 'Miyazya', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
       ),
       allowNull: false,
       defaultValue: 'Tir', // Current Ethiopian month (January 2026 = Tir)

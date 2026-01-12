@@ -75,7 +75,7 @@ const DocumentationManagement = () => {
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const isDocumentationOfficer = userJobTitle === 'Documentation Officer';
-  const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3003';
+  const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   const ethiopianMonths = [
     'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'

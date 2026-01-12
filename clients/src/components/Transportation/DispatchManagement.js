@@ -33,7 +33,7 @@ const DispatchManagement = () => {
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const isDispatcher = userJobTitle === 'Dispatcher - HP';
-  const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3003';
+  const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Ethiopian calendar function
   const getCurrentEthiopianMonth = () => {

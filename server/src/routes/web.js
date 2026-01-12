@@ -34,9 +34,6 @@ const locationController = require('../controllers/CustomerService/locationContr
 const vehicleController = require('../controllers/Settings/vehicleController');
 const userManagementController = require('../controllers/Settings/userManagementController');
 
-//reports
-const picklistReportsController = require('../controllers/Reports/picklistReportsController');
-
 //transportation
 const routeManagementController = require('../controllers/Transportation/routeManagementController');
 
@@ -95,10 +92,6 @@ let routes =  (app) => {
 
   // Vehicle Management routes
   router.get('/api/vehicles', vehicleController.getAllVehicles);
-  router.get('/api/vehicles/:id', vehicleController.getVehicleById);
-  router.post('/api/vehicles', vehicleController.createVehicle);
-  router.put('/api/vehicles/:id', vehicleController.updateVehicle);
-  router.delete('/api/vehicles/:id', vehicleController.deleteVehicle);
   router.get('/api/vehicles/stats', vehicleController.getVehicleStats);
   router.get('/api/vehicles/available', routeManagementController.getAvailableVehicles);
   router.get('/api/vehicles/:id', vehicleController.getVehicleById);
@@ -115,12 +108,6 @@ let routes =  (app) => {
   router.delete('/api/users-management/:id', userManagementController.deleteUser);
   router.patch('/api/users-management/:id/status', userManagementController.toggleUserStatus);
   router.patch('/api/users-management/:id/reset-password', userManagementController.resetUserPassword);
-
-  // Picklist Reports routes
-  router.get('/api/reports/picklists/stats', picklistReportsController.getPicklistStats);
-  router.get('/api/reports/picklists', picklistReportsController.getPicklistReports);
-  router.get('/api/reports/picklists/operators', picklistReportsController.getOperatorPerformance);
-  router.get('/api/reports/picklists/export', picklistReportsController.exportPicklistData);
 
   // Dashboard Analytics routes
   const dashboardAnalyticsController = require('../controllers/Reports/dashboardAnalyticsController');

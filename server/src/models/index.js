@@ -54,6 +54,28 @@ db.employee.hasMany(db.picklist, {
   as: 'picklists' 
 });
 
+// Process and Facility associations
+db.process.belongsTo(db.facility, {
+  foreignKey: 'facility_id',
+  as: 'facility'
+});
+
+db.facility.hasMany(db.process, {
+  foreignKey: 'facility_id',
+  as: 'processes'
+});
+
+// ODN and Process associations
+db.odn.belongsTo(db.process, {
+  foreignKey: 'process_id',
+  as: 'process'
+});
+
+db.process.hasMany(db.odn, {
+  foreignKey: 'process_id',
+  as: 'odns'
+});
+
 // Route Assignment associations
 db.routeAssignment.belongsTo(db.route, {
   foreignKey: 'route_id',

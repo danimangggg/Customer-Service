@@ -46,7 +46,7 @@ import {
 } from 'recharts';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const DashboardAnalytics = () => {
   const [loading, setLoading] = useState(true);

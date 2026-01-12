@@ -7,8 +7,25 @@ const getPIVehicleRequests = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
+    console.log('PI Vehicle Requests - Request params:', { month, year, page, limit, search });
+
     // Build the reporting month string
     const reportingMonth = `${month} ${year}`;
+    console.log('Looking for reporting month:', reportingMonth);
+
+    // Check if pi_vehicle_requests table exists
+    try {
+      await db.sequelize.query('SELECT 1 FROM pi_vehicle_requests LIMIT 1', {
+        type: db.sequelize.QueryTypes.SELECT
+      });
+      console.log('✓ pi_vehicle_requests table exists');
+    } catch (tableError) {
+      console.error('❌ pi_vehicle_requests table does not exist:', tableError.message);
+      return res.status(500).json({ 
+        error: 'Database table missing',
+        details: 'pi_vehicle_requests table does not exist. Please run database migrations.'
+      });
+    }
 
     // Query to find routes where all facilities have EWM completed or vehicle requested status
     const query = `
@@ -45,10 +62,14 @@ const getPIVehicleRequests = async (req, res) => {
 
     queryParams.push(parseInt(limit), parseInt(offset));
 
+    console.log('Executing query with params:', queryParams);
+
     const routes = await db.sequelize.query(query, {
       replacements: queryParams,
       type: db.sequelize.QueryTypes.SELECT
     });
+
+    console.log(`Found ${routes.length} routes`);
 
     // For each route, get the facilities and their ODNs
     const routesWithDetails = await Promise.all(routes.map(async (route) => {
@@ -122,6 +143,8 @@ const getPIVehicleRequests = async (req, res) => {
 
     const totalCount = countResult.length;
 
+    console.log(`Returning ${routesWithDetails.length} routes with details, total count: ${totalCount}`);
+
     res.json({
       routes: routesWithDetails,
       totalCount,
@@ -131,7 +154,11 @@ const getPIVehicleRequests = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching PI vehicle requests:', error);
-    res.status(500).json({ error: 'Failed to fetch PI vehicle requests' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch PI vehicle requests',
+      details: error.message
+    });
   }
 };
 
@@ -140,6 +167,8 @@ const getPIVehicleRequestStats = async (req, res) => {
   try {
     const { month, year } = req.query;
     const reportingMonth = `${month} ${year}`;
+
+    console.log('PI Vehicle Request Stats - Request params:', { month, year, reportingMonth });
 
     // Get total routes ready for vehicle request (ewm_completed) or already requested (vehicle_requested)
     const totalRoutesQuery = `
@@ -169,14 +198,22 @@ const getPIVehicleRequestStats = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    res.json({
+    const stats = {
       totalRoutes: totalResult.length,
       requestedRoutes: requestedResult[0]?.count || 0
-    });
+    };
+
+    console.log('PI Vehicle Request Stats result:', stats);
+
+    res.json(stats);
 
   } catch (error) {
     console.error('Error fetching PI vehicle request stats:', error);
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch stats',
+      details: error.message
+    });
   }
 };
 

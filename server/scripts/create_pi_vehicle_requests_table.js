@@ -1,33 +1,48 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-const createPIVehicleRequestsTable = async () => {
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'epss_db'
+};
+
+async function createPIVehicleRequestsTable() {
   let connection;
   
   try {
-    // Create connection
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || 'areacode',
-      database: process.env.DB_NAME || 'customer-service'
-    });
-
-    console.log('Connected to MySQL database');
-
+    console.log('Connecting to database...');
+    connection = await mysql.createConnection(dbConfig);
+    
+    console.log('Checking if pi_vehicle_requests table exists...');
+    
     // Check if table exists
     const [tables] = await connection.execute(`
-      SELECT TABLE_NAME 
-      FROM information_schema.TABLES 
-      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'pi_vehicle_requests'
-    `, [process.env.DB_NAME || 'customer-service']);
-
+      SHOW TABLES LIKE 'pi_vehicle_requests'
+    `);
+    
     if (tables.length > 0) {
-      console.log('pi_vehicle_requests table already exists');
+      console.log('✓ pi_vehicle_requests table already exists');
+      
+      // Show table structure
+      const [columns] = await connection.execute(`DESCRIBE pi_vehicle_requests`);
+      console.log('Table structure:');
+      columns.forEach(col => {
+        console.log(`  ${col.Field}: ${col.Type} ${col.Null === 'NO' ? 'NOT NULL' : 'NULL'} ${col.Key ? `(${col.Key})` : ''}`);
+      });
+      
+      // Show sample data
+      const [sampleData] = await connection.execute(`
+        SELECT COUNT(*) as count FROM pi_vehicle_requests
+      `);
+      console.log(`Records in table: ${sampleData[0].count}`);
+      
       return;
     }
-
-    // Create pi_vehicle_requests table
+    
+    console.log('Creating pi_vehicle_requests table...');
+    
     const createTableQuery = `
       CREATE TABLE pi_vehicle_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,43 +51,57 @@ const createPIVehicleRequestsTable = async () => {
         year INT NOT NULL,
         requested_by INT NOT NULL,
         requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        status ENUM('requested', 'approved', 'assigned', 'completed') DEFAULT 'requested',
+        status ENUM('requested', 'approved', 'assigned', 'completed', 'cancelled') DEFAULT 'requested',
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         
+        INDEX idx_route_month_year (route_id, month, year),
+        INDEX idx_requested_by (requested_by),
+        INDEX idx_status (status),
+        INDEX idx_requested_at (requested_at),
+        
         FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE,
         FOREIGN KEY (requested_by) REFERENCES employees(id) ON DELETE CASCADE,
         
-        UNIQUE KEY unique_route_period (route_id, month, year),
-        INDEX idx_month_year (month, year),
-        INDEX idx_status (status),
-        INDEX idx_requested_by (requested_by)
+        UNIQUE KEY unique_route_period (route_id, month, year)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `;
-
+    
     await connection.execute(createTableQuery);
-    console.log('✅ pi_vehicle_requests table created successfully');
-
-    // Add sample data for testing (optional)
-    console.log('PI Vehicle Requests table setup completed');
-
+    console.log('✅ Successfully created pi_vehicle_requests table');
+    
+    // Verify table creation
+    const [newColumns] = await connection.execute(`DESCRIBE pi_vehicle_requests`);
+    console.log('Created table structure:');
+    newColumns.forEach(col => {
+      console.log(`  ${col.Field}: ${col.Type} ${col.Null === 'NO' ? 'NOT NULL' : 'NULL'} ${col.Key ? `(${col.Key})` : ''}`);
+    });
+    
   } catch (error) {
-    console.error('❌ Error creating pi_vehicle_requests table:', error);
+    console.error('Error creating pi_vehicle_requests table:', error);
+    
+    if (error.code === 'ER_NO_REFERENCED_ROW_2' || error.code === 'ER_CANNOT_ADD_FOREIGN') {
+      console.log('\n⚠️  Foreign key constraint failed. This might be because:');
+      console.log('   - routes table does not exist');
+      console.log('   - employees table does not exist');
+      console.log('   - These tables need to be created first');
+    }
+    
     throw error;
   } finally {
     if (connection) {
       await connection.end();
-      console.log('Database connection closed');
+      console.log('Database connection closed.');
     }
   }
-};
+}
 
-// Run the script if called directly
+// Run the script
 if (require.main === module) {
   createPIVehicleRequestsTable()
     .then(() => {
-      console.log('Script completed successfully');
+      console.log('\nTable creation completed');
       process.exit(0);
     })
     .catch((error) => {

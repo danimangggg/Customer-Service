@@ -31,7 +31,7 @@ async function addEthiopianMonthColumn() {
       ALTER TABLE route_assignments 
       ADD COLUMN ethiopian_month ENUM(
         'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
-        'Megabit', 'Miazia', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
+        'Megabit', 'Miyazya', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
       ) NOT NULL DEFAULT 'Tir' 
       AFTER scheduled_date
     `);

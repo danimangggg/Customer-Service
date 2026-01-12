@@ -7,8 +7,11 @@ const getDispatchRoutes = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
+    console.log('Dispatch routes request:', { month, year, page, limit, search });
+
     // Build the reporting month string
     const reportingMonth = `${month} ${year}`;
+    console.log('Looking for reporting month:', reportingMonth);
 
     // Query to find routes that have been assigned vehicles and are ready for dispatch
     const query = `
@@ -65,10 +68,14 @@ const getDispatchRoutes = async (req, res) => {
 
     queryParams.push(parseInt(limit), parseInt(offset));
 
+    console.log('Executing query with params:', queryParams);
+
     const routes = await db.sequelize.query(query, {
       replacements: queryParams,
       type: db.sequelize.QueryTypes.SELECT
     });
+
+    console.log(`Found ${routes.length} routes`);
 
     // For each route, get the detailed facility information
     const routesWithFacilities = await Promise.all(routes.map(async (route) => {
@@ -100,6 +107,8 @@ const getDispatchRoutes = async (req, res) => {
 
     const totalCount = countResult[0]?.total || 0;
 
+    console.log(`Returning ${routesWithFacilities.length} routes with facilities, total count: ${totalCount}`);
+
     res.json({
       routes: routesWithFacilities,
       totalCount,
@@ -109,7 +118,8 @@ const getDispatchRoutes = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching dispatch routes:', error);
-    res.status(500).json({ error: 'Failed to fetch dispatch routes' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to fetch dispatch routes', details: error.message });
   }
 };
 
@@ -118,6 +128,8 @@ const getDispatchStats = async (req, res) => {
   try {
     const { month, year } = req.query;
     const reportingMonth = `${month} ${year}`;
+
+    console.log('Dispatch stats request:', { month, year, reportingMonth });
 
     // Get total assigned routes (with vehicles)
     const totalAssignedQuery = `
@@ -154,14 +166,19 @@ const getDispatchStats = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    res.json({
+    const stats = {
       totalAssigned: totalResult[0]?.count || 0,
       completedDispatches: completedResult[0]?.count || 0
-    });
+    };
+
+    console.log('Dispatch stats result:', stats);
+
+    res.json(stats);
 
   } catch (error) {
     console.error('Error fetching dispatch stats:', error);
-    res.status(500).json({ error: 'Failed to fetch dispatch stats' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to fetch dispatch stats', details: error.message });
   }
 };
 

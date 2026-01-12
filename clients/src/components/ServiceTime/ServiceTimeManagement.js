@@ -52,7 +52,7 @@ const ServiceTimeManagement = () => {
 
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
-  const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3003';
+  const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Access control - only for regular process officers
   const hasAccess = ['O2C Officer', 'EWM Officer', 'Customer Service Officer'].includes(userJobTitle);

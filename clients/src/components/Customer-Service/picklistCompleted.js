@@ -22,8 +22,6 @@ const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const CompletedPicklists = () => {
   const [picklists, setPicklists] = useState([]);
-  const [services, setServices] = useState([]);
-  const [facilities, setFacilities] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [combinedPicklists, setCombinedPicklists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,21 +32,17 @@ const CompletedPicklists = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [pickRes, serviceRes, facilityRes, empRes] = await Promise.all([
+      const [pickRes, empRes] = await Promise.all([
         axios.get(`${api_url}/api/getPicklists`),
-        axios.get(`${api_url}/api/serviceList`),
-        axios.get(`${api_url}/api/facilities`),
         axios.get(`${api_url}/api/get-employee`),
       ]);
 
-      // Filter picklists with status "completed"
+      // Filter picklists with status "completed" (facility info now comes from backend)
       const completed = (Array.isArray(pickRes.data) ? pickRes.data : []).filter(
         (p) => String(p.status || '').toLowerCase() === 'completed'
       );
 
       setPicklists(completed);
-      setServices(Array.isArray(serviceRes.data) ? serviceRes.data : []);
-      setFacilities(Array.isArray(facilityRes.data) ? facilityRes.data : []);
       setEmployees(Array.isArray(empRes.data) ? empRes.data : []);
     } catch (err) {
       console.error('Error fetching completed picklists:', err);
@@ -61,24 +55,20 @@ const CompletedPicklists = () => {
     fetchData();
   }, [fetchData]);
 
-  // Combine facility and operator info
+  // Combine operator info (facility info now comes from backend)
   useEffect(() => {
     const combined = picklists.map((p) => {
-      const service = services.find((s) => String(s.id) === String(p.process_id));
-      const facility = facilities.find(
-        (f) => service && String(f.id) === String(service.facility_id)
-      );
       const operator = employees.find(
         (e) => Number(e.id) === Number(p.operator_id)
       );
       return {
         ...p,
-        facility,
+        // facility is now provided directly from backend
         operator,
       };
     });
     setCombinedPicklists(combined);
-  }, [picklists, services, facilities, employees]);
+  }, [picklists, employees]);
 
   const columns = [
     { name: 'odn', label: 'ODN' },

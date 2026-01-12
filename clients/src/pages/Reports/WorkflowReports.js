@@ -50,15 +50,78 @@ import {
 } from 'recharts';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3003';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const WorkflowReports = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
+  const ethiopianMonths = [
+    'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
+  ];
+
+  // Ethiopian calendar helper functions (copied from HP-Facilities)
+  const getCurrentEthiopianMonth = (gDate = new Date()) => {
+    // Ethiopian New Year starts on September 11 (or 12 in leap years)
+    const gy = gDate.getFullYear();
+    const gm = gDate.getMonth(); // 0-based (0 = January, 8 = September)
+    const gd = gDate.getDate();
+    
+    // Determine if current Gregorian year is a leap year
+    const isLeap = (gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0);
+    
+    // Ethiopian New Year date for current Gregorian year
+    const newYearDay = isLeap ? 12 : 11; // September 12 in leap years, September 11 otherwise
+    
+    let ethYear, ethMonthIndex;
+    
+    // Check if we're before or after Ethiopian New Year
+    if (gm > 8 || (gm === 8 && gd >= newYearDay)) {
+      // After Ethiopian New Year - we're in the new Ethiopian year
+      ethYear = gy - 7; // Ethiopian year is 7 years behind after New Year
+      
+      // Calculate days since Ethiopian New Year
+      const newYearDate = new Date(gy, 8, newYearDay); // September 11/12
+      const diffDays = Math.floor((gDate - newYearDate) / (24 * 60 * 60 * 1000));
+      
+      // Each Ethiopian month has 30 days (except Pagume which has 5/6 days)
+      if (diffDays < 360) {
+        ethMonthIndex = Math.floor(diffDays / 30);
+      } else {
+        ethMonthIndex = 12; // Pagume (13th month)
+      }
+    } else {
+      // Before Ethiopian New Year - we're still in the previous Ethiopian year
+      ethYear = gy - 8; // Ethiopian year is 8 years behind before New Year
+      
+      // Calculate from previous year's Ethiopian New Year
+      const prevIsLeap = ((gy - 1) % 4 === 0 && (gy - 1) % 100 !== 0) || ((gy - 1) % 400 === 0);
+      const prevNewYearDay = prevIsLeap ? 12 : 11;
+      const prevNewYearDate = new Date(gy - 1, 8, prevNewYearDay);
+      const diffDays = Math.floor((gDate - prevNewYearDate) / (24 * 60 * 60 * 1000));
+      
+      if (diffDays < 360) {
+        ethMonthIndex = Math.floor(diffDays / 30);
+      } else {
+        ethMonthIndex = 12; // Pagume
+      }
+    }
+    
+    // Ensure month index is within valid range
+    ethMonthIndex = Math.max(0, Math.min(ethMonthIndex, 12));
+    
+    const result = { year: ethYear, monthIndex: ethMonthIndex };
+    
+    return result;
+  };
+
+  const initialEth = getCurrentEthiopianMonth();
+  const currentEthiopianMonth = ethiopianMonths[initialEth.monthIndex];
+  const currentEthiopianYear = initialEth.year;
+
   const [filters, setFilters] = useState({
-    month: '',
-    year: new Date().getFullYear().toString()
+    month: currentEthiopianMonth,
+    year: currentEthiopianYear.toString()
   });
 
   // Data states
@@ -67,10 +130,6 @@ const WorkflowReports = () => {
   const [followupData, setFollowupData] = useState({});
   const [qualityData, setQualityData] = useState({});
   const [workflowData, setWorkflowData] = useState({});
-
-  const ethiopianMonths = [
-    'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
-  ];
 
   const colors = ['#2196f3', '#4caf50', '#ff9800', '#f44336', '#9c27b0', '#00bcd4'];
 
@@ -163,14 +222,24 @@ const WorkflowReports = () => {
           </FormControl>
         </Grid>
         <Grid item xs={12} md={3}>
-          <TextField
-            fullWidth
-            label="Year"
-            type="number"
-            value={filters.year}
-            onChange={(e) => handleFilterChange('year', e.target.value)}
-            inputProps={{ min: 2010, max: 2030 }}
-          />
+          <FormControl fullWidth>
+            <InputLabel>Ethiopian Year</InputLabel>
+            <Select
+              value={filters.year}
+              label="Ethiopian Year"
+              onChange={(e) => handleFilterChange('year', e.target.value)}
+            >
+              <MenuItem value="">All Years</MenuItem>
+              {Array.from({ length: 11 }, (_, i) => {
+                const year = currentEthiopianYear - 5 + i;
+                return (
+                  <MenuItem key={year} value={year.toString()}>
+                    {year}
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          </FormControl>
         </Grid>
       </Grid>
 

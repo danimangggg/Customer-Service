@@ -149,7 +149,7 @@ const RouteManagement = () => {
   const statusOptions = ['Assigned', 'Not Assigned'];
   const ethiopianMonths = [
     'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
-    'Megabit', 'Miazia', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
+    'Megabit', 'Miyazya', 'Ginbot', 'Sene', 'Hamle', 'Nehase', 'Pagume'
   ];
 
   useEffect(() => {

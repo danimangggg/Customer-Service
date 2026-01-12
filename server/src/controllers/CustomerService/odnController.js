@@ -62,6 +62,30 @@ const saveODN = async (req, res) => {
       });
     }
 
+    // Check if ODN number already exists
+    const existingODN = await ODN.findOne({
+      where: { odn_number: odn_number.trim() },
+      include: [{
+        model: Process,
+        as: 'process',
+        include: [{
+          model: db.facility,
+          as: 'facility',
+          attributes: ['facility_name']
+        }]
+      }]
+    });
+
+    if (existingODN) {
+      const facilityName = existingODN.process?.facility?.facility_name || 'Unknown Facility';
+      
+      return res.status(409).send({ 
+        message: `ODN number "${odn_number.trim()}" already exists for ${facilityName}. Please use a unique ODN number.`,
+        existingFacility: facilityName,
+        existingProcessId: existingODN.process_id
+      });
+    }
+
     // Save the ODN
     const savedODN = await ODN.create({
       process_id,
@@ -75,6 +99,14 @@ const saveODN = async (req, res) => {
 
   } catch (err) {
     console.error('saveODN error:', err);
+    
+    // Handle unique constraint violation
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).send({ 
+        message: `ODN number "${req.body.odn_number}" already exists. Please use a unique ODN number.`
+      });
+    }
+    
     return res.status(500).send({ 
       message: 'Internal server error', 
       error: err.message 

@@ -46,10 +46,23 @@ const HPFacilities = () => {
 
   const fetchRoutes = async () => {
     try {
+      console.log('Fetching routes from:', `${api_url}/api/routes`);
       const res = await axios.get(`${api_url}/api/routes`);
+      console.log('Routes response:', res.data);
       setRoutes(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("Routes fetch error:", err);
+      console.error("Error response:", err.response?.data);
+      console.error("Error status:", err.response?.status);
+      
+      // Show user-friendly error message
+      if (err.response?.status === 500) {
+        alert("Failed to load route data. Please check if the database is running and try again.");
+      } else if (err.response?.status === 404) {
+        alert("Route API endpoint not found. Please contact system administrator.");
+      } else {
+        alert(`Failed to load route data: ${err.message}`);
+      }
     }
   };
 

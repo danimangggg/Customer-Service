@@ -109,6 +109,20 @@ const Sidebar = () => {
               background: 'rgba(255,255,255,0.3)',
               borderRadius: '3px',
             },
+            // Global text wrapping for all menu items
+            '& .MuiListItemText-root': {
+              margin: 0,
+              '& .MuiListItemText-primary': {
+                whiteSpace: 'normal',
+                wordWrap: 'break-word',
+                lineHeight: 1.3,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical'
+              }
+            }
           },
         }}
       >
@@ -170,7 +184,10 @@ const Sidebar = () => {
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
-                     fontSize: '0.95rem'
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
                    } 
                  }} 
                />
@@ -206,7 +223,10 @@ const Sidebar = () => {
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
-                     fontSize: '0.95rem'
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
                    } 
                  }} 
                />
@@ -457,77 +477,10 @@ const Sidebar = () => {
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
-         {/* Picklists - for O2C and EWM Officers (Non-HP) */}
-         {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer") && (
-           <MenuTooltip title={"Picklists"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/all-picklists"
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
-                 transition: 'all 0.2s ease'
-               }}
-             >
-               <ListItemIcon>
-                 <Inventory sx={{ color: '#9c27b0' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"Picklists"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
-         {/* Picklists - for HP Officers */}
-         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
-           <MenuTooltip title={"Picklists"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/all-picklists"
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
-                 transition: 'all 0.2s ease'
-               }}
-             >
-               <ListItemIcon>
-                 <Inventory sx={{ color: '#9c27b0' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"Picklists"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
-                     fontSize: '0.95rem'
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
                    } 
                  }} 
                />
@@ -667,7 +620,10 @@ const Sidebar = () => {
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
-                     fontSize: '0.95rem'
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
                    } 
                  }} 
                />
@@ -740,7 +696,10 @@ const Sidebar = () => {
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,
-                       fontSize: '0.9rem'
+                       fontSize: '0.8rem',
+                       lineHeight: 1.2,
+                       whiteSpace: 'normal',
+                       wordWrap: 'break-word'
                      } 
                    }} 
                  />
@@ -773,7 +732,10 @@ const Sidebar = () => {
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,
-                       fontSize: '0.9rem'
+                       fontSize: '0.8rem',
+                       lineHeight: 1.2,
+                       whiteSpace: 'normal',
+                       wordWrap: 'break-word'
                      } 
                    }} 
                  />
@@ -941,8 +903,11 @@ const Sidebar = () => {
                    primary={"Vehicle Management"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
-                       fontSize: '0.8rem',
+                       fontSize: '0.75rem',
                        fontWeight: 400,
+                       lineHeight: 1.2,
+                       whiteSpace: 'normal',
+                       wordWrap: 'break-word'
                      } 
                    }} 
                  />
@@ -1120,12 +1085,12 @@ const Sidebar = () => {
                </ListItem>
              </MenuTooltip>
 
-             {/* Picklist Reports */}
-             <MenuTooltip title={"Picklist Reports"}>
+             {/* All Picklists */}
+             <MenuTooltip title={"All Picklists"}>
                <ListItem 
                  button 
                  component={Link} 
-                 to="/reports/picklists"
+                 to="/reports/all-picklists"
                  sx={{
                    borderRadius: 2,
                    mx: 1,
@@ -1142,7 +1107,7 @@ const Sidebar = () => {
                    <Assignment sx={{ color: '#9c27b0', fontSize: 20 }} />
                  </ListItemIcon>
                  <ListItemText 
-                   primary={"Picklist Reports"} 
+                   primary={"All Picklists"} 
                    sx={{ 
                      '& .MuiListItemText-primary': { 
                        fontWeight: 400,

@@ -30,6 +30,14 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'odns',
     timestamps: false,
+    indexes: [
+      {
+        // Add unique constraint on odn_number to prevent duplicates
+        unique: true,
+        fields: ['odn_number'],
+        name: 'unique_odn_number'
+      }
+    ]
   });
 
   return ODN;

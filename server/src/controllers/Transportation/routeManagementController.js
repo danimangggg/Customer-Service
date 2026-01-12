@@ -8,16 +8,54 @@ const Employee = db.employee;
 // Get all routes
 const getAllRoutes = async (req, res) => {
   try {
+    console.log('Fetching all routes...');
+    console.log('Route model available:', !!Route);
+    console.log('Database connection available:', !!db.sequelize);
+    
+    // Test database connection
+    await db.sequelize.authenticate();
+    console.log('Database connection successful');
+    
     const routes = await Route.findAll({
       attributes: ['id', 'route_name'],
       order: [['route_name', 'ASC']]
     });
 
     console.log('Routes found:', routes.length);
+    console.log('Sample routes:', routes.slice(0, 3).map(r => ({ id: r.id, route_name: r.route_name })));
+    
+    if (routes.length === 0) {
+      console.log('⚠️  No routes found in database. This might be why PI Officer HP is getting "Failed to load route data"');
+    }
+    
     res.json(routes);
   } catch (error) {
     console.error('Error fetching routes:', error);
-    res.status(500).json({ error: 'Failed to fetch routes' });
+    console.error('Error stack:', error.stack);
+    
+    // Check if it's a database connection error
+    if (error.name === 'ConnectionError' || error.name === 'SequelizeConnectionError') {
+      console.error('❌ Database connection failed');
+      return res.status(503).json({ 
+        error: 'Database connection failed',
+        details: 'Please check if the database server is running'
+      });
+    }
+    
+    // Check if it's a table not found error
+    if (error.message.includes('Table') && error.message.includes("doesn't exist")) {
+      console.error('❌ Routes table does not exist');
+      return res.status(500).json({ 
+        error: 'Routes table not found',
+        details: 'Please run database migrations to create the routes table'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch routes',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
@@ -64,6 +102,9 @@ const getAvailableDeliverers = async (req, res) => {
 // Get all available vehicles
 const getAvailableVehicles = async (req, res) => {
   try {
+    console.log('Fetching available vehicles...');
+    console.log('Vehicle model available:', !!Vehicle);
+    
     const vehicles = await Vehicle.findAll({
       where: { 
         status: 'Active'
@@ -72,11 +113,31 @@ const getAvailableVehicles = async (req, res) => {
       order: [['vehicle_name', 'ASC']]
     });
 
-    console.log('Vehicles found:', vehicles.length);
+    console.log('Available vehicles found:', vehicles.length);
+    console.log('Sample vehicles:', vehicles.slice(0, 3).map(v => ({ 
+      id: v.id, 
+      vehicle_name: v.vehicle_name, 
+      plate_number: v.plate_number 
+    })));
+    
     res.json(vehicles);
   } catch (error) {
-    console.error('Error fetching vehicles:', error);
-    res.status(500).json({ error: 'Failed to fetch vehicles' });
+    console.error('Error fetching available vehicles:', error);
+    console.error('Error stack:', error.stack);
+    
+    // Check if it's a table not found error
+    if (error.message.includes('Table') && error.message.includes("doesn't exist")) {
+      console.error('❌ Vehicles table does not exist');
+      return res.status(500).json({ 
+        error: 'Vehicles table not found',
+        details: 'Please run database migrations to create the vehicles table'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to fetch available vehicles',
+      details: error.message
+    });
   }
 };
 
@@ -582,8 +643,11 @@ const getReadyRoutes = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '', status = '' } = req.query;
     const offset = (page - 1) * limit;
 
+    console.log('Ready Routes - Request params:', { month, year, page, limit, search, status });
+
     // Build the reporting month string
     const reportingMonth = `${month} ${year}`;
+    console.log('Looking for reporting month:', reportingMonth);
 
     // Query to find routes that are ready for transportation assignment (vehicle requested)
     const query = `
@@ -620,37 +684,23 @@ const getReadyRoutes = async (req, res) => {
       LIMIT ? OFFSET ?
     `;
 
-    const countQuery = `
-      SELECT COUNT(DISTINCT r.id) as total
-      FROM routes r
-      INNER JOIN facilities f ON f.route = r.route_name
-      INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-      LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE f.route IS NOT NULL 
-        AND f.period IS NOT NULL
-        AND p.status = 'vehicle_requested'
-        ${search ? 'AND f.facility_name LIKE ?' : ''}
-        ${status === 'Assigned' ? 'AND ra.status IS NOT NULL' : ''}
-        ${status === 'Not Assigned' ? 'AND ra.status IS NULL' : ''}
-      GROUP BY r.id
-      HAVING COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END)
-    `;
-
     let queryParams = [reportingMonth, month];
-    let countParams = [reportingMonth, month];
 
     if (search) {
       const searchPattern = `%${search}%`;
       queryParams.push(searchPattern);
-      countParams.push(searchPattern);
     }
 
     queryParams.push(parseInt(limit), parseInt(offset));
+
+    console.log('Executing ready routes query with params:', queryParams);
 
     const routes = await db.sequelize.query(query, {
       replacements: queryParams,
       type: db.sequelize.QueryTypes.SELECT
     });
+
+    console.log(`Found ${routes.length} ready routes`);
     
     // For each route, get the detailed facility information
     const routesWithFacilities = await Promise.all(routes.map(async (route) => {
@@ -675,12 +725,34 @@ const getReadyRoutes = async (req, res) => {
       };
     }));
     
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(DISTINCT r.id) as total
+      FROM routes r
+      INNER JOIN facilities f ON f.route = r.route_name
+      INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+      WHERE f.route IS NOT NULL 
+        AND f.period IS NOT NULL
+        AND p.status = 'vehicle_requested'
+        ${search ? 'AND f.facility_name LIKE ?' : ''}
+      GROUP BY r.id
+      HAVING COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END)
+    `;
+
+    let countParams = [reportingMonth];
+    if (search) {
+      const searchPattern = `%${search}%`;
+      countParams.push(searchPattern);
+    }
+
     const countResult = await db.sequelize.query(countQuery, {
       replacements: countParams,
       type: db.sequelize.QueryTypes.SELECT
     });
     
     const totalCount = countResult.length;
+
+    console.log(`Returning ${routesWithFacilities.length} routes with details, total count: ${totalCount}`);
 
     res.json({
       routes: routesWithFacilities,
@@ -691,7 +763,11 @@ const getReadyRoutes = async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching ready routes:', error);
-    res.status(500).json({ error: 'Failed to fetch ready routes' });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch ready routes',
+      details: error.message
+    });
   }
 };
 

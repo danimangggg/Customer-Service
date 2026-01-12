@@ -34,7 +34,7 @@ import DashboardAnalytics from './pages/Reports/DashboardAnalytics';
 import WorkflowReports from './pages/Reports/WorkflowReports';
 import TransportationReports from './pages/Reports/TransportationReports';
 import HealthProgramReports from './pages/Reports/HealthProgramReports';
-import PicklistReportsPage from './pages/Reports/PicklistReportsPage';
+import AllPicklists from './components/Customer-Service/AllPicklists';
 import OrganizationProfileView from './components/Reports/OrganizationProfileView';
 import OrganizationProfilePage from './pages/Settings/OrganizationProfilePage';
 import UserManagementPage from './pages/Settings/UserManagementPage';
@@ -91,9 +91,9 @@ const AppContent = () => {
             <Route path = '/service-time-management' Component={ServiceTimeManagement} />
             <Route path = '/reports/dashboard' Component={DashboardAnalytics} />
             <Route path = '/reports/workflow' Component={WorkflowReports} />
+            <Route path = '/reports/all-picklists' Component={AllPicklists} />
             <Route path = '/reports/transportation' Component={TransportationReports} />
             <Route path = '/reports/health-program' Component={HealthProgramReports} />
-            <Route path = '/reports/picklists' Component={PicklistReportsPage} />
             <Route path = '/reports/organization-profile' Component={OrganizationProfileView} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />
