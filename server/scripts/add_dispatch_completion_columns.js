@@ -1,73 +1,78 @@
-require('dotenv').config();
-const mysql = require('mysql2/promise');
-
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'areacode',
-  database: process.env.DB_NAME || 'customer-service'
-};
+const db = require('../src/models');
 
 async function addDispatchCompletionColumns() {
-  let connection;
-  
   try {
-    connection = await mysql.createConnection(dbConfig);
-    console.log('Connected to MySQL database');
-
-    // Check if columns already exist
-    const [columns] = await connection.execute(`
-      SELECT COLUMN_NAME 
-      FROM INFORMATION_SCHEMA.COLUMNS 
-      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'route_assignments' 
-      AND COLUMN_NAME IN ('completed_at', 'completed_by')
-    `, [dbConfig.database]);
-
-    const existingColumns = columns.map(col => col.COLUMN_NAME);
+    console.log('🔧 Adding dispatch completion columns...\n');
     
-    if (existingColumns.includes('completed_at') && existingColumns.includes('completed_by')) {
-      console.log('✅ Dispatch completion columns already exist in route_assignments table');
-      return;
+    await db.sequelize.authenticate();
+    console.log('✅ Database connection successful\n');
+    
+    // Check if completed_at column exists
+    try {
+      await db.sequelize.query('SELECT completed_at FROM route_assignments LIMIT 1');
+      console.log('✅ completed_at column already exists');
+    } catch (error) {
+      if (error.message.includes('Unknown column')) {
+        console.log('Adding completed_at column...');
+        await db.sequelize.query(`
+          ALTER TABLE route_assignments 
+          ADD COLUMN completed_at DATETIME NULL 
+          COMMENT 'When the dispatch was completed'
+        `);
+        console.log('✅ Added completed_at column');
+      } else {
+        throw error;
+      }
     }
-
-    // Add completed_at column if it doesn't exist
-    if (!existingColumns.includes('completed_at')) {
-      await connection.execute(`
-        ALTER TABLE route_assignments 
-        ADD COLUMN completed_at TIMESTAMP NULL DEFAULT NULL
-      `);
-      console.log('✅ Added completed_at column to route_assignments table');
+    
+    // Check if completed_by column exists
+    try {
+      await db.sequelize.query('SELECT completed_by FROM route_assignments LIMIT 1');
+      console.log('✅ completed_by column already exists');
+    } catch (error) {
+      if (error.message.includes('Unknown column')) {
+        console.log('Adding completed_by column...');
+        await db.sequelize.query(`
+          ALTER TABLE route_assignments 
+          ADD COLUMN completed_by INT NULL 
+          COMMENT 'Employee ID who completed the dispatch'
+        `);
+        console.log('✅ Added completed_by column');
+      } else {
+        throw error;
+      }
     }
-
-    // Add completed_by column if it doesn't exist
-    if (!existingColumns.includes('completed_by')) {
-      await connection.execute(`
-        ALTER TABLE route_assignments 
-        ADD COLUMN completed_by VARCHAR(255) NULL DEFAULT NULL
-      `);
-      console.log('✅ Added completed_by column to route_assignments table');
-    }
-
-    console.log('✅ Dispatch completion columns setup completed successfully');
-
+    
+    // Show updated table structure
+    const tableInfo = await db.sequelize.query('DESCRIBE route_assignments', {
+      type: db.sequelize.QueryTypes.SELECT
+    });
+    
+    console.log('\nUpdated route_assignments table structure:');
+    const relevantColumns = tableInfo.filter(col => 
+      ['status', 'completed_at', 'completed_by', 'actual_start_time', 'actual_end_time'].includes(col.Field)
+    );
+    
+    relevantColumns.forEach(column => {
+      console.log(`  ${column.Field}: ${column.Type} ${column.Null === 'YES' ? 'NULL' : 'NOT NULL'} ${column.Default ? `DEFAULT ${column.Default}` : ''}`);
+    });
+    
+    console.log('\n🎉 Dispatch completion columns added successfully!');
+    
   } catch (error) {
-    console.error('❌ Error setting up dispatch completion columns:', error);
+    console.error('❌ Error adding columns:', error);
     throw error;
   } finally {
-    if (connection) {
-      await connection.end();
-      console.log('Database connection closed');
-    }
+    await db.sequelize.close();
   }
 }
 
-// Run the script
 addDispatchCompletionColumns()
   .then(() => {
-    console.log('Script completed successfully');
+    console.log('\n✅ Column addition completed successfully!');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('Script failed:', error);
+    console.error('\n❌ Column addition failed:', error);
     process.exit(1);
   });

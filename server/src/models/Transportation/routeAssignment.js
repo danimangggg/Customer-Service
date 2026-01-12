@@ -87,6 +87,20 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: true
     },
+    completed_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'When the dispatch was completed'
+    },
+    completed_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'employees',
+        key: 'id'
+      },
+      comment: 'Employee ID who completed the dispatch'
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
