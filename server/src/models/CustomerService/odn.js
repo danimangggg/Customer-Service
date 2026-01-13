@@ -89,6 +89,16 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: true
     },
+    arrival_kilometer: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Arrival kilometer reading'
+    },
+    pod_number: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      comment: 'POD number for documentation'
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,

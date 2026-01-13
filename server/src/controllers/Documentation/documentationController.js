@@ -18,6 +18,8 @@ const getDispatchedODNs = async (req, res) => {
         o.status as odn_status,
         o.pod_confirmed,
         o.pod_reason,
+        o.pod_number,
+        o.arrival_kilometer,
         o.pod_confirmed_by,
         o.pod_confirmed_at,
         f.facility_name,
@@ -236,7 +238,7 @@ const bulkUpdatePODConfirmation = async (req, res) => {
     // Process each update
     const results = [];
     for (const update of updates) {
-      const { odn_id, pod_confirmed, pod_reason } = update;
+      const { odn_id, pod_confirmed, pod_reason, pod_number, arrival_kilometer } = update;
 
       if (odn_id === undefined || pod_confirmed === undefined) {
         continue; // Skip invalid updates
@@ -252,13 +254,22 @@ const bulkUpdatePODConfirmation = async (req, res) => {
           UPDATE odns 
           SET pod_confirmed = ?, 
               pod_reason = ?,
+              pod_number = ?,
+              arrival_kilometer = ?,
               pod_confirmed_by = ?,
               pod_confirmed_at = NOW()
           WHERE id = ?
         `;
 
         await db.sequelize.query(updateQuery, {
-          replacements: [pod_confirmed, pod_reason || null, confirmed_by, odn_id],
+          replacements: [
+            pod_confirmed, 
+            pod_reason || null, 
+            pod_number || null,
+            arrival_kilometer || null,
+            confirmed_by, 
+            odn_id
+          ],
           type: db.sequelize.QueryTypes.UPDATE
         });
 
@@ -266,7 +277,9 @@ const bulkUpdatePODConfirmation = async (req, res) => {
           odn_id,
           success: true,
           pod_confirmed,
-          pod_reason: pod_reason || null
+          pod_reason: pod_reason || null,
+          pod_number: pod_number || null,
+          arrival_kilometer: arrival_kilometer || null
         });
       } catch (error) {
         results.push({

@@ -193,6 +193,130 @@ const DocumentationManagement = () => {
     const currentODN = odnData.find(odn => odn.odn_id === odnId);
     const currentReason = pendingUpdates[odnId]?.pod_reason || currentODN?.pod_reason || '';
 
+    // If confirming POD, collect POD number and arrival kilometer
+    if (confirmed) {
+      const { value: formValues } = await MySwal.fire({
+        title: 'POD Confirmation Details',
+        html: `
+          <div style="text-align: left; margin: 20px 0;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">POD Number:</label>
+            <input id="pod-number" class="swal2-input" placeholder="Enter POD number..." value="${currentODN?.pod_number || ''}" style="margin-bottom: 15px;">
+            
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Arrival Kilometer:</label>
+            <input id="arrival-km" class="swal2-input" type="number" step="0.01" min="0" placeholder="Enter arrival kilometer..." value="${currentODN?.arrival_kilometer || ''}" style="margin-bottom: 15px;">
+          </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Confirm POD',
+        cancelButtonText: 'Cancel',
+        preConfirm: () => {
+          const podNumber = document.getElementById('pod-number').value;
+          const arrivalKm = document.getElementById('arrival-km').value;
+          
+          if (!podNumber.trim()) {
+            MySwal.showValidationMessage('POD number is required');
+            return false;
+          }
+          
+          if (!arrivalKm || parseFloat(arrivalKm) < 0) {
+            MySwal.showValidationMessage('Valid arrival kilometer is required');
+            return false;
+          }
+          
+          return {
+            podNumber: podNumber.trim(),
+            arrivalKm: parseFloat(arrivalKm)
+          };
+        }
+      });
+
+      if (formValues) {
+        // Update UI immediately for instant feedback
+        setPendingUpdates(prev => ({
+          ...prev,
+          [odnId]: {
+            ...prev[odnId],
+            pod_confirmed: true,
+            pod_reason: '',
+            pod_number: formValues.podNumber,
+            arrival_kilometer: formValues.arrivalKm
+          }
+        }));
+
+        // Update ODN data for consistent UI
+        setODNData(prevData => 
+          prevData.map(odn => 
+            odn.odn_id === odnId 
+              ? { 
+                  ...odn, 
+                  pod_confirmed: 1,
+                  pod_number: formValues.podNumber,
+                  arrival_kilometer: formValues.arrivalKm
+                }
+              : odn
+          )
+        );
+
+        // Save to database
+        try {
+          setAutoSaving(true);
+          const update = {
+            odn_id: parseInt(odnId),
+            pod_confirmed: true,
+            pod_reason: '',
+            pod_number: formValues.podNumber,
+            arrival_kilometer: formValues.arrivalKm
+          };
+
+          await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
+            updates: [update],
+            confirmed_by: loggedInUserId
+          });
+
+          // Remove from pending updates since it's saved
+          setPendingUpdates(prev => {
+            const newState = { ...prev };
+            delete newState[odnId];
+            return newState;
+          });
+
+          // Update stats
+          fetchStats();
+
+          MySwal.fire({
+            icon: 'success',
+            title: 'Success!',
+            text: 'POD confirmed with details',
+            timer: 2000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+          });
+
+        } catch (err) {
+          console.error('Save error:', err);
+          // Revert UI changes if save failed
+          setODNData(prevData => 
+            prevData.map(odn => 
+              odn.odn_id === odnId 
+                ? { ...odn, pod_confirmed: 0 }
+                : odn
+            )
+          );
+          setPendingUpdates(prev => {
+            const newState = { ...prev };
+            delete newState[odnId];
+            return newState;
+          });
+          MySwal.fire('Error', 'Failed to save POD confirmation.', 'error');
+        } finally {
+          setAutoSaving(false);
+        }
+      }
+      return;
+    }
+
     // Update UI immediately for instant feedback
     setPendingUpdates(prev => {
       const newState = {
@@ -250,7 +374,9 @@ const DocumentationManagement = () => {
           const update = {
             odn_id: parseInt(odnId),
             pod_confirmed: false,
-            pod_reason: reason.trim()
+            pod_reason: reason.trim(),
+            pod_number: currentODN?.pod_number || '',
+            arrival_kilometer: currentODN?.arrival_kilometer || null
           };
 
           await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -325,7 +451,9 @@ const DocumentationManagement = () => {
       const update = {
         odn_id: parseInt(odnId),
         pod_confirmed: confirmed,
-        pod_reason: confirmed ? '' : currentReason
+        pod_reason: confirmed ? '' : currentReason,
+        pod_number: currentODN?.pod_number || '',
+        arrival_kilometer: currentODN?.arrival_kilometer || null
       };
 
       await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -441,7 +569,9 @@ const DocumentationManagement = () => {
         const update = {
           odn_id: parseInt(odnId),
           pod_confirmed: currentPODStatus,
-          pod_reason: reason
+          pod_reason: reason,
+          pod_number: pendingUpdates[odnId]?.pod_number || odnData.find(odn => odn.odn_id === odnId)?.pod_number || '',
+          arrival_kilometer: pendingUpdates[odnId]?.arrival_kilometer || odnData.find(odn => odn.odn_id === odnId)?.arrival_kilometer || null
         };
 
         await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -583,7 +713,9 @@ const DocumentationManagement = () => {
     const updates = Object.entries(pendingUpdates).map(([odn_id, data]) => ({
       odn_id: parseInt(odn_id),
       pod_confirmed: data.pod_confirmed,
-      pod_reason: data.pod_reason
+      pod_reason: data.pod_reason,
+      pod_number: data.pod_number,
+      arrival_kilometer: data.arrival_kilometer
     }));
 
     if (updates.length === 0) {
