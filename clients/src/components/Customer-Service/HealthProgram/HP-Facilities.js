@@ -19,7 +19,6 @@ import RouteIcon from '@mui/icons-material/Route';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import PersonIcon from '@mui/icons-material/Person';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import axios from 'axios';
 import Swal from 'sweetalert2';
@@ -34,6 +33,7 @@ const HpFacilities = () => {
   const [activeProcesses, setActiveProcesses] = useState([]);
   const [processODNCounts, setProcessODNCounts] = useState({});
   const [processODNData, setProcessODNData] = useState({});
+  const [routes, setRoutes] = useState(["All"]); // Initialize with "All" option
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -129,14 +129,20 @@ const HpFacilities = () => {
       try {
         setLoading(true);
         setError(null);
-        const [facRes, procRes] = await Promise.all([
+        const [facRes, procRes, routesRes] = await Promise.all([
           axios.get(`${api_url}/api/facilities`),
-          axios.get(`${api_url}/api/active-processes`)
+          axios.get(`${api_url}/api/active-processes`),
+          axios.get(`${api_url}/api/routes`) // Fetch routes from routes table
         ]);
         const allFacilities = facRes.data || [];
         setFacilities(allFacilities); // Store all facilities, not just those with routes
         const processes = procRes.data || [];
         setActiveProcesses(processes);
+        
+        // Set routes from database
+        const routesData = routesRes.data || [];
+        const routeNames = ["All", ...routesData.map(route => route.route_name)];
+        setRoutes(routeNames);
         
         // Fetch ODN counts for all active processes
         if (processes.length > 0) {
@@ -708,7 +714,13 @@ const HpFacilities = () => {
       const shouldShow = shouldShowFacility(f);
       
       if (matchesSearch && matchesRoute && shouldShow) {
-        const proc = activeProcesses.find(a => a.facility_id === f.id && a.status === 'o2c_completed');
+        // Filter processes by current month/year for EWM officers
+        const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
+        const proc = activeProcesses.find(a => 
+          a.facility_id === f.id && 
+          a.status === 'o2c_completed' && 
+          a.reporting_month === selReporting // Add month/year filtering
+        );
         
         if (proc) {
           const odnList = processODNData[proc.id] || [];
@@ -760,18 +772,9 @@ const HpFacilities = () => {
     });
   }
 
-  // Get unique routes for filter dropdown
-  const routes = ["All", ...new Set(facilities.map(f => f.route).filter(Boolean))];
-
-  // Calculate statistics based on user role
-  const totalFacilities = filteredData.length;
-  const activeProcessCount = activeProcesses.length;
-  const totalODNs = Object.values(processODNCounts).reduce((sum, count) => sum + count, 0);
-  
-  // Role-specific statistics
-  const o2cCompletedCount = activeProcesses.filter(p => p.status === 'o2c_completed').length;
-  const ewmCompletedCount = activeProcesses.filter(p => p.status === 'ewm_completed').length;
-  const pendingEWMCount = isEWMOfficer ? o2cCompletedCount - ewmCompletedCount : 0;
+  // Get unique routes for filter dropdown - now using routes from database
+  // const routes = ["All", ...new Set(facilities.map(f => f.route).filter(Boolean))]; // OLD: hardcoded from facilities
+  // Routes are now fetched from database in useEffect
 
   // Access control - only allow specific job titles
   if (!isO2COfficer && !isEWMOfficer) {
@@ -869,61 +872,6 @@ const HpFacilities = () => {
             </Stack>
           </Box>
         </Card>
-
-        {/* Statistics Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <BusinessIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {totalFacilities}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Facilities
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-2" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <TrendingUpIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {isEWMOfficer ? pendingEWMCount : activeProcessCount}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    {isEWMOfficer ? 'Pending EWM' : 'Active Processes'}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-3" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <AssignmentIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {isEWMOfficer ? ewmCompletedCount : totalODNs}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    {isEWMOfficer ? 'EWM Completed' : 'Total ODNs'}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-        </Grid>
 
         {/* Error Alert */}
         {error && (
