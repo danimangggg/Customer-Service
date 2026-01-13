@@ -66,7 +66,12 @@ export default function SignIn() {
           if(response.data.Position === "Admin"){
             navigate('/customer-dashboard');
           } else if(response.data.Position === "Officer" && response.data.JobTitle != "WIM Operator"){
-            navigate(`/customer-dashboard`);
+            // Check if it's an HP Officer, PI Officer, Documentation Officer, Documentation Follower, Quality Evaluator, Dispatcher, or TM Manager
+            if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
+              navigate('/hp-dashboard');
+            } else {
+              navigate(`/customer-dashboard`);
+            }
           } 
           else if(response.data.Position === "Officer" && response.data.JobTitle === "WIM Operator"){
             navigate(`/all-picklists`);

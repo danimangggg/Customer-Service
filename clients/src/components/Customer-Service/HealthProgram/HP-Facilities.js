@@ -20,6 +20,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import PersonIcon from '@mui/icons-material/Person';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import FilterListIcon from '@mui/icons-material/FilterList';
+import ReplyIcon from '@mui/icons-material/Reply';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -213,6 +214,7 @@ const HpFacilities = () => {
         setActiveProcesses(prev => [...prev, { 
           id: res.data.process_id, 
           facility_id: facilityId, 
+          status: "o2c_started", // Add the missing status field
           o2c_officer_name: res.data.officerName, 
           o2c_officer_id: loggedInUserId, 
           reporting_month: reportingMonthStr 
@@ -578,18 +580,55 @@ const HpFacilities = () => {
           odn_id: odnId
         });
         
-        // Update the ODN status in local state
-        setProcessODNData(prev => {
-          const newData = { ...prev };
-          Object.keys(newData).forEach(processId => {
-            newData[processId] = newData[processId].map(odn => 
-              odn.id === odnId 
-                ? { ...odn, status: 'ewm_completed' }
-                : odn
-            );
+        // For EWM Officers: Remove the completed process from view immediately
+        if (isEWMOfficer) {
+          // Find which process this ODN belongs to
+          let processIdToRemove = null;
+          Object.keys(processODNData).forEach(processId => {
+            const odnExists = processODNData[processId].find(odn => odn.id === odnId);
+            if (odnExists) {
+              processIdToRemove = processId;
+            }
           });
-          return newData;
-        });
+          
+          if (processIdToRemove) {
+            // Update process status to ewm_completed so it disappears from EWM view
+            setActiveProcesses(prev => 
+              prev.map(p => 
+                p.id === parseInt(processIdToRemove) 
+                  ? { ...p, status: 'ewm_completed' }
+                  : p
+              )
+            );
+            
+            // Remove the process ODN data
+            setProcessODNData(prev => {
+              const newData = { ...prev };
+              delete newData[processIdToRemove];
+              return newData;
+            });
+            
+            // Remove ODN count
+            setProcessODNCounts(prev => {
+              const newData = { ...prev };
+              delete newData[processIdToRemove];
+              return newData;
+            });
+          }
+        } else {
+          // For O2C Officers: Just update the ODN status in local state
+          setProcessODNData(prev => {
+            const newData = { ...prev };
+            Object.keys(newData).forEach(processId => {
+              newData[processId] = newData[processId].map(odn => 
+                odn.id === odnId 
+                  ? { ...odn, status: 'ewm_completed' }
+                  : odn
+              );
+            });
+            return newData;
+          });
+        }
         
         Swal.fire('Completed!', 'ODN has been marked as EWM completed.', 'success');
         
@@ -630,6 +669,42 @@ const HpFacilities = () => {
       } catch (err) {
         console.error('EWM Revert process error:', err);
         Swal.fire('Error', 'Failed to revert process.', 'error');
+      }
+    }
+  };
+
+  // --- RETURN PROCESS TO O2C FOR CORRECTIONS ---
+  const handleReturnToO2C = async (processId) => {
+    const result = await Swal.fire({
+      title: 'Return to O2C Officer?',
+      text: 'This will return the process to O2C Officer for corrections. The process status will change from "O2C Completed" back to "Completed" so the O2C Officer can update any mistaken information.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Return for Corrections',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ff9800'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await axios.post(`${api_url}/api/return-to-o2c`, { 
+          process_id: processId
+        });
+        
+        // Update the process status in local state
+        setActiveProcesses(prev => 
+          prev.map(p => 
+            p.id === processId 
+              ? { ...p, status: 'completed' }
+              : p
+          )
+        );
+        
+        Swal.fire('Returned!', 'Process has been returned to O2C Officer for corrections.', 'success');
+        
+      } catch (err) {
+        console.error('Return to O2C error:', err);
+        Swal.fire('Error', 'Failed to return process to O2C Officer.', 'error');
       }
     }
   };
@@ -757,7 +832,16 @@ const HpFacilities = () => {
       
       const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
       const proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
-      return matchesSearch && matchesRoute && shouldShow && (!proc || proc.status !== 'o2c_completed');
+      
+      // O2C Officer should only see facilities that:
+      // 1. Have no process (can start new), OR
+      // 2. Have process with status 'o2c_started' (O2C is working on it), OR  
+      // 3. Have process with status 'completed' (O2C needs to start working on it)
+      const shouldShowForO2C = !proc || 
+                               proc.status === 'o2c_started' || 
+                               proc.status === 'completed';
+      
+      return matchesSearch && matchesRoute && shouldShow && shouldShowForO2C;
     });
     
     console.log('O2C Debug Info:', {
@@ -1084,6 +1168,19 @@ const HpFacilities = () => {
                                 </Button>
                               </Tooltip>
                             )}
+                            <Tooltip title="Return to O2C for Corrections">
+                              <Button 
+                                variant="outlined" 
+                                color="warning" 
+                                size="small" 
+                                startIcon={<ReplyIcon />} 
+                                onClick={() => handleReturnToO2C(proc.id)}
+                                className="action-button"
+                                sx={{ borderRadius: 2 }}
+                              >
+                                Return
+                              </Button>
+                            </Tooltip>
                             <Tooltip title="View Details">
                               <Button 
                                 variant="outlined" 

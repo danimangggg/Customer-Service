@@ -20,7 +20,13 @@ const LandingPage = () => {
   const isLoggedIn = localStorage.getItem('token') !== null;
   const Explore = ()=> {
       if(isLoggedIn){
-        navigate('/customer-dashboard')
+        // Check if user is HP Officer, PI Officer, Documentation Officer, Documentation Follower, Quality Evaluator, Dispatcher, or TM Manager
+        const jobTitle = localStorage.getItem('JobTitle');
+        if(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager"){
+          navigate('/hp-dashboard');
+        } else {
+          navigate('/customer-dashboard');
+        }
       }else{
         navigate('/login')
       }

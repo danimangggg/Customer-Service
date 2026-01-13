@@ -67,6 +67,7 @@ let routes =  (app) => {
   router.post('/api/start-process', processController.startProcess);
   router.get('/api/active-processes', processQueryController.getActiveProcesses);
   router.delete('/api/process/:id', processController.revertProcess);
+  router.post('/api/return-to-o2c', processController.returnToO2C);
   router.post('/api/save-odn', odnController.saveODN);
   router.get('/api/odns/:process_id', odnController.getODNsByProcess);
   router.put('/api/odn/:id', odnController.updateODN);
@@ -113,6 +114,10 @@ let routes =  (app) => {
   const dashboardAnalyticsController = require('../controllers/Reports/dashboardAnalyticsController');
   router.get('/api/reports/dashboard/analytics', dashboardAnalyticsController.getDashboardAnalytics);
   router.get('/api/reports/dashboard/performance', dashboardAnalyticsController.getSystemPerformance);
+
+  // HP Dashboard routes
+  const hpDashboardController = require('../controllers/CustomerService/hpDashboardController');
+  router.get('/api/hp-dashboard-data', hpDashboardController.getHPDashboardData);
 
   // Health Program Reports routes
   const healthProgramReportsController = require('../controllers/Reports/healthProgramReportsController');

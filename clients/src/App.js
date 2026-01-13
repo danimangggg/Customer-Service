@@ -24,6 +24,7 @@ import facilityManager from './pages/Customer-Service/HealthProgram/FacilityMana
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
 import HPFacilitiesCS from './components/Customer-Service/HealthProgram/HP-Facilities';
 import PIVehicleRequests from './components/Customer-Service/HealthProgram/PIVehicleRequests';
+import HPDashboard from './pages/Customer-Service/HealthProgram/HPDashboard';
 import DispatchManagement from './components/Transportation/DispatchManagement';
 import DocumentationManagement from './components/Documentation/DocumentationManagement';
 import DocumentFollowup from './components/Documentation/DocumentFollowup';
@@ -38,12 +39,13 @@ import AllPicklists from './components/Customer-Service/AllPicklists';
 import OrganizationProfileView from './components/Reports/OrganizationProfileView';
 import OrganizationProfilePage from './pages/Settings/OrganizationProfilePage';
 import UserManagementPage from './pages/Settings/UserManagementPage';
+import DefaultRedirect from './components/DefaultRedirect';
+import OutstandingProcessPage from './pages/Customer-Service/OutstandingProcessPage';
+import ServiceTimeManagement from './components/ServiceTime/ServiceTimeManagement';
+import AccountTypesManagement from './pages/Admin/AccountTypesManagement';
 import RouteManagementPage from './pages/Transportation/RouteManagementPage';
 import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
 import VehicleManagement from './components/Transportation/VehicleManagement';
-import AccountTypesManagement from './pages/Admin/AccountTypesManagement';
-import ServiceTimeManagement from './components/ServiceTime/ServiceTimeManagement';
-import OutstandingProcessPage from './pages/Customer-Service/OutstandingProcessPage';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -56,7 +58,12 @@ const AppContent = () => {
       {!isPublicPage && <Navbar2 />}
       <div className={isPublicPage ? 'public-content' : 'main-content'}>
         <Routes>
-        <Route path = '/' Component={LandingPage2} />
+        <Route path = '/' element={
+          <>
+            <DefaultRedirect />
+            <LandingPage2 />
+          </>
+        } />
         <Route path = '/login' Component={SignIn} />
 
         <Route element = {<ProtectedRoutes/>}>
@@ -81,6 +88,7 @@ const AppContent = () => {
             <Route path = '/update-facility' Component={facilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
             <Route path = '/hp-facilities' Component={HPFacilitiesCS} />
+            <Route path = '/hp-dashboard' Component={HPDashboard} />
             <Route path = '/pi-vehicle-requests' Component={PIVehicleRequests} />
             <Route path = '/dispatch-management' Component={DispatchManagement} />
             <Route path = '/documentation-management' Component={DocumentationManagement} />

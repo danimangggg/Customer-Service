@@ -301,21 +301,6 @@ const PIVehicleRequests = () => {
             box-shadow: 0 8px 25px rgba(0,0,0,0.15);
             border-left-color: #1976d2;
           }
-          .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .stats-card-2 {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .stats-card-3 {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-            border-radius: 16px;
-          }
           .header-gradient {
             background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
             color: white;
@@ -344,61 +329,6 @@ const PIVehicleRequests = () => {
             </Stack>
           </Box>
         </Card>
-
-        {/* Statistics Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <RouteIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.totalRoutes || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Ready Routes
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-2" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <VehicleIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.requestedRoutes || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Requested
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-3" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <CalendarTodayIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {currentEthiopianMonth}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    {currentEthiopianYear}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-        </Grid>
 
         {/* Error Alert */}
         {error && (

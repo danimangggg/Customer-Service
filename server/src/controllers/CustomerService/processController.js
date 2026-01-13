@@ -54,4 +54,42 @@ const revertProcess = async (req, res) => {
   }
 };
 
-module.exports = { startProcess, revertProcess };
+const returnToO2C = async (req, res) => {
+  try {
+    const { process_id } = req.body;
+    if (!process_id) {
+      return res.status(400).send({ message: 'process_id is required' });
+    }
+
+    // Find the process
+    const process = await Process.findByPk(process_id);
+    if (!process) {
+      return res.status(404).send({ message: 'Process not found' });
+    }
+
+    // Check if process is in the correct status to be returned
+    if (process.status !== 'o2c_completed') {
+      return res.status(400).send({ 
+        message: 'Process must be in "o2c_completed" status to be returned to O2C Officer' 
+      });
+    }
+
+    // Update process status back to 'completed' so O2C Officer can make corrections
+    await Process.update(
+      { status: 'completed' },
+      { where: { id: process_id } }
+    );
+
+    return res.status(200).send({ 
+      message: 'Process returned to O2C Officer for corrections',
+      process_id: process_id,
+      new_status: 'completed'
+    });
+
+  } catch (err) {
+    console.error('returnToO2C error:', err);
+    return res.status(500).send({ message: 'Internal server error', error: err.message });
+  }
+};
+
+module.exports = { startProcess, revertProcess, returnToO2C };

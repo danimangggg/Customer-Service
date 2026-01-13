@@ -13,7 +13,6 @@ import {
   Pending as PendingIcon,
   CalendarToday as CalendarTodayIcon,
   Search as SearchIcon,
-  Save as SaveIcon,
   Route as RouteIcon,
   Edit as SignatureIcon,
   Share as HandoverIcon
@@ -267,38 +266,6 @@ const DocumentFollowup = () => {
     }
   };
 
-  const handleSaveUpdates = async () => {
-    const updates = Object.entries(pendingUpdates).map(([odn_id, data]) => ({
-      odn_id: parseInt(odn_id),
-      documents_signed: data.documents_signed,
-      documents_handover: data.documents_handover
-    }));
-
-    if (updates.length === 0) {
-      MySwal.fire('Info', 'No changes to save.', 'info');
-      return;
-    }
-
-    try {
-      setAutoSaving(true);
-      await axios.put(`${api_url}/api/odns/bulk-followup`, {
-        updates,
-        completed_by: loggedInUserId
-      });
-      
-      MySwal.fire('Success!', 'Document follow-up status updated successfully.', 'success');
-      setPendingUpdates({});
-      fetchFollowupODNs();
-      fetchStats();
-      
-    } catch (err) {
-      console.error('Save updates error:', err);
-      MySwal.fire('Error', 'Failed to save document follow-up status.', 'error');
-    } finally {
-      setAutoSaving(false);
-    }
-  };
-
   // Access control
   if (!isDocumentFollower) {
     return (
@@ -405,7 +372,7 @@ const DocumentFollowup = () => {
                 inputProps={{ min: 2010, max: 2030 }}
               />
             </Grid>
-            <Grid item xs={12} md={5}>
+            <Grid item xs={12} md={7}>
               <TextField
                 fullWidth
                 placeholder="Search by ODN number or facility name..."
@@ -419,32 +386,6 @@ const DocumentFollowup = () => {
                   ),
                 }}
               />
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="primary"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveUpdates}
-                disabled={Object.keys(pendingUpdates).length === 0}
-                sx={{ 
-                  height: 56,
-                  bgcolor: Object.keys(pendingUpdates).length > 0 ? 'warning.main' : 'success.main',
-                  '&:hover': {
-                    bgcolor: Object.keys(pendingUpdates).length > 0 ? 'warning.dark' : 'success.dark'
-                  }
-                }}
-              >
-                {Object.keys(pendingUpdates).length > 0 ? 'Save Remaining' : 'All Saved'}
-                {Object.keys(pendingUpdates).length > 0 && (
-                  <Chip 
-                    label={Object.keys(pendingUpdates).length} 
-                    size="small" 
-                    sx={{ ml: 1, bgcolor: 'rgba(255,255,255,0.3)' }}
-                  />
-                )}
-              </Button>
             </Grid>
           </Grid>
         </Card>

@@ -1,0 +1,137 @@
+const db = require('../../models');
+const Process = db.process;
+const ODN = db.odn;
+const Facility = db.facility;
+const { Op } = require('sequelize');
+
+const getHPDashboardData = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const reportingMonth = month && year ? `${month} ${year}` : null;
+
+    // Get total HP facilities (only facilities that have routes) - NOT month dependent
+    const totalFacilities = await Facility.count({
+      where: {
+        route: { [Op.ne]: null },
+        route: { [Op.ne]: '' }
+      }
+    });
+
+    // For month-dependent metrics, filter by reporting month
+    const odnWhere = {};
+    if (reportingMonth) {
+      // Find processes for the specific month/year and get their ODNs
+      const processes = await Process.findAll({
+        where: { reporting_month: reportingMonth },
+        attributes: ['id']
+      });
+      const processIds = processes.map(p => p.id);
+      if (processIds.length > 0) {
+        odnWhere.process_id = { [Op.in]: processIds };
+      } else {
+        odnWhere.process_id = -1; // No processes found, return 0 ODNs
+      }
+    }
+
+    // Get total ODNs (month dependent if filter applied)
+    const totalODNs = await ODN.count({ where: odnWhere });
+
+    // Get RRF Sent count (facilities that have processes - meaning they sent RRF)
+    // Only count HP facilities (those with routes) and filter by month if specified
+    const processWhere = reportingMonth ? { reporting_month: reportingMonth } : {};
+    const facilitiesWithProcesses = await Process.findAll({
+      include: [{
+        model: Facility,
+        as: 'facility',
+        where: {
+          route: { [Op.ne]: null },
+          route: { [Op.ne]: '' }
+        }
+      }],
+      where: processWhere,
+      attributes: ['facility_id'],
+      group: ['facility_id']
+    });
+    const rrfSent = facilitiesWithProcesses.length;
+
+    // Get dispatched ODNs (status = 'dispatched' or 'ewm_completed')
+    const dispatchedODNs = await ODN.count({
+      where: {
+        ...odnWhere,
+        status: { [Op.in]: ['dispatched', 'ewm_completed'] }
+      }
+    });
+
+    // Get POD confirmed ODNs (have pod_confirmed = true)
+    const podConfirmed = await ODN.count({
+      where: {
+        ...odnWhere,
+        pod_confirmed: true
+      }
+    });
+
+    // Get quality evaluated ODNs (have quality_confirmed = true)
+    const qualityEvaluated = await ODN.count({
+      where: {
+        ...odnWhere,
+        quality_confirmed: true
+      }
+    });
+
+    // Expected vs Done calculation
+    // Expected: All HP facilities should process
+    // Done: HP facilities that have completed processes (filtered by month if specified)
+    const expected = totalFacilities;
+    
+    // Count HP facilities with completed processes (quality evaluated means process is finished)
+    // Use raw query to count distinct facilities with quality evaluated ODNs
+    let completedFacilitiesQuery = `
+      SELECT COUNT(DISTINCT p.facility_id) as count
+      FROM processes p
+      INNER JOIN facilities f ON p.facility_id = f.id 
+      INNER JOIN odns o ON p.id = o.process_id
+      WHERE f.route IS NOT NULL 
+        AND f.route != ''
+        AND o.quality_confirmed = true
+    `;
+    
+    const queryParams = [];
+    if (reportingMonth) {
+      completedFacilitiesQuery += ' AND p.reporting_month = ?';
+      queryParams.push(reportingMonth);
+    }
+
+    const [completedResult] = await db.sequelize.query(completedFacilitiesQuery, {
+      replacements: queryParams,
+      type: db.Sequelize.QueryTypes.SELECT
+    });
+    const done = completedResult.count;
+
+    const dashboardData = {
+      totalODNs,
+      totalFacilities,
+      rrfSent,
+      dispatchedODNs,
+      podConfirmed,
+      qualityEvaluated,
+      expectedVsDone: {
+        expected,
+        done
+      },
+      reportingPeriod: reportingMonth || 'All Time'
+    };
+
+    res.status(200).json(dashboardData);
+
+  } catch (error) {
+    console.error('Error fetching HP dashboard data:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch HP dashboard data', 
+      error: error.message 
+    });
+  }
+};
+
+module.exports = {
+  getHPDashboardData
+};

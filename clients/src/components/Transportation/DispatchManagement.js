@@ -416,7 +416,7 @@ const DispatchManagement = () => {
                           onClick={() => handleCompleteDispatch(route.assignment_id, route.route_name)}
                           sx={{ borderRadius: 2 }}
                         >
-                          Completed
+                          Complete
                         </Button>
                       )}
                     </TableCell>

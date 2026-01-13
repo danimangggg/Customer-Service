@@ -51,9 +51,57 @@ const QualityEvaluation = () => {
   ];
 
   useEffect(() => {
-    // Set default to Tahsas 2018 where the test data exists
-    setSelectedMonth('Tahsas');
-    setSelectedYear('2018');
+    // Get current Ethiopian month and year
+    const getCurrentEthiopianMonth = () => {
+      const ethiopianMonths = [
+        'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
+      ];
+      
+      const gDate = new Date();
+      const gy = gDate.getFullYear();
+      const gm = gDate.getMonth();
+      const gd = gDate.getDate();
+      
+      const isLeap = (gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0);
+      const newYearDay = isLeap ? 12 : 11;
+      
+      let ethYear, ethMonthIndex;
+      
+      if (gm > 8 || (gm === 8 && gd >= newYearDay)) {
+        ethYear = gy - 7;
+        const newYearDate = new Date(gy, 8, newYearDay);
+        const diffDays = Math.floor((gDate - newYearDate) / (24 * 60 * 60 * 1000));
+        
+        if (diffDays < 360) {
+          ethMonthIndex = Math.floor(diffDays / 30);
+        } else {
+          ethMonthIndex = 12;
+        }
+      } else {
+        ethYear = gy - 8;
+        const prevIsLeap = ((gy - 1) % 4 === 0 && (gy - 1) % 100 !== 0) || ((gy - 1) % 400 === 0);
+        const prevNewYearDay = prevIsLeap ? 12 : 11;
+        const prevNewYearDate = new Date(gy - 1, 8, prevNewYearDay);
+        const diffDays = Math.floor((gDate - prevNewYearDate) / (24 * 60 * 60 * 1000));
+        
+        if (diffDays < 360) {
+          ethMonthIndex = Math.floor(diffDays / 30);
+        } else {
+          ethMonthIndex = 12;
+        }
+      }
+      
+      ethMonthIndex = Math.max(0, Math.min(ethMonthIndex, 12));
+      
+      return {
+        month: ethiopianMonths[ethMonthIndex],
+        year: ethYear
+      };
+    };
+
+    const currentEthiopian = getCurrentEthiopianMonth();
+    setSelectedMonth(currentEthiopian.month);
+    setSelectedYear(currentEthiopian.year.toString());
   }, []);
 
   useEffect(() => {
