@@ -98,10 +98,12 @@ const DispatchManagement = () => {
       setLoading(true);
       setError(null);
       
+      // Fetch routes that have vehicle assigned (previous stage completed)
       const response = await axios.get(`${api_url}/api/dispatch-routes`, {
         params: {
           month: currentEthiopianMonth,
-          year: currentEthiopianYear
+          year: currentEthiopianYear,
+          includeAll: true // Include both active and completed dispatches
         }
       });
       
@@ -344,8 +346,20 @@ const DispatchManagement = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => (
-                  <TableRow key={route.assignment_id} hover sx={{ '&:hover': { bgcolor: 'grey.50' } }}>
+                {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => {
+                  // Check if this route has passed dispatch stage (already completed)
+                  const isInactive = route.assignment_status === 'Completed';
+                  
+                  return (
+                  <TableRow 
+                    key={route.assignment_id} 
+                    hover 
+                    sx={{ 
+                      '&:hover': { bgcolor: 'grey.50' },
+                      bgcolor: isInactive ? 'grey.100' : 'inherit',
+                      opacity: isInactive ? 0.6 : 1
+                    }}
+                  >
                     <TableCell>
                       <Chip   
                         label={(page * rowsPerPage) + index + 1} 
@@ -400,12 +414,12 @@ const DispatchManagement = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      {route.assignment_status === 'Completed' ? (
+                      {isInactive ? (
                         <Chip 
-                          label="Completed" 
-                          color="success" 
+                          label="Passed to Documentation" 
+                          color="info" 
                           size="small" 
-                          icon={<CompleteIcon />}
+                          variant="outlined"
                         />
                       ) : (
                         <Button 
@@ -421,7 +435,8 @@ const DispatchManagement = () => {
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             <TablePagination 

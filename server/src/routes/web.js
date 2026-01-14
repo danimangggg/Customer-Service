@@ -180,6 +180,13 @@ let routes =  (app) => {
   router.put('/api/service-times/:id', serviceTimeController.updateServiceTime);
   router.delete('/api/service-times/:id', serviceTimeController.deleteServiceTime);
 
+  // HP Comprehensive Report routes
+  const hpComprehensiveReportController = require('../controllers/Reports/hpComprehensiveReportController');
+  router.get('/api/hp-comprehensive-report', hpComprehensiveReportController.getComprehensiveHPReport);
+  router.get('/api/hp-report/time-trend', hpComprehensiveReportController.getTimeTrendData);
+  router.get('/api/hp-odn-pod-details', hpComprehensiveReportController.getODNPODDetails);
+  router.get('/api/hp-odn-pod-details-all', hpComprehensiveReportController.getAllODNPODDetails);
+
   return app.use("/", router);
 };
 

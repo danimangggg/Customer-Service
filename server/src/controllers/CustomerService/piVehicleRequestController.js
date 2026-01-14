@@ -27,27 +27,27 @@ const getPIVehicleRequests = async (req, res) => {
       });
     }
 
-    // Query to find routes where all facilities have EWM completed or vehicle requested status
+    // Query to find routes where ALL facilities have EWM completed status
+    // We need to count ALL facilities in the route for the period, not just those with ewm_completed
     const query = `
-      SELECT DISTINCT 
+      SELECT 
         r.id as route_id,
         r.route_name,
-        COUNT(DISTINCT f.id) as total_facilities,
+        COUNT(DISTINCT f.id) as total_facilities_in_route,
         COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END) as ewm_completed_facilities,
         COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as vehicle_requested_facilities,
-        CASE WHEN pvr.route_id IS NOT NULL THEN 1 ELSE 0 END as vehicle_requested
+        CASE WHEN pvr.route_id IS NOT NULL OR MAX(CASE WHEN p.status = 'vehicle_requested' THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END as vehicle_requested
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
       INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
       LEFT JOIN pi_vehicle_requests pvr ON pvr.route_id = r.id AND pvr.month = ? AND pvr.year = ?
       WHERE f.route IS NOT NULL 
         AND f.period IS NOT NULL
-        AND p.status IN ('ewm_completed', 'vehicle_requested')
         ${search ? 'AND r.route_name LIKE ?' : ''}
       GROUP BY r.id, r.route_name, pvr.route_id
-      HAVING total_facilities > 0 AND (
-        (ewm_completed_facilities = total_facilities) OR 
-        (vehicle_requested_facilities = total_facilities)
+      HAVING total_facilities_in_route > 0 AND (
+        (ewm_completed_facilities = total_facilities_in_route) OR 
+        (vehicle_requested_facilities = total_facilities_in_route)
       )
       ORDER BY r.route_name
       LIMIT ? OFFSET ?
@@ -70,17 +70,23 @@ const getPIVehicleRequests = async (req, res) => {
     });
 
     console.log(`Found ${routes.length} routes`);
+    
+    // Add detailed logging for debugging
+    routes.forEach(route => {
+      console.log(`Route: ${route.route_name}, Total Facilities: ${route.total_facilities_in_route}, EWM Completed: ${route.ewm_completed_facilities}, Vehicle Requested: ${route.vehicle_requested_facilities}`);
+    });
 
     // For each route, get the facilities and their ODNs
     const routesWithDetails = await Promise.all(routes.map(async (route) => {
-      // Get facilities for this route
+      // Get ALL facilities for this route with their process status
       const facilitiesQuery = `
         SELECT DISTINCT 
           f.id,
-          f.facility_name
+          f.facility_name,
+          p.status as process_status
         FROM facilities f
         INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-        WHERE f.route = ? AND p.status IN ('ewm_completed', 'vehicle_requested')
+        WHERE f.route = ?
         ORDER BY f.facility_name
       `;
 
@@ -88,6 +94,8 @@ const getPIVehicleRequests = async (req, res) => {
         replacements: [reportingMonth, route.route_name],
         type: db.sequelize.QueryTypes.SELECT
       });
+      
+      console.log(`Route ${route.route_name} facilities:`, facilities.map(f => `${f.facility_name} (${f.process_status})`).join(', '));
 
       // For each facility, get its ODNs
       const facilitiesWithODNs = await Promise.all(facilities.map(async (facility) => {
@@ -95,7 +103,7 @@ const getPIVehicleRequests = async (req, res) => {
           SELECT odn_number
           FROM odns o
           INNER JOIN processes p ON p.id = o.process_id
-          WHERE p.facility_id = ? AND p.reporting_month = ? AND p.status IN ('ewm_completed', 'vehicle_requested')
+          WHERE p.facility_id = ? AND p.reporting_month = ?
           ORDER BY o.odn_number
         `;
 
@@ -105,7 +113,9 @@ const getPIVehicleRequests = async (req, res) => {
         });
 
         return {
-          ...facility,
+          id: facility.id,
+          facility_name: facility.facility_name,
+          process_status: facility.process_status,
           odns: odns
         };
       }));
@@ -118,16 +128,19 @@ const getPIVehicleRequests = async (req, res) => {
 
     // Get total count for pagination
     const countQuery = `
-      SELECT COUNT(DISTINCT r.id) as total
-      FROM routes r
-      INNER JOIN facilities f ON f.route = r.route_name
-      INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-      WHERE f.route IS NOT NULL 
-        AND f.period IS NOT NULL
-        AND p.status IN ('ewm_completed', 'vehicle_requested')
-        ${search ? 'AND r.route_name LIKE ?' : ''}
-      GROUP BY r.id
-      HAVING COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status IN ('ewm_completed', 'vehicle_requested') THEN f.id END)
+      SELECT COUNT(*) as total
+      FROM (
+        SELECT r.id
+        FROM routes r
+        INNER JOIN facilities f ON f.route = r.route_name
+        INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+        WHERE f.route IS NOT NULL 
+          AND f.period IS NOT NULL
+          ${search ? 'AND r.route_name LIKE ?' : ''}
+        GROUP BY r.id
+        HAVING COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END)
+           OR COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END)
+      ) as route_count
     `;
 
     let countParams = [reportingMonth];
@@ -141,7 +154,7 @@ const getPIVehicleRequests = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    const totalCount = countResult.length;
+    const totalCount = countResult[0]?.total || 0;
 
     console.log(`Returning ${routesWithDetails.length} routes with details, total count: ${totalCount}`);
 
@@ -170,15 +183,19 @@ const getPIVehicleRequestStats = async (req, res) => {
 
     console.log('PI Vehicle Request Stats - Request params:', { month, year, reportingMonth });
 
-    // Get total routes ready for vehicle request (ewm_completed) or already requested (vehicle_requested)
+    // Get total routes ready for vehicle request (ALL facilities ewm_completed) or already requested (ALL facilities vehicle_requested)
     const totalRoutesQuery = `
-      SELECT COUNT(DISTINCT r.id) as count
-      FROM routes r
-      INNER JOIN facilities f ON f.route = r.route_name
-      INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-      WHERE f.route IS NOT NULL AND f.period IS NOT NULL AND p.status IN ('ewm_completed', 'vehicle_requested')
-      GROUP BY r.id
-      HAVING COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status IN ('ewm_completed', 'vehicle_requested') THEN f.id END)
+      SELECT COUNT(*) as count
+      FROM (
+        SELECT r.id
+        FROM routes r
+        INNER JOIN facilities f ON f.route = r.route_name
+        INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+        WHERE f.route IS NOT NULL AND f.period IS NOT NULL
+        GROUP BY r.id
+        HAVING COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END)
+           OR COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END)
+      ) as route_count
     `;
 
     // Get requested routes count
@@ -199,7 +216,7 @@ const getPIVehicleRequestStats = async (req, res) => {
     });
 
     const stats = {
-      totalRoutes: totalResult.length,
+      totalRoutes: totalResult[0]?.count || 0,
       requestedRoutes: requestedResult[0]?.count || 0
     };
 
@@ -244,23 +261,25 @@ const submitVehicleRequest = async (req, res) => {
       });
     }
 
-    // Verify that all facilities in this route have EWM completed status
+    // Verify that ALL facilities in this route have EWM completed status
     const reportingMonth = `${month} ${year}`;
     const verificationQuery = `
       SELECT 
         COUNT(DISTINCT f.id) as total_facilities,
-        COUNT(DISTINCT CASE WHEN p.status IN ('ewm_completed', 'vehicle_requested') THEN f.id END) as completed_facilities
+        COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END) as ewm_completed_facilities,
+        COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as vehicle_requested_facilities
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
       INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-      WHERE r.id = ? AND f.route IS NOT NULL AND f.period IS NOT NULL 
-        AND p.status IN ('ewm_completed', 'vehicle_requested')
+      WHERE r.id = ? AND f.route IS NOT NULL AND f.period IS NOT NULL
     `;
 
     const verification = await db.sequelize.query(verificationQuery, {
       replacements: [reportingMonth, route_id],
       type: db.sequelize.QueryTypes.SELECT
     });
+    
+    console.log('Vehicle request verification:', verification[0]);
 
     if (!verification[0] || verification[0].total_facilities === 0) {
       return res.status(400).json({ 
@@ -268,9 +287,15 @@ const submitVehicleRequest = async (req, res) => {
       });
     }
 
-    if (verification[0].total_facilities !== verification[0].completed_facilities) {
+    // Check if ALL facilities have ewm_completed status (not vehicle_requested yet)
+    if (verification[0].total_facilities !== verification[0].ewm_completed_facilities) {
       return res.status(400).json({ 
-        error: 'Not all facilities in this route have completed EWM process or been requested for vehicles' 
+        error: `Not all facilities in this route have completed EWM process. Total: ${verification[0].total_facilities}, EWM Completed: ${verification[0].ewm_completed_facilities}`,
+        details: {
+          total_facilities: verification[0].total_facilities,
+          ewm_completed: verification[0].ewm_completed_facilities,
+          vehicle_requested: verification[0].vehicle_requested_facilities
+        }
       });
     }
 

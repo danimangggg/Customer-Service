@@ -129,10 +129,9 @@ const DocumentationManagement = () => {
   const currentEthiopian = getCurrentEthiopianMonth();
 
   useEffect(() => {
-    // Set default to a month that has data (based on diagnosis results)
-    // Available months: Tahsas 2018, Hidar 2018, Tir 2018
-    setSelectedMonth('Tahsas'); // This month has the most data (6 processes)
-    setSelectedYear('2018');
+    // Set default to current Ethiopian month and year
+    setSelectedMonth(currentEthiopian.month);
+    setSelectedYear(currentEthiopian.year.toString());
   }, []);
 
   useEffect(() => {
@@ -643,7 +642,10 @@ const DocumentationManagement = () => {
         const update = {
           odn_id: parseInt(odnId),
           pod_confirmed: currentPODStatus,
-          pod_reason: reason
+          pod_reason: reason,
+          pod_number: pendingUpdates[odnId]?.pod_number || odnData.find(odn => odn.odn_id === odnId)?.pod_number || '',
+          arrival_kilometer: pendingUpdates[odnId]?.arrival_kilometer || odnData.find(odn => odn.odn_id === odnId)?.arrival_kilometer || null,
+          route_assignment_id: odnData.find(odn => odn.odn_id === odnId)?.route_assignment_id
         };
 
         await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -697,10 +699,14 @@ const DocumentationManagement = () => {
   const saveUnconfirmedPOD = async (odnId, reason) => {
     try {
       setAutoSaving(true);
+      const currentODN = odnData.find(odn => odn.odn_id === odnId);
       const update = {
         odn_id: parseInt(odnId),
         pod_confirmed: false,
-        pod_reason: reason
+        pod_reason: reason,
+        pod_number: currentODN?.pod_number || '',
+        arrival_kilometer: currentODN?.arrival_kilometer || null,
+        route_assignment_id: currentODN?.route_assignment_id
       };
 
       await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -756,7 +762,10 @@ const DocumentationManagement = () => {
       const update = {
         odn_id: parseInt(odnId),
         pod_confirmed: currentPODStatus,
-        pod_reason: reason
+        pod_reason: reason,
+        pod_number: pendingUpdates[odnId]?.pod_number || odnData.find(odn => odn.odn_id === odnId)?.pod_number || '',
+        arrival_kilometer: pendingUpdates[odnId]?.arrival_kilometer || odnData.find(odn => odn.odn_id === odnId)?.arrival_kilometer || null,
+        route_assignment_id: odnData.find(odn => odn.odn_id === odnId)?.route_assignment_id
       };
 
       await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -1114,13 +1123,18 @@ const DocumentationManagement = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn, index) => (
+                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn, index) => {
+                  // Check if this ODN has passed documentation stage (POD confirmed)
+                  const isInactive = Boolean(Number(odn.pod_confirmed));
+                  
+                  return (
                   <TableRow 
                     key={`${odn.odn_id}-${odn.pod_confirmed}-${pendingUpdates[odn.odn_id]?.pod_confirmed || 'none'}`}
                     hover 
                     sx={{ 
                       '&:hover': { bgcolor: 'grey.50' },
-                      bgcolor: pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit',
+                      bgcolor: isInactive ? 'grey.100' : (pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit'),
+                      opacity: isInactive ? 0.6 : 1,
                       borderLeft: pendingUpdates[odn.odn_id] ? '3px solid orange' : 'none'
                     }}
                   >
@@ -1145,11 +1159,28 @@ const DocumentationManagement = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <PODCheckbox 
-                        odn={odn}
-                        pendingUpdates={pendingUpdates}
-                        onPODChange={handlePODConfirmationChange}
-                      />
+                      {isInactive ? (
+                        <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                          <Chip 
+                            label="✓ Confirmed" 
+                            color="success" 
+                            size="small" 
+                            variant="outlined"
+                          />
+                          <Chip 
+                            label="Passed to Follow-up" 
+                            color="info" 
+                            size="small" 
+                            variant="outlined"
+                          />
+                        </Stack>
+                      ) : (
+                        <PODCheckbox 
+                          odn={odn}
+                          pendingUpdates={pendingUpdates}
+                          onPODChange={handlePODConfirmationChange}
+                        />
+                      )}
                     </TableCell>
                     <TableCell>
                       <Box>
@@ -1171,34 +1202,41 @@ const DocumentationManagement = () => {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        placeholder="Enter reason if POD not confirmed..."
-                        value={getPODReason(odn)}
-                        onChange={(e) => handleReasonChange(odn.odn_id, e.target.value)}
-                        disabled={pendingUpdates[odn.odn_id]?.pod_confirmed || Boolean(Number(odn.pod_confirmed))}
-                        multiline
-                        rows={2}
-                        required={!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed}
-                        error={
-                          (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
-                          !getPODReason(odn).trim()
-                        }
-                        helperText={
-                          (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
-                          !getPODReason(odn).trim() ? 
-                          'Reason required when POD not confirmed' : ''
-                        }
-                        sx={{ 
-                          '& .MuiInputBase-input': { 
-                            fontSize: '0.875rem' 
-                          } 
-                        }}
-                      />
+                      {isInactive ? (
+                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          POD confirmed - no reason needed
+                        </Typography>
+                      ) : (
+                        <TextField
+                          fullWidth
+                          size="small"
+                          placeholder="Enter reason if POD not confirmed..."
+                          value={getPODReason(odn)}
+                          onChange={(e) => handleReasonChange(odn.odn_id, e.target.value)}
+                          disabled={pendingUpdates[odn.odn_id]?.pod_confirmed || Boolean(Number(odn.pod_confirmed))}
+                          multiline
+                          rows={2}
+                          required={!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed}
+                          error={
+                            (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
+                            !getPODReason(odn).trim()
+                          }
+                          helperText={
+                            (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
+                            !getPODReason(odn).trim() ? 
+                            'Reason required when POD not confirmed' : ''
+                          }
+                          sx={{ 
+                            '& .MuiInputBase-input': { 
+                              fontSize: '0.875rem' 
+                            } 
+                          }}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             <TablePagination 

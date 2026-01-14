@@ -789,12 +789,14 @@ const HpFacilities = () => {
       const shouldShow = shouldShowFacility(f);
       
       if (matchesSearch && matchesRoute && shouldShow) {
-        // Filter processes by current month/year for EWM officers
+        // EWM officers should only see processes that have completed O2C stage
         const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
         const proc = activeProcesses.find(a => 
           a.facility_id === f.id && 
-          a.status === 'o2c_completed' && 
-          a.reporting_month === selReporting // Add month/year filtering
+          a.reporting_month === selReporting &&
+          (a.status === 'o2c_completed' || a.status === 'ewm_completed' || 
+           a.status === 'vehicle_requested' || a.status === 'vehicle_assigned' || 
+           a.status === 'dispatched') // Only show if O2C is completed or beyond
         );
         
         if (proc) {
@@ -833,13 +835,10 @@ const HpFacilities = () => {
       const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
       const proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
       
-      // O2C Officer should only see facilities that:
-      // 1. Have no process (can start new), OR
-      // 2. Have process with status 'o2c_started' (O2C is working on it), OR  
-      // 3. Have process with status 'completed' (O2C needs to start working on it)
-      const shouldShowForO2C = !proc || 
-                               proc.status === 'o2c_started' || 
-                               proc.status === 'completed';
+      // O2C Officer should see:
+      // 1. Facilities with no process (can start new), OR
+      // 2. Facilities with any process status (active or passed)
+      const shouldShowForO2C = true; // Show all that match other filters
       
       return matchesSearch && matchesRoute && shouldShow && shouldShowForO2C;
     });
@@ -1112,10 +1111,24 @@ const HpFacilities = () => {
                     const f = item; // facility data
                     const proc = item.process;
                     const odn = item.odn;
+                    
+                    // Process is inactive if it has passed EWM stage
+                    // EWM stage status: 'o2c_completed'
+                    // Passed EWM: 'ewm_completed', 'vehicle_requested', 'vehicle_assigned', 'dispatched', etc.
+                    const hasPassedEWM = proc && proc.status !== 'o2c_completed';
+                    const isInactive = hasPassedEWM;
                     const isODNCompleted = odn.status === 'ewm_completed';
 
                     return (
-                      <TableRow key={item.uniqueId} hover sx={{ '&:hover': { bgcolor: 'grey.50' } }}>
+                      <TableRow 
+                        key={item.uniqueId} 
+                        hover 
+                        sx={{ 
+                          '&:hover': { bgcolor: 'grey.50' },
+                          bgcolor: isInactive ? 'grey.100' : 'inherit',
+                          opacity: isInactive ? 0.6 : 1
+                        }}
+                      >
                         <TableCell>
                           <Chip   
                             label={(page * rowsPerPage) + index + 1} 
@@ -1153,7 +1166,7 @@ const HpFacilities = () => {
                         </TableCell>
                         <TableCell align="center">
                           <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                            {!isODNCompleted && (
+                            {!isInactive && !isODNCompleted && (
                               <Tooltip title="Complete ODN">
                                 <Button 
                                   variant="contained" 
@@ -1168,19 +1181,21 @@ const HpFacilities = () => {
                                 </Button>
                               </Tooltip>
                             )}
-                            <Tooltip title="Return to O2C for Corrections">
-                              <Button 
-                                variant="outlined" 
-                                color="warning" 
-                                size="small" 
-                                startIcon={<ReplyIcon />} 
-                                onClick={() => handleReturnToO2C(proc.id)}
-                                className="action-button"
-                                sx={{ borderRadius: 2 }}
-                              >
-                                Return
-                              </Button>
-                            </Tooltip>
+                            {!isInactive && (
+                              <Tooltip title="Return to O2C for Corrections">
+                                <Button 
+                                  variant="outlined" 
+                                  color="warning" 
+                                  size="small" 
+                                  startIcon={<ReplyIcon />} 
+                                  onClick={() => handleReturnToO2C(proc.id)}
+                                  className="action-button"
+                                  sx={{ borderRadius: 2 }}
+                                >
+                                  Return
+                                </Button>
+                              </Tooltip>
+                            )}
                             <Tooltip title="View Details">
                               <Button 
                                 variant="outlined" 
@@ -1190,10 +1205,21 @@ const HpFacilities = () => {
                                 onClick={() => handleViewODNDetails(proc.id, f.facility_name, f, odn.odn_number)}
                                 className="action-button"
                                 sx={{ borderRadius: 2 }}
+                                disabled={isInactive}
                               >
                                 Detail
                               </Button>
                             </Tooltip>
+                            {isInactive && (
+                              <Chip 
+                                label={`Passed to ${proc.status === 'ewm_completed' ? 'PI' : 
+                                       proc.status === 'vehicle_requested' ? 'Dispatch' : 
+                                       'Next Stage'}`}
+                                color="default" 
+                                size="small" 
+                                icon={<CheckCircleIcon />}
+                              />
+                            )}
                           </Stack>
                         </TableCell>
                       </TableRow>
@@ -1206,10 +1232,23 @@ const HpFacilities = () => {
                     const isOwner = proc && String(proc.o2c_officer_id) === String(loggedInUserId);
                     const hasODNs = proc && (processODNCounts[proc.id] || 0) > 0;
                     const odnCount = proc ? (processODNCounts[proc.id] || 0) : 0;
-                    const isCompleted = proc && proc.status === 'o2c_completed';
+                    
+                    // Process is inactive if it has passed O2C stage
+                    // O2C stage statuses: 'o2c_started', 'completed'
+                    // Passed O2C: 'o2c_completed', 'ewm_completed', 'vehicle_requested', 'vehicle_assigned', 'dispatched', etc.
+                    const hasPassedO2C = proc && !['o2c_started', 'completed'].includes(proc.status);
+                    const isInactive = hasPassedO2C;
 
                     return (
-                      <TableRow key={f.id} hover sx={{ '&:hover': { bgcolor: 'grey.50' } }}>
+                      <TableRow 
+                        key={f.id} 
+                        hover 
+                        sx={{ 
+                          '&:hover': { bgcolor: 'grey.50' },
+                          bgcolor: isInactive ? 'grey.100' : 'inherit',
+                          opacity: isInactive ? 0.6 : 1
+                        }}
+                      >
                         <TableCell>
                           <Chip 
                             label={(page * rowsPerPage) + index + 1} 
@@ -1242,55 +1281,60 @@ const HpFacilities = () => {
                             <Stack direction="row" spacing={1} justifyContent="center" alignItems="center" flexWrap="wrap">
                               {isOwner ? (
                                 <>
-                                  {!hasODNs && !isCompleted && (
-                                    <Tooltip title="Revert Process">
-                                      <Button 
-                                        variant="outlined" 
-                                        color="warning" 
-                                        size="small" 
-                                        startIcon={<UndoIcon />} 
-                                        onClick={() => handleRevertProcess(proc.id)}
-                                        className="action-button"
-                                        sx={{ borderRadius: 2 }}
-                                      >
-                                        Revert
-                                      </Button>
-                                    </Tooltip>
+                                  {!isInactive && (
+                                    <>
+                                      {!hasODNs && (
+                                        <Tooltip title="Revert Process">
+                                          <Button 
+                                            variant="outlined" 
+                                            color="warning" 
+                                            size="small" 
+                                            startIcon={<UndoIcon />} 
+                                            onClick={() => handleRevertProcess(proc.id)}
+                                            className="action-button"
+                                            sx={{ borderRadius: 2 }}
+                                          >
+                                            Revert
+                                          </Button>
+                                        </Tooltip>
+                                      )}
+                                      <Tooltip title="Complete Process">
+                                        <Button 
+                                          variant="contained" 
+                                          color="success" 
+                                          size="small" 
+                                          startIcon={<CheckCircleIcon />} 
+                                          onClick={() => handleCompleteProcess(proc.id)}
+                                          className="action-button"
+                                          sx={{ borderRadius: 2 }}
+                                        >
+                                          Complete
+                                        </Button>
+                                      </Tooltip>
+                                      <Tooltip title="Manage ODNs">
+                                        <Badge badgeContent={odnCount} color="info">
+                                          <Button 
+                                            variant="outlined" 
+                                            color="secondary" 
+                                            size="small" 
+                                            startIcon={<ManageAccountsIcon />} 
+                                            onClick={() => handleManageODNs(proc.id)}
+                                            className="action-button"
+                                            sx={{ borderRadius: 2 }}
+                                          >
+                                            Manage ODNs
+                                          </Button>
+                                        </Badge>
+                                      </Tooltip>
+                                    </>
                                   )}
-                                  {!isCompleted && (
-                                    <Tooltip title="Complete Process">
-                                      <Button 
-                                        variant="contained" 
-                                        color="success" 
-                                        size="small" 
-                                        startIcon={<CheckCircleIcon />} 
-                                        onClick={() => handleCompleteProcess(proc.id)}
-                                        className="action-button"
-                                        sx={{ borderRadius: 2 }}
-                                      >
-                                        Complete
-                                      </Button>
-                                    </Tooltip>
-                                  )}
-                                  <Tooltip title="Manage ODNs">
-                                    <Badge badgeContent={odnCount} color="info">
-                                      <Button 
-                                        variant="outlined" 
-                                        color="secondary" 
-                                        size="small" 
-                                        startIcon={<ManageAccountsIcon />} 
-                                        onClick={() => handleManageODNs(proc.id)}
-                                        className="action-button"
-                                        sx={{ borderRadius: 2 }}
-                                      >
-                                        Manage ODNs
-                                      </Button>
-                                    </Badge>
-                                  </Tooltip>
-                                  {isCompleted && (
+                                  {isInactive && (
                                     <Chip 
-                                      label="Completed" 
-                                      color="success" 
+                                      label={`Passed to ${proc.status === 'o2c_completed' ? 'EWM' : 
+                                             proc.status === 'ewm_completed' ? 'PI' : 
+                                             proc.status === 'vehicle_requested' ? 'Dispatch' : 
+                                             'Next Stage'}`}
+                                      color="default" 
                                       size="small" 
                                       icon={<CheckCircleIcon />}
                                     />
@@ -1306,15 +1350,15 @@ const HpFacilities = () => {
                                       {proc.o2c_officer_name}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
-                                      {isCompleted ? 'Completed' : 'Process Owner'}
+                                      {isInactive ? 'Passed O2C' : 'Process Owner'}
                                     </Typography>
                                   </Box>
-                                  {isCompleted && (
+                                  {isInactive && (
                                     <Chip 
-                                      label="Completed" 
-                                      color="success" 
+                                      label="Inactive" 
+                                      color="default" 
                                       size="small" 
-                                      icon={<CheckCircleIcon />}
+                                      variant="outlined"
                                     />
                                   )}
                                 </Stack>

@@ -43,6 +43,7 @@ import AccountTypesManagement from './pages/Admin/AccountTypesManagement';
 import RouteManagementPage from './pages/Transportation/RouteManagementPage';
 import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
 import VehicleManagement from './components/Transportation/VehicleManagement';
+import HPComprehensiveReport from './components/Reports/HPComprehensiveReport';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -97,6 +98,7 @@ const AppContent = () => {
             <Route path = '/reports/all-picklists' Component={AllPicklists} />
             <Route path = '/reports/transportation' Component={TransportationReports} />
             <Route path = '/reports/organization-profile' Component={OrganizationProfileView} />
+            <Route path = '/reports/hp-comprehensive' Component={HPComprehensiveReport} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />
             <Route path = '/settings/account-types' Component={AccountTypesManagement} />

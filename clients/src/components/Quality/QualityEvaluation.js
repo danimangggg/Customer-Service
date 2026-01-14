@@ -541,11 +541,19 @@ const QualityEvaluation = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn) => (
+                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn) => {
+                  // Check if this ODN has passed quality evaluation stage (quality confirmed)
+                  const isInactive = Boolean(Number(odn.quality_confirmed));
+                  
+                  return (
                   <TableRow 
                     key={odn.odn_id}
                     hover 
-                    sx={{ '&:hover': { bgcolor: 'grey.50' } }}
+                    sx={{ 
+                      '&:hover': { bgcolor: 'grey.50' },
+                      bgcolor: isInactive ? 'grey.100' : 'inherit',
+                      opacity: isInactive ? 0.6 : 1
+                    }}
                   >
                     <TableCell>
                       <Typography variant="body2" fontWeight="bold" color="primary">
@@ -586,18 +594,28 @@ const QualityEvaluation = () => {
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<EditIcon />}
-                      onClick={() => handleEditClick(odn)}
-                      sx={{ minWidth: 80 }}
-                    >
-                      Edit
-                    </Button>
+                    {isInactive ? (
+                      <Chip 
+                        label="Process Complete" 
+                        color="success" 
+                        size="small" 
+                        variant="outlined"
+                      />
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleEditClick(odn)}
+                        sx={{ minWidth: 80 }}
+                      >
+                        Edit
+                      </Button>
+                    )}
                   </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             <TablePagination 

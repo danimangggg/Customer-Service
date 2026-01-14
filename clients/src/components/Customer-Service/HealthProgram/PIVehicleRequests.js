@@ -323,7 +323,7 @@ const PIVehicleRequests = () => {
                   PI Vehicle Requests
                 </Typography>
                 <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Request vehicles for completed EWM routes
+                  Request vehicles for routes where ALL facilities have completed EWM
                 </Typography>
               </Box>
             </Stack>
@@ -389,8 +389,21 @@ const PIVehicleRequests = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => (
-                  <TableRow key={route.route_id} hover sx={{ '&:hover': { bgcolor: 'grey.50' } }}>
+                {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => {
+                  // Route is inactive if it has passed PI stage (vehicle already requested/assigned)
+                  const hasPassedPI = route.vehicle_requested === 1;
+                  const isInactive = hasPassedPI;
+                  
+                  return (
+                    <TableRow 
+                      key={route.route_id} 
+                      hover 
+                      sx={{ 
+                        '&:hover': { bgcolor: 'grey.50' },
+                        bgcolor: isInactive ? 'grey.100' : 'inherit',
+                        opacity: isInactive ? 0.6 : 1
+                      }}
+                    >
                     <TableCell>
                       <Chip   
                         label={(page * rowsPerPage) + index + 1} 
@@ -411,6 +424,9 @@ const PIVehicleRequests = () => {
                     </TableCell>
                     <TableCell>
                       <Box>
+                        <Typography variant="body2" fontWeight="bold" color="success.main" sx={{ mb: 1 }}>
+                          {route.facilities.length} Facilities (All EWM Completed ✓)
+                        </Typography>
                         {route.facilities.map((facility, idx) => (
                           <Typography key={idx} variant="body2" sx={{ mb: 0.5 }}>
                             • {facility.facility_name}
@@ -450,22 +466,26 @@ const PIVehicleRequests = () => {
                             size="small" 
                             icon={<VehicleIcon />}
                           />
-                          <IconButton 
-                            color="primary" 
-                            size="small" 
-                            onClick={() => handleAssignVehicle(route)}
-                            title="Assign Vehicle"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                          <IconButton 
-                            color="error" 
-                            size="small" 
-                            onClick={() => handleDeleteRequest(route.route_id, route.route_name)}
-                            title="Delete Request"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
+                          {!isInactive && (
+                            <>
+                              <IconButton 
+                                color="primary" 
+                                size="small" 
+                                onClick={() => handleAssignVehicle(route)}
+                                title="Assign Vehicle"
+                              >
+                                <EditIcon />
+                              </IconButton>
+                              <IconButton 
+                                color="error" 
+                                size="small" 
+                                onClick={() => handleDeleteRequest(route.route_id, route.route_name)}
+                                title="Delete Request"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </>
+                          )}
                         </Stack>
                       ) : (
                         <Button 
@@ -475,13 +495,15 @@ const PIVehicleRequests = () => {
                           startIcon={<RequestIcon />} 
                           onClick={() => handleRequestVehicle(route.route_id, route.route_name)}
                           sx={{ borderRadius: 2 }}
+                          disabled={isInactive}
                         >
                           Request Vehicle
                         </Button>
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+                })}
               </TableBody>
             </Table>
             <TablePagination 

@@ -62,25 +62,45 @@ export default function SignIn() {
         
 
         // Redirect to a protected route based on user roles
-        if(response.data.AccountType === "Self Assesment" || response.data.AccountType === "Admin"){
+        console.log("=== LOGIN ROUTING DEBUG ===");
+        console.log("AccountType:", response.data.AccountType);
+        console.log("Position:", response.data.Position);
+        console.log("Department:", response.data.Department);
+        console.log("JobTitle:", response.data.JobTitle);
+        console.log("========================");
+        
+        // Check for Transport Management department first (highest priority for HP dashboard)
+        // Check both "Transport Management" and "Transportation Management" for compatibility
+        if(response.data.Department === "Transport Management" || response.data.Department === "Transportation Management"){
+          console.log("✓ Routing to HP Dashboard - Transport Management department");
+          navigate('/hp-dashboard');
+        }
+        // Check for specific HP-related job titles
+        else if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
+          console.log("✓ Routing to HP Dashboard - HP job title");
+          navigate('/hp-dashboard');
+        }
+        // Handle Self Assessment and Admin account types
+        else if(response.data.AccountType === "Self Assesment" || response.data.AccountType === "Admin"){
           if(response.data.Position === "Admin"){
+            console.log("→ Routing to Customer Dashboard - Admin position");
             navigate('/customer-dashboard');
-          } else if(response.data.Position === "Officer" && response.data.JobTitle != "WIM Operator"){
-            // Check if it's an HP Officer, PI Officer, Documentation Officer, Documentation Follower, Quality Evaluator, Dispatcher, or TM Manager
-            if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
-              navigate('/hp-dashboard');
-            } else {
-              navigate(`/customer-dashboard`);
-            }
-          } 
-          else if(response.data.Position === "Officer" && response.data.JobTitle === "WIM Operator"){
+          } else if(response.data.Position === "Officer" && response.data.JobTitle === "WIM Operator"){
+            console.log("→ Routing to Picklists - WIM Operator");
             navigate(`/all-picklists`);
-          }else if(response.data.Position === "Coordinator"){
-            navigate('/customer-dashboard');
-          } else if(response.data.Position === "Manager"){
+          } else {
+            console.log("→ Routing to Customer Dashboard - Self Assessment/Admin");
             navigate('/customer-dashboard');
           }
-        } else if (response.data.AccountType === "Credit Manager" || response.data.AccountType === "Admin"){
+        } 
+        // Handle Credit Manager
+        else if (response.data.AccountType === "Credit Manager"){
+          console.log("→ Routing to Customer Dashboard - Credit Manager");
+          navigate('/customer-dashboard');
+        }
+        // Default fallback
+        else {
+          console.log("→ Routing to Customer Dashboard - default fallback");
           navigate('/customer-dashboard');
         }
       }

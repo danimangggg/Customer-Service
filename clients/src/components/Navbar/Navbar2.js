@@ -69,6 +69,7 @@ const Sidebar = () => {
   const accountType = rawAccountType;
   const position = rawPosition.trim().toLowerCase();
   const jobTitle = localStorage.getItem("JobTitle");
+  const department = localStorage.getItem("Department");
 
   const isAdmin = accountType === "Admin";
   const isCreditManager = accountType === "Credit Manager";
@@ -179,8 +180,8 @@ const Sidebar = () => {
        <List sx={{ pt: 2, px: 1 }}>
          {/* DASHBOARDS SECTION - AT THE TOP */}
          
-         {/* HP Dashboard - for HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, Dispatchers, and TM Managers */}
-         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") && (
+         {/* HP Dashboard - for HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, Dispatchers, TM Managers, and Transport Management department */}
+         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || department === "Transport Management" || department === "Transportation Management") && (
            <MenuTooltip title={"HP Dashboard"}>
              <ListItem 
                button 
@@ -972,6 +973,47 @@ const Sidebar = () => {
          {/* Reports Sub-menu */}
          <Collapse in={reportsOpen} timeout="auto" unmountOnExit>
            <List component="div" disablePadding sx={{ pl: 2 }}>
+             {/* HP Comprehensive Report - for HP Officers */}
+             {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
+               <MenuTooltip title={"HP Comprehensive Report"}>
+                 <ListItem 
+                   button 
+                   component={Link} 
+                   to="/reports/hp-comprehensive"
+                   sx={{
+                     borderRadius: 2,
+                     mx: 1,
+                     mb: 0.5,
+                     bgcolor: isActivePath('/reports/hp-comprehensive') ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
+                     borderLeft: isActivePath('/reports/hp-comprehensive') ? 4 : 0,
+                     borderColor: isActivePath('/reports/hp-comprehensive') ? '#1976d2' : 'transparent',
+                     '&:hover': {
+                       bgcolor: 'rgba(25, 118, 210, 0.1)',
+                       transform: 'translateX(4px)',
+                       transition: 'all 0.2s ease'
+                     },
+                     transition: 'all 0.2s ease'
+                   }}
+                 >
+                   <ListItemIcon>
+                     <Assessment sx={{ color: '#4caf50', fontSize: 20 }} />
+                   </ListItemIcon>
+                   <ListItemText 
+                     primary={"HP Comprehensive Report"} 
+                     sx={{ 
+                       '& .MuiListItemText-primary': { 
+                         fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 400,
+                         fontSize: '0.85rem',
+                         lineHeight: 1.2,
+                         whiteSpace: 'normal',
+                         wordWrap: 'break-word'
+                       } 
+                     }} 
+                   />
+                 </ListItem>
+               </MenuTooltip>
+             )}
+
              {/* All Picklists */}
              <MenuTooltip title={"All Picklists"}>
                <ListItem 

@@ -101,6 +101,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       comment: 'Employee ID who completed the dispatch'
     },
+    arrival_kilometer: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Arrival kilometer reading for the route'
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,

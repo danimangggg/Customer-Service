@@ -20,11 +20,32 @@ const LandingPage = () => {
   const isLoggedIn = localStorage.getItem('token') !== null;
   const Explore = ()=> {
       if(isLoggedIn){
-        // Check if user is HP Officer, PI Officer, Documentation Officer, Documentation Follower, Quality Evaluator, Dispatcher, or TM Manager
+        // Check Department first, then JobTitle
         const jobTitle = localStorage.getItem('JobTitle');
-        if(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager"){
+        const department = localStorage.getItem('Department');
+        
+        console.log("=== LANDING PAGE ROUTING DEBUG ===");
+        console.log("Department:", department);
+        console.log("JobTitle:", jobTitle);
+        console.log("==================================");
+        
+        // Check for Transport Management department or HP-related job titles
+        // Check both "Transport Management" and "Transportation Management" for compatibility
+        if(department === "Transport Management" || 
+           department === "Transportation Management" ||
+           jobTitle === "O2C Officer - HP" || 
+           jobTitle === "EWM Officer - HP" || 
+           jobTitle === "PI Officer-HP" || 
+           jobTitle === "Documentation Officer" || 
+           jobTitle === "Documentation Follower" || 
+           jobTitle === "Quality Evaluator" || 
+           jobTitle === "Dispatcher" || 
+           jobTitle === "Dispatcher - HP" || 
+           jobTitle === "TM Manager"){
+          console.log("✓ Navigating to HP Dashboard");
           navigate('/hp-dashboard');
         } else {
+          console.log("→ Navigating to Customer Dashboard");
           navigate('/customer-dashboard');
         }
       }else{

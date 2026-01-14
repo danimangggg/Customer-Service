@@ -536,13 +536,18 @@ const DocumentFollowup = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn, index) => (
+                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn, index) => {
+                  // Check if this ODN has passed document follow-up stage (both documents signed and handover completed)
+                  const isInactive = Boolean(Number(odn.documents_signed)) && Boolean(Number(odn.documents_handover));
+                  
+                  return (
                   <TableRow 
                     key={`${odn.odn_id}-${odn.documents_signed}-${odn.documents_handover}-${pendingUpdates[odn.odn_id]?.documents_signed || 'none'}-${pendingUpdates[odn.odn_id]?.documents_handover || 'none'}`}
                     hover 
                     sx={{ 
                       '&:hover': { bgcolor: 'grey.50' },
-                      bgcolor: pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit',
+                      bgcolor: isInactive ? 'grey.100' : (pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit'),
+                      opacity: isInactive ? 0.6 : 1,
                       borderLeft: pendingUpdates[odn.odn_id] ? '3px solid orange' : 'none'
                     }}
                   >
@@ -567,23 +572,50 @@ const DocumentFollowup = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <DocumentFollowupCheckbox 
-                        odn={odn}
-                        field="documents_signed"
-                        pendingUpdates={pendingUpdates}
-                        onFollowupChange={handleFollowupChange}
-                      />
+                      {isInactive ? (
+                        <Chip 
+                          label="✓ Done" 
+                          color="success" 
+                          size="small" 
+                          variant="outlined"
+                        />
+                      ) : (
+                        <DocumentFollowupCheckbox 
+                          odn={odn}
+                          field="documents_signed"
+                          pendingUpdates={pendingUpdates}
+                          onFollowupChange={handleFollowupChange}
+                        />
+                      )}
                     </TableCell>
                     <TableCell align="center">
-                      <DocumentFollowupCheckbox 
-                        odn={odn}
-                        field="documents_handover"
-                        pendingUpdates={pendingUpdates}
-                        onFollowupChange={handleFollowupChange}
-                      />
+                      {isInactive ? (
+                        <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                          <Chip 
+                            label="✓ Done" 
+                            color="success" 
+                            size="small" 
+                            variant="outlined"
+                          />
+                          <Chip 
+                            label="Passed to Quality" 
+                            color="info" 
+                            size="small" 
+                            variant="outlined"
+                          />
+                        </Stack>
+                      ) : (
+                        <DocumentFollowupCheckbox 
+                          odn={odn}
+                          field="documents_handover"
+                          pendingUpdates={pendingUpdates}
+                          onFollowupChange={handleFollowupChange}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             <TablePagination 
