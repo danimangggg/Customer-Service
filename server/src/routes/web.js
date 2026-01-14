@@ -110,27 +110,9 @@ let routes =  (app) => {
   router.patch('/api/users-management/:id/status', userManagementController.toggleUserStatus);
   router.patch('/api/users-management/:id/reset-password', userManagementController.resetUserPassword);
 
-  // Dashboard Analytics routes
-  const dashboardAnalyticsController = require('../controllers/Reports/dashboardAnalyticsController');
-  router.get('/api/reports/dashboard/analytics', dashboardAnalyticsController.getDashboardAnalytics);
-  router.get('/api/reports/dashboard/performance', dashboardAnalyticsController.getSystemPerformance);
-
   // HP Dashboard routes
   const hpDashboardController = require('../controllers/CustomerService/hpDashboardController');
   router.get('/api/hp-dashboard-data', hpDashboardController.getHPDashboardData);
-
-  // Health Program Reports routes
-  const healthProgramReportsController = require('../controllers/Reports/healthProgramReportsController');
-  router.get('/api/reports/health-program/analytics', healthProgramReportsController.getHealthProgramAnalytics);
-  router.get('/api/reports/health-program/facilities', healthProgramReportsController.getHPFacilityPerformance);
-
-  // Workflow Reports routes
-  const workflowReportsController = require('../controllers/Reports/workflowReportsController');
-  router.get('/api/reports/dispatch', workflowReportsController.getDispatchReports);
-  router.get('/api/reports/documentation', workflowReportsController.getDocumentationReports);
-  router.get('/api/reports/followup', workflowReportsController.getFollowupReports);
-  router.get('/api/reports/quality', workflowReportsController.getQualityReports);
-  router.get('/api/reports/workflow', workflowReportsController.getWorkflowReports);
 
   // Route Management routes
   router.get('/api/routes', routeManagementController.getAllRoutes);
@@ -174,6 +156,7 @@ let routes =  (app) => {
   const documentFollowupController = require('../controllers/Documentation/documentFollowupController');
   router.get('/api/dispatched-odns', documentationController.getDispatchedODNs);
   router.get('/api/documentation/stats', documentationController.getDocumentationStats);
+  router.get('/api/documentation/available-months', documentationController.getAvailableMonths);
   router.put('/api/odns/:id/pod-confirmation', documentationController.updatePODConfirmation);
   router.put('/api/odns/bulk-pod-confirmation', documentationController.bulkUpdatePODConfirmation);
 

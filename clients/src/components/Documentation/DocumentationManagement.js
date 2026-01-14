@@ -129,9 +129,10 @@ const DocumentationManagement = () => {
   const currentEthiopian = getCurrentEthiopianMonth();
 
   useEffect(() => {
-    // Set default to current Ethiopian month and year
-    setSelectedMonth(currentEthiopian.month);
-    setSelectedYear(currentEthiopian.year.toString());
+    // Set default to a month that has data (based on diagnosis results)
+    // Available months: Tahsas 2018, Hidar 2018, Tir 2018
+    setSelectedMonth('Tahsas'); // This month has the most data (6 processes)
+    setSelectedYear('2018');
   }, []);
 
   useEffect(() => {
@@ -155,6 +156,20 @@ const DocumentationManagement = () => {
       setLoading(true);
       setError(null);
       
+      // Validate required parameters
+      if (!selectedMonth || !selectedYear) {
+        setError("Please select both month and year to load ODNs.");
+        return;
+      }
+      
+      console.log('Fetching ODNs with params:', {
+        month: selectedMonth,
+        year: selectedYear,
+        page: page + 1,
+        limit: rowsPerPage,
+        search: searchTerm
+      });
+      
       const response = await axios.get(`${api_url}/api/dispatched-odns`, {
         params: {
           month: selectedMonth,
@@ -165,10 +180,47 @@ const DocumentationManagement = () => {
         }
       });
       
-      setODNData(response.data.odns || []);
+      console.log('API Response:', response.data);
+      
+      if (response.data.odns) {
+        setODNData(response.data.odns);
+        
+        // Show informative message if no ODNs found
+        if (response.data.odns.length === 0) {
+          setError(`No ODNs found for ${selectedMonth} ${selectedYear}. ${response.data.message || 'Try selecting a different month/year.'}`);
+        }
+      } else {
+        setODNData([]);
+        setError("No ODN data received from server.");
+      }
+      
     } catch (err) {
       console.error("Fetch error:", err);
-      setError("Failed to load dispatched ODNs. Please try again.");
+      
+      let errorMessage = "Failed to load dispatched ODNs. ";
+      
+      if (err.response) {
+        // Server responded with error status
+        const status = err.response.status;
+        const data = err.response.data;
+        
+        if (status === 400) {
+          errorMessage += `Invalid parameters: ${data.error || 'Please check month and year selection.'}`;
+        } else if (status === 500) {
+          errorMessage += `Server error: ${data.details || data.error || 'Please try again or contact support.'}`;
+        } else {
+          errorMessage += `HTTP ${status}: ${data.error || 'Please try again.'}`;
+        }
+      } else if (err.request) {
+        // Network error
+        errorMessage += "Network error. Please check your connection and try again.";
+      } else {
+        // Other error
+        errorMessage += err.message || "Please try again.";
+      }
+      
+      setError(errorMessage);
+      setODNData([]);
     } finally {
       setLoading(false);
     }
@@ -176,15 +228,27 @@ const DocumentationManagement = () => {
 
   const fetchStats = async () => {
     try {
+      if (!selectedMonth || !selectedYear) {
+        return; // Don't fetch stats without valid parameters
+      }
+      
       const response = await axios.get(`${api_url}/api/documentation/stats`, {
         params: {
           month: selectedMonth,
           year: selectedYear
         }
       });
+      
+      console.log('Stats response:', response.data);
       setStats(response.data);
     } catch (err) {
       console.error("Stats fetch error:", err);
+      // Don't show error for stats, just log it
+      setStats({
+        totalDispatched: 0,
+        confirmedPODs: 0,
+        pendingPODs: 0
+      });
     }
   };
 
@@ -204,6 +268,13 @@ const DocumentationManagement = () => {
             
             <label style="display: block; margin-bottom: 5px; font-weight: bold;">Arrival Kilometer:</label>
             <input id="arrival-km" class="swal2-input" type="number" step="0.01" min="0" placeholder="Enter arrival kilometer..." value="${currentODN?.arrival_kilometer || ''}" style="margin-bottom: 15px;">
+            
+            <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
+              <small style="color: #666;">
+                <strong>Route:</strong> ${currentODN?.route_name || 'Unknown'}<br>
+                <strong>Facility:</strong> ${currentODN?.facility_name || 'Unknown'}
+              </small>
+            </div>
           </div>
         `,
         focusConfirm: false,
@@ -266,7 +337,8 @@ const DocumentationManagement = () => {
             pod_confirmed: true,
             pod_reason: '',
             pod_number: formValues.podNumber,
-            arrival_kilometer: formValues.arrivalKm
+            arrival_kilometer: formValues.arrivalKm,
+            route_assignment_id: currentODN?.route_assignment_id
           };
 
           await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -376,7 +448,8 @@ const DocumentationManagement = () => {
             pod_confirmed: false,
             pod_reason: reason.trim(),
             pod_number: currentODN?.pod_number || '',
-            arrival_kilometer: currentODN?.arrival_kilometer || null
+            arrival_kilometer: currentODN?.arrival_kilometer || null,
+            route_assignment_id: currentODN?.route_assignment_id
           };
 
           await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -453,7 +526,8 @@ const DocumentationManagement = () => {
         pod_confirmed: confirmed,
         pod_reason: confirmed ? '' : currentReason,
         pod_number: currentODN?.pod_number || '',
-        arrival_kilometer: currentODN?.arrival_kilometer || null
+        arrival_kilometer: currentODN?.arrival_kilometer || null,
+        route_assignment_id: currentODN?.route_assignment_id
       };
 
       await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -569,9 +643,7 @@ const DocumentationManagement = () => {
         const update = {
           odn_id: parseInt(odnId),
           pod_confirmed: currentPODStatus,
-          pod_reason: reason,
-          pod_number: pendingUpdates[odnId]?.pod_number || odnData.find(odn => odn.odn_id === odnId)?.pod_number || '',
-          arrival_kilometer: pendingUpdates[odnId]?.arrival_kilometer || odnData.find(odn => odn.odn_id === odnId)?.arrival_kilometer || null
+          pod_reason: reason
         };
 
         await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -710,13 +782,17 @@ const DocumentationManagement = () => {
   };
 
   const handleSaveUpdates = async () => {
-    const updates = Object.entries(pendingUpdates).map(([odn_id, data]) => ({
-      odn_id: parseInt(odn_id),
-      pod_confirmed: data.pod_confirmed,
-      pod_reason: data.pod_reason,
-      pod_number: data.pod_number,
-      arrival_kilometer: data.arrival_kilometer
-    }));
+    const updates = Object.entries(pendingUpdates).map(([odn_id, data]) => {
+      const currentODN = odnData.find(odn => odn.odn_id === parseInt(odn_id));
+      return {
+        odn_id: parseInt(odn_id),
+        pod_confirmed: data.pod_confirmed,
+        pod_reason: data.pod_reason,
+        pod_number: data.pod_number,
+        arrival_kilometer: data.arrival_kilometer,
+        route_assignment_id: currentODN?.route_assignment_id
+      };
+    });
 
     if (updates.length === 0) {
       MySwal.fire('Info', 'No changes to save.', 'info');
@@ -964,7 +1040,14 @@ const DocumentationManagement = () => {
         {/* Error Alert */}
         {error && (
           <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
+            <Typography variant="body2" gutterBottom>
+              {error}
+            </Typography>
+            {error.includes('No ODNs found') && (
+              <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                💡 Try selecting "Tahsas 2018" or "Hidar 2018" - these months have available data.
+              </Typography>
+            )}
           </Alert>
         )}
 
@@ -1018,6 +1101,12 @@ const DocumentationManagement = () => {
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
+                      <DocumentIcon fontSize="small" />
+                      <span>POD Details</span>
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
                       <NotConfirmedIcon fontSize="small" />
                       <span>Reason (if not confirmed)</span>
                     </Stack>
@@ -1061,6 +1150,25 @@ const DocumentationManagement = () => {
                         pendingUpdates={pendingUpdates}
                         onPODChange={handlePODConfirmationChange}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        {(odn.pod_number || pendingUpdates[odn.odn_id]?.pod_number) && (
+                          <Typography variant="body2" sx={{ mb: 0.5 }}>
+                            <strong>POD #:</strong> {pendingUpdates[odn.odn_id]?.pod_number || odn.pod_number}
+                          </Typography>
+                        )}
+                        {(odn.arrival_kilometer || pendingUpdates[odn.odn_id]?.arrival_kilometer) && (
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Arrival KM:</strong> {pendingUpdates[odn.odn_id]?.arrival_kilometer || odn.arrival_kilometer}
+                          </Typography>
+                        )}
+                        {!odn.pod_number && !pendingUpdates[odn.odn_id]?.pod_number && (
+                          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            No POD details yet
+                          </Typography>
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <TextField

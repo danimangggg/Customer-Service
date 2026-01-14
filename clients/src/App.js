@@ -31,10 +31,7 @@ import DocumentFollowup from './components/Documentation/DocumentFollowup';
 import QualityEvaluation from './components/Quality/QualityEvaluation';
 import HPFacilitiesTransport from './components/Transportation/HPFacilities';
 import HPPicklist from './pages/Customer-Service/HealthProgram/HP-PicklistPage';
-import DashboardAnalytics from './pages/Reports/DashboardAnalytics';
-import WorkflowReports from './pages/Reports/WorkflowReports';
 import TransportationReports from './pages/Reports/TransportationReports';
-import HealthProgramReports from './pages/Reports/HealthProgramReports';
 import AllPicklists from './components/Customer-Service/AllPicklists';
 import OrganizationProfileView from './components/Reports/OrganizationProfileView';
 import OrganizationProfilePage from './pages/Settings/OrganizationProfilePage';
@@ -97,11 +94,8 @@ const AppContent = () => {
             <Route path = '/transportation/hp-facilities' Component={HPFacilitiesTransport} />
             <Route path = '/outstandingProcess' Component={OutstandingProcessPage} />
             <Route path = '/service-time-management' Component={ServiceTimeManagement} />
-            <Route path = '/reports/dashboard' Component={DashboardAnalytics} />
-            <Route path = '/reports/workflow' Component={WorkflowReports} />
             <Route path = '/reports/all-picklists' Component={AllPicklists} />
             <Route path = '/reports/transportation' Component={TransportationReports} />
-            <Route path = '/reports/health-program' Component={HealthProgramReports} />
             <Route path = '/reports/organization-profile' Component={OrganizationProfileView} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />

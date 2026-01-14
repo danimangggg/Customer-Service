@@ -972,72 +972,6 @@ const Sidebar = () => {
          {/* Reports Sub-menu */}
          <Collapse in={reportsOpen} timeout="auto" unmountOnExit>
            <List component="div" disablePadding sx={{ pl: 2 }}>
-             {/* Dashboard Analytics */}
-             <MenuTooltip title={"Dashboard Analytics"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/reports/dashboard"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <Analytics sx={{ color: '#2196f3', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Dashboard Analytics"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.9rem'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
-
-             {/* Workflow Reports */}
-             <MenuTooltip title={"Workflow Reports"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/reports/workflow"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <Assignment sx={{ color: '#4caf50', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Workflow Reports"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.9rem'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
-
              {/* All Picklists */}
              <MenuTooltip title={"All Picklists"}>
                <ListItem 
@@ -1070,41 +1004,6 @@ const Sidebar = () => {
                  />
                </ListItem>
              </MenuTooltip>
-
-             {/* Health Program Reports - for HP Officers */}
-             {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
-               <MenuTooltip title={"Health Program Reports"}>
-                 <ListItem 
-                   button 
-                   component={Link} 
-                   to="/reports/health-program"
-                   sx={{
-                     borderRadius: 2,
-                     mx: 1,
-                     mb: 0.5,
-                     '&:hover': {
-                       bgcolor: 'rgba(25, 118, 210, 0.1)',
-                       transform: 'translateX(4px)',
-                       transition: 'all 0.2s ease'
-                     },
-                     transition: 'all 0.2s ease'
-                   }}
-                 >
-                   <ListItemIcon>
-                     <LocalHospital sx={{ color: '#f44336', fontSize: 20 }} />
-                   </ListItemIcon>
-                   <ListItemText 
-                     primary={"Health Program Reports"} 
-                     sx={{ 
-                       '& .MuiListItemText-primary': { 
-                         fontWeight: 400,
-                         fontSize: '0.9rem'
-                       } 
-                     }} 
-                   />
-                 </ListItem>
-               </MenuTooltip>
-             )}
 
              {/* Organization Profile - View Only for all users */}
              <MenuTooltip title={"Organization Profile"}>
