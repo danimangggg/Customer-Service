@@ -1,25 +1,37 @@
 
 const db = require("../../models");
-const User = db.user;
-const express = require('express')
-const app = express()
-app.use(express.json())
+const Employee = db.employee;
 
-const retriveUsers = (req, res) => {
-
-    User.findAll({
-    }).then(data => {
-      var jsonArray = [];
-          data.forEach((element)=>{
-            jsonArray.push(element.toJSON());
-          });
-          console.log(jsonArray);
-          res.send(jsonArray)
-          }).catch ((error) => {
-    console.log(error);
-    return res.send(`Error when trying fetchin users`);
-          })
-      }
+const retriveUsers = async (req, res) => {
+  try {
+    const data = await Employee.findAll({
+      attributes: ['id', 'user_name', 'full_name', 'account_type', 'jobTitle', 'department']
+    });
+    
+    // Map to match expected frontend format
+    const jsonArray = data.map(element => {
+      const emp = element.toJSON();
+      return {
+        id: emp.id,
+        user_name: emp.user_name,
+        FullName: emp.full_name,
+        AccountType: emp.account_type,
+        JobTitle: emp.jobTitle,
+        Department: emp.department
+      };
+    });
+    
+    console.log('Employees fetched:', jsonArray.length);
+    
+    res.status(200).json(jsonArray);
+  } catch (error) {
+    console.error('Error fetching employees:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch employees',
+      message: error.message 
+    });
+  }
+}
 
 module.exports = {
   retriveUsers

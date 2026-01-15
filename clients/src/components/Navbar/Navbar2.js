@@ -49,13 +49,9 @@ const drawerWidth = 260;
 
 const Sidebar = () => {
   const [reportsOpen, setReportsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [transportationOpen, setTransportationOpen] = useState(false);
   const location = useLocation();
 
   const handleReportsToggle = () => setReportsOpen(!reportsOpen);
-  const handleSettingsToggle = () => setSettingsOpen(!settingsOpen);
-  const handleTransportationToggle = () => setTransportationOpen(!transportationOpen);
 
   const signOut = () => {
     localStorage.clear();
@@ -577,33 +573,23 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Customer Registration - for all users */}
-         {(isAdmin || jobTitle === "Customer Service Officer") && (
-           <MenuTooltip title={"Customer Registration"}>
+         {/* Organization Profile - Admin only */}
+         {isAdmin && (
+           <MenuTooltip title={"Organization Profile"}>
              <ListItem 
                button 
                component={Link} 
-               to="/register-customer"
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
-                 transition: 'all 0.2s ease'
-               }}
+               to="/settings/organization-profile"
+               sx={getActiveStyles('/settings/organization-profile')}
              >
                <ListItemIcon>
-                 <AddCircleOutline sx={{ color: '#00bcd4' }} />
+                 <Business sx={{ color: '#795548' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Customer Registration"} 
+                 primary={"Organization Profile"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
+                     fontWeight: isActivePath('/settings/organization-profile') ? 600 : 500,
                      fontSize: '0.85rem',
                      lineHeight: 1.2,
                      whiteSpace: 'normal',
@@ -615,327 +601,198 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Settings Menu - for Admin users only */}
+         {/* User Management - Admin only */}
          {isAdmin && (
-           <MenuTooltip title={"Settings"}>
+           <MenuTooltip title={"User Management"}>
              <ListItem 
                button 
-               onClick={handleSettingsToggle}
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 bgcolor: settingsOpen ? 'rgba(25, 118, 210, 0.1)' : 'transparent',
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
-                 transition: 'all 0.2s ease'
-               }}
+               component={Link} 
+               to="/settings/user-management"
+               sx={getActiveStyles('/settings/user-management')}
              >
                <ListItemIcon>
-                 <Settings sx={{ color: '#607d8b' }} />
+                 <ManageAccounts sx={{ color: '#9c27b0' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Settings"} 
+                 primary={"User Management"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
+                     fontWeight: isActivePath('/settings/user-management') ? 600 : 500,
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Account Types & Roles - Admin only */}
+         {isAdmin && (
+           <MenuTooltip title={"Account Types & Roles"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/settings/account-types"
+               sx={getActiveStyles('/settings/account-types')}
+             >
+               <ListItemIcon>
+                 <Group sx={{ color: '#f44336' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Account Types & Roles"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/settings/account-types') ? 600 : 500,
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Reset Password - Admin only */}
+         {isAdmin && (
+           <MenuTooltip title={"Reset Password"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/reset-password"
+               sx={getActiveStyles('/reset-password')}
+             >
+               <ListItemIcon>
+                 <VpnKey sx={{ color: '#ff9800' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Reset Password"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/reset-password') ? 600 : 500,
                      fontSize: '0.95rem'
                    } 
                  }} 
                />
-               {settingsOpen ? <ExpandLess /> : <ExpandMore />}
              </ListItem>
            </MenuTooltip>
          )}
 
-         {/* Settings Sub-menu */}
-         <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
-           <List component="div" disablePadding sx={{ pl: 2 }}>
-             {/* Organization Profile */}
-             <MenuTooltip title={"Organization Profile"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/settings/organization-profile"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <Business sx={{ color: '#795548', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Organization Profile"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.8rem',
-                       lineHeight: 1.2,
-                       whiteSpace: 'normal',
-                       wordWrap: 'break-word'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
 
-             {/* User Management */}
-             <MenuTooltip title={"User Management"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/settings/user-management"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <ManageAccounts sx={{ color: '#9c27b0', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"User Management"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.8rem',
-                       lineHeight: 1.2,
-                       whiteSpace: 'normal',
-                       wordWrap: 'break-word'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
 
-             {/* Account Types & Roles */}
-             <MenuTooltip title={"Account Types & Roles"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/settings/account-types"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
-                     transform: 'translateX(4px)',
-                     transition: 'all 0.2s ease'
-                   },
-                   transition: 'all 0.2s ease'
-                 }}
-               >
-                 <ListItemIcon>
-                   <Group sx={{ color: '#f44336', fontSize: 20 }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Account Types & Roles"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: 400,
-                       fontSize: '0.9rem'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
-           </List>
-         </Collapse>
 
-         {/* Transportation Menu - for TM Managers */}
-         {(jobTitle === "TM Manager") && (
-           <MenuTooltip title={"Transportation"}>
+
+         {/* Route Assignment - TM Manager only */}
+         {jobTitle === "TM Manager" && (
+           <MenuTooltip title={"Route Assignment"}>
              <ListItem 
                button 
-               onClick={handleTransportationToggle}
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 bgcolor: transportationOpen ? 'rgba(25, 118, 210, 0.1)' : 'transparent',
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                 },
-                 transition: 'all 0.2s ease-in-out',
-               }}
+               component={Link} 
+               to="/transportation/route-management"
+               sx={getActiveStyles('/transportation/route-management')}
              >
                <ListItemIcon>
-                 <LocalShipping sx={{ color: '#607d8b' }} />
+                 <Assignment sx={{ color: '#607d8b' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Transportation"} 
+                 primary={"Route Assignment"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
-                     fontSize: '0.875rem',
-                     fontWeight: 500,
+                     fontWeight: isActivePath('/transportation/route-management') ? 600 : 500,
+                     fontSize: '0.95rem'
                    } 
                  }} 
                />
-               {transportationOpen ? <ExpandLess /> : <ExpandMore />}
              </ListItem>
            </MenuTooltip>
          )}
 
-         {/* Transportation Sub-menu */}
-         <Collapse in={transportationOpen} timeout="auto" unmountOnExit>
-           <List component="div" disablePadding sx={{ pl: 2 }}>
-             {/* Route Management */}
-             <MenuTooltip title={"Route Management"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/transportation/route-management"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.08)',
-                     transform: 'translateX(4px)',
-                   },
-                   transition: 'all 0.2s ease-in-out',
-                 }}
-               >
-                 <ListItemIcon>
-                   <Assignment sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Route Assignment"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontSize: '0.8rem',
-                       fontWeight: 400,
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
+         {/* Routes - TM Manager only */}
+         {jobTitle === "TM Manager" && (
+           <MenuTooltip title={"Routes"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/transportation/routes"
+               sx={getActiveStyles('/transportation/routes')}
+             >
+               <ListItemIcon>
+                 <Route sx={{ color: '#2196f3' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Routes"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/transportation/routes') ? 600 : 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
 
-             {/* Routes CRUD */}
-             <MenuTooltip title={"Routes"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/transportation/routes"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.08)',
-                     transform: 'translateX(4px)',
-                   },
-                   transition: 'all 0.2s ease-in-out',
-                 }}
-               >
-                 <ListItemIcon>
-                   <Route sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Routes"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontSize: '0.8rem',
-                       fontWeight: 400,
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
+         {/* Vehicle Management - TM Manager only */}
+         {jobTitle === "TM Manager" && (
+           <MenuTooltip title={"Vehicle Management"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/transportation/vehicle-management"
+               sx={getActiveStyles('/transportation/vehicle-management')}
+             >
+               <ListItemIcon>
+                 <DirectionsCar sx={{ color: '#ff9800' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Vehicle Management"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/transportation/vehicle-management') ? 600 : 500,
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
 
-             {/* Vehicle Management */}
-             <MenuTooltip title={"Vehicle Management"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/transportation/vehicle-management"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.08)',
-                     transform: 'translateX(4px)',
-                   },
-                   transition: 'all 0.2s ease-in-out',
-                 }}
-               >
-                 <ListItemIcon>
-                   <DirectionsCar sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"Vehicle Management"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontSize: '0.75rem',
-                       fontWeight: 400,
-                       lineHeight: 1.2,
-                       whiteSpace: 'normal',
-                       wordWrap: 'break-word'
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
-
-             {/* HP Facilities */}
-             <MenuTooltip title={"HP Facilities"}>
-               <ListItem 
-                 button 
-                 component={Link} 
-                 to="/transportation/hp-facilities"
-                 sx={{
-                   borderRadius: 2,
-                   mx: 1,
-                   mb: 0.5,
-                   '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.08)',
-                     transform: 'translateX(4px)',
-                   },
-                   transition: 'all 0.2s ease-in-out',
-                 }}
-               >
-                 <ListItemIcon>
-                   <LocalHospital sx={{ color: '#607d8b', fontSize: '1.2rem' }} />
-                 </ListItemIcon>
-                 <ListItemText 
-                   primary={"HP Facilities"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontSize: '0.8rem',
-                       fontWeight: 400,
-                     } 
-                   }} 
-                 />
-               </ListItem>
-             </MenuTooltip>
+         {/* HP Facilities - TM Manager only */}
+         {jobTitle === "TM Manager" && (
+           <MenuTooltip title={"HP Facilities"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/transportation/hp-facilities"
+               sx={getActiveStyles('/transportation/hp-facilities')}
+             >
+               <ListItemIcon>
+                 <LocalHospital sx={{ color: '#4caf50' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"HP Facilities"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/transportation/hp-facilities') ? 600 : 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
 
 
-           </List>
-         </Collapse>
 
-         {/* Reports Menu - for all users */}
-         {(isAdmin || position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
+         {/* Reports Menu - for non-admin users and all HP-related roles */}
+         {(!isAdmin && (position === "manager" || position === "coordinator" || jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || department === "Transport Management" || department === "Transportation Management")) && (
            <MenuTooltip title={"Reports"}>
              <ListItem 
                button 
@@ -973,8 +830,8 @@ const Sidebar = () => {
          {/* Reports Sub-menu */}
          <Collapse in={reportsOpen} timeout="auto" unmountOnExit>
            <List component="div" disablePadding sx={{ pl: 2 }}>
-             {/* HP Comprehensive Report - for HP Officers */}
-             {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
+             {/* HP Comprehensive Report - for all HP-related roles */}
+             {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || department === "Transport Management" || department === "Transportation Management") && (
                <MenuTooltip title={"HP Comprehensive Report"}>
                  <ListItem 
                    button 
@@ -1082,12 +939,35 @@ const Sidebar = () => {
            </List>
          </Collapse>
 
-          {(isCreditManager || isAdmin) && (
-            <MenuTooltip title={"All Employees"}>
+        </List>
+
+        <Divider sx={{ my: 2, bgcolor: 'rgba(255,255,255,0.1)' }} />
+
+        {/* User Info Section - Bottom */}
+        <Box sx={{ mt: 'auto', px: 2, py: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, mx: 1, mb: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Avatar sx={{ width: 40, height: 40, bgcolor: 'rgba(255,255,255,0.2)' }}>
+              <AccountCircle />
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" fontWeight="600" noWrap sx={{ fontSize: '0.9rem', mb: 0.5 }}>
+                {fullName}
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.75rem' }}>
+                {jobTitle || accountType || 'User'}
+              </Typography>
+            </Box>
+          </Stack>
+        </Box>
+
+        <List sx={{ px: 1 }}>
+          {/* Change Password - All logged in users */}
+          {token !== "guest" && (
+            <MenuTooltip title={"Change Password"}>
               <ListItem 
                 button 
                 component={Link} 
-                to="/all-employee"
+                to="/change-password"
                 sx={{
                   borderRadius: 2,
                   mx: 1,
@@ -1101,10 +981,10 @@ const Sidebar = () => {
                 }}
               >
                 <ListItemIcon>
-                  <Group sx={{ color: '#795548' }} />
+                  <VpnKey sx={{ color: '#4caf50' }} />
                 </ListItemIcon>
                 <ListItemText 
-                  primary={"All Employees"} 
+                  primary={"Change Password"} 
                   sx={{ 
                     '& .MuiListItemText-primary': { 
                       fontWeight: 500,
@@ -1116,40 +996,37 @@ const Sidebar = () => {
             </MenuTooltip>
           )}
 
-        </List>
-
-        <Divider sx={{ my: 2, bgcolor: '#333' }} />
-
-        <List sx={{ mt: 'auto' }}>
-          <ListItem>
-            <ListItemIcon><AccountCircle sx={{ color: 'white' }} /></ListItemIcon>
-            <ListItemText primary={fullName} />
-          </ListItem>
-
-          {isAdmin && (
-            <>
-              <ListItem button component={Link} to="/users">
-                <ListItemIcon><Group sx={{ color: 'white' }} /></ListItemIcon>
-                <ListItemText primary={"Users"} />
-              </ListItem>
-              <ListItem button component={Link} to="/reset-password">
-                <ListItemIcon><VpnKey sx={{ color: 'white' }} /></ListItemIcon>
-                <ListItemText primary={"Reset Password"} />
-              </ListItem>
-            </>
-          )}
-
-          {token !== "guest" && (
-            <ListItem button component={Link} to="/change-password">
-              <ListItemIcon><VpnKey sx={{ color: 'white' }} /></ListItemIcon>
-              <ListItemText primary={"Change Password"} />
+          {/* Log Out */}
+          <MenuTooltip title={token !== "guest" ? "Log Out" : "Log In"}>
+            <ListItem 
+              button 
+              onClick={signOut}
+              sx={{
+                borderRadius: 2,
+                mx: 1,
+                mb: 1,
+                '&:hover': {
+                  bgcolor: 'rgba(244, 67, 54, 0.1)',
+                  transform: 'translateX(4px)',
+                  transition: 'all 0.2s ease'
+                },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <ListItemIcon>
+                <ExitToApp sx={{ color: '#f44336' }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary={token !== "guest" ? "Log Out" : "Log In"} 
+                sx={{ 
+                  '& .MuiListItemText-primary': { 
+                    fontWeight: 500,
+                    fontSize: '0.95rem'
+                  } 
+                }} 
+              />
             </ListItem>
-          )}
-
-          <ListItem button onClick={signOut}>
-            <ListItemIcon><ExitToApp sx={{ color: 'white' }} /></ListItemIcon>
-            <ListItemText primary={token !== "guest" ? "Log Out" : "Log In"} />
-          </ListItem>
+          </MenuTooltip>
         </List>
       </Drawer>
     </Box>

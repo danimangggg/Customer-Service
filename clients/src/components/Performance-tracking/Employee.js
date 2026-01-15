@@ -50,10 +50,6 @@ const UserList = () => {
     fetchData();
   }, []);
 
-  const handleView = (user) => {
-    navigate(`/employee-detail/${user.userId}`, { state: { user } });
-  };
-
   const columns = [
     { field: 'serialId', headerName: "No", width: 70, headerClassName: 'bold-header' },
     { field: 'full_name', headerName: "Full Name", flex: 1, headerClassName: 'bold-header' },
@@ -83,12 +79,6 @@ const UserList = () => {
       headerName: "Actions",
       width: 120,
       headerClassName: 'bold-header',
-      sortable: false,
-      renderCell: (params) => (
-        <Button variant="outlined" size="small" onClick={() => handleView(params.row)}>
-          {"Detail"}
-        </Button>
-      ),
     },
   ];
 

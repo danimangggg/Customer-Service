@@ -7,8 +7,6 @@ import AddUsersPage from './pages/UserAccountPage/AddUsersPage';
 import ResetPasswordPage from './pages/UserAccountPage/ResetPasswordPage';
 import UserListPage from './pages/UserAccountPage/UserListPage';
 import EmployeePage from './pages/Performance-tracking/EmployeePage';
-import EmployeeDetailPage from './pages/Performance-tracking/EmployeeDetailPage';
-import LandingPage2 from './landingPage';
 import RegisterCustomer from './pages/Customer-Service/RegisterCustomerPage';
 import TvRegisterList from './pages/Customer-Service/TvRegistrationListPage';
 import DashboardCustomer from './pages/Customer-Service/DashboardCS';
@@ -56,12 +54,7 @@ const AppContent = () => {
       {!isPublicPage && <Navbar2 />}
       <div className={isPublicPage ? 'public-content' : 'main-content'}>
         <Routes>
-        <Route path = '/' element={
-          <>
-            <DefaultRedirect />
-            <LandingPage2 />
-          </>
-        } />
+        <Route path = '/' element={<DefaultRedirect />} />
         <Route path = '/login' Component={SignIn} />
 
         <Route element = {<ProtectedRoutes/>}>
@@ -70,7 +63,6 @@ const AppContent = () => {
             <Route path = '/reset-password' Component={ResetPasswordPage} />
             <Route path = '/users' Component={UserListPage} />
             <Route path = '/all-employee' Component={EmployeePage} />
-            <Route path = '/employee-detail/:id' Component={EmployeeDetailPage} />
             <Route path = '/register-customer' Component={RegisterCustomer} />
             <Route path = '/customer-slide' Component={TvRegisterList} />
             <Route path = '/customer-dashboard' Component={DashboardCustomer} />

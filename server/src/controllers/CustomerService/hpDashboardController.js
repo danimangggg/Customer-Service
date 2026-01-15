@@ -54,13 +54,30 @@ const getHPDashboardData = async (req, res) => {
     });
     const rrfSent = facilitiesWithProcesses.length;
 
-    // Get dispatched ODNs (status = 'dispatched' or 'ewm_completed')
-    const dispatchedODNs = await ODN.count({
-      where: {
-        ...odnWhere,
-        status: { [Op.in]: ['dispatched', 'ewm_completed'] }
-      }
+    // Get dispatched ODNs (ODNs from processes that have vehicle assigned/dispatched)
+    // Count ODNs where the route has been assigned and dispatched
+    let dispatchedODNsQuery = `
+      SELECT COUNT(DISTINCT o.id) as count
+      FROM odns o
+      INNER JOIN processes p ON o.process_id = p.id
+      INNER JOIN facilities f ON p.facility_id = f.id
+      INNER JOIN routes r ON f.route = r.route_name
+      INNER JOIN route_assignments ra ON ra.route_id = r.id
+      WHERE p.status IN ('vehicle_requested', 'ewm_completed')
+        AND ra.status IN ('Dispatched', 'Completed')
+    `;
+    
+    const dispatchedQueryParams = [];
+    if (reportingMonth) {
+      dispatchedODNsQuery += ' AND p.reporting_month = ? AND ra.ethiopian_month = ?';
+      dispatchedQueryParams.push(reportingMonth, month);
+    }
+
+    const [dispatchedResult] = await db.sequelize.query(dispatchedODNsQuery, {
+      replacements: dispatchedQueryParams,
+      type: db.Sequelize.QueryTypes.SELECT
     });
+    const dispatchedODNs = dispatchedResult.count;
 
     // Get POD confirmed ODNs (have pod_confirmed = true)
     const podConfirmed = await ODN.count({

@@ -143,6 +143,7 @@ const RouteManagement = () => {
     vehicle_id: '',
     driver_id: '',
     deliverer_id: '',
+    departure_kilometer: '',
     notes: ''
   });
 
@@ -257,22 +258,29 @@ const RouteManagement = () => {
         return;
       }
 
-      // Create route assignment
       const assignmentData = {
         ...formData,
         ethiopian_month: currentEthiopianMonth,
         ethiopian_year: currentEthiopianYear
       };
 
-      await axios.post(`${API_URL}/api/route-assignments`, assignmentData);
-      MySwal.fire('Success', 'Route assignment created successfully', 'success');
+      // Check if we're editing an existing assignment or creating a new one
+      if (editingRoute && editingRoute.assignment_id) {
+        // Update existing assignment
+        await axios.put(`${API_URL}/api/route-assignments/${editingRoute.assignment_id}`, assignmentData);
+        MySwal.fire('Success', 'Route assignment updated successfully', 'success');
+      } else {
+        // Create new assignment
+        await axios.post(`${API_URL}/api/route-assignments`, assignmentData);
+        MySwal.fire('Success', 'Route assignment created successfully', 'success');
+      }
       
       handleCloseDialog();
       fetchReadyRoutes();
       fetchStats();
     } catch (error) {
-      console.error('Error creating assignment:', error);
-      MySwal.fire('Error', 'Failed to create route assignment', 'error');
+      console.error('Error saving assignment:', error);
+      MySwal.fire('Error', 'Failed to save route assignment', 'error');
     }
   };
 
@@ -283,6 +291,7 @@ const RouteManagement = () => {
       vehicle_id: route.assigned_vehicle_id || '',
       driver_id: route.assigned_driver_id || '',
       deliverer_id: route.assigned_deliverer_id || '',
+      departure_kilometer: route.departure_kilometer || '',
       notes: route.notes || ''
     });
     setOpenDialog(true);
@@ -296,6 +305,7 @@ const RouteManagement = () => {
       vehicle_id: '',
       driver_id: '',
       deliverer_id: '',
+      departure_kilometer: '',
       notes: ''
     });
   };
@@ -664,7 +674,7 @@ const RouteManagement = () => {
             <Stack direction="row" alignItems="center" spacing={2}>
               <RouteIcon />
               <Typography variant="h6">
-                Assign Transportation Resources
+                {editingRoute && editingRoute.assignment_id ? 'Update' : 'Assign'} Transportation Resources
               </Typography>
             </Stack>
           </DialogTitle>
@@ -764,6 +774,21 @@ const RouteManagement = () => {
                 </FormControl>
               </Grid>
               
+              {/* Departure Kilometer */}
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Departure Kilometer"
+                  type="number"
+                  value={formData.departure_kilometer}
+                  onChange={(e) => setFormData({ ...formData, departure_kilometer: e.target.value })}
+                  InputProps={{
+                    endAdornment: <InputAdornment position="end">km</InputAdornment>
+                  }}
+                  helperText="Vehicle odometer reading at departure"
+                />
+              </Grid>
+              
               {/* Ethiopian Month Display (read-only) */}
               <Grid item xs={12} md={6}>
                 <TextField
@@ -793,7 +818,7 @@ const RouteManagement = () => {
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>
             <Button onClick={handleSubmit} variant="contained">
-              Assign Transportation
+              {editingRoute && editingRoute.assignment_id ? 'Update' : 'Assign'} Transportation
             </Button>
           </DialogActions>
         </Dialog>

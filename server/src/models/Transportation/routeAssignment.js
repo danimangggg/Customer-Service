@@ -37,6 +37,11 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
+    departure_kilometer: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Departure kilometer reading for the route'
+    },
     assigned_by: {
       type: DataTypes.INTEGER,
       allowNull: false,

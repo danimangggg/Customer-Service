@@ -563,7 +563,7 @@ const HpFacilities = () => {
   };
 
   // --- COMPLETE INDIVIDUAL ODN ---
-  const handleCompleteODN = async (odnId) => {
+  const handleCompleteODN = async (odnId, processId) => {
     const result = await Swal.fire({
       title: 'Complete ODN?',
       text: 'This will mark this ODN as EWM completed.',
@@ -580,55 +580,32 @@ const HpFacilities = () => {
           odn_id: odnId
         });
         
-        // For EWM Officers: Remove the completed process from view immediately
-        if (isEWMOfficer) {
-          // Find which process this ODN belongs to
-          let processIdToRemove = null;
-          Object.keys(processODNData).forEach(processId => {
-            const odnExists = processODNData[processId].find(odn => odn.id === odnId);
-            if (odnExists) {
-              processIdToRemove = processId;
-            }
-          });
-          
-          if (processIdToRemove) {
-            // Update process status to ewm_completed so it disappears from EWM view
-            setActiveProcesses(prev => 
-              prev.map(p => 
-                p.id === parseInt(processIdToRemove) 
-                  ? { ...p, status: 'ewm_completed' }
-                  : p
-              )
+        // Update the ODN status in local state
+        setProcessODNData(prev => {
+          const newData = { ...prev };
+          if (newData[processId]) {
+            newData[processId] = newData[processId].map(odn => 
+              odn.id === odnId 
+                ? { ...odn, status: 'ewm_completed' }
+                : odn
             );
             
-            // Remove the process ODN data
-            setProcessODNData(prev => {
-              const newData = { ...prev };
-              delete newData[processIdToRemove];
-              return newData;
-            });
+            // Check if ALL ODNs for this process are now completed
+            const allODNsCompleted = newData[processId].every(odn => odn.status === 'ewm_completed');
             
-            // Remove ODN count
-            setProcessODNCounts(prev => {
-              const newData = { ...prev };
-              delete newData[processIdToRemove];
-              return newData;
-            });
-          }
-        } else {
-          // For O2C Officers: Just update the ODN status in local state
-          setProcessODNData(prev => {
-            const newData = { ...prev };
-            Object.keys(newData).forEach(processId => {
-              newData[processId] = newData[processId].map(odn => 
-                odn.id === odnId 
-                  ? { ...odn, status: 'ewm_completed' }
-                  : odn
+            if (allODNsCompleted) {
+              // Update process status to ewm_completed
+              setActiveProcesses(prevProc => 
+                prevProc.map(p => 
+                  p.id === parseInt(processId) 
+                    ? { ...p, status: 'ewm_completed' }
+                    : p
+                )
               );
-            });
-            return newData;
-          });
-        }
+            }
+          }
+          return newData;
+        });
         
         Swal.fire('Completed!', 'ODN has been marked as EWM completed.', 'success');
         
@@ -1166,58 +1143,73 @@ const HpFacilities = () => {
                         </TableCell>
                         <TableCell align="center">
                           <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                            {!isInactive && !isODNCompleted && (
-                              <Tooltip title="Complete ODN">
-                                <Button 
-                                  variant="contained" 
-                                  color="success" 
-                                  size="small" 
-                                  startIcon={<CheckCircleIcon />} 
-                                  onClick={() => handleCompleteODN(odn.id)}
-                                  className="action-button"
-                                  sx={{ borderRadius: 2 }}
-                                >
-                                  Complete
-                                </Button>
-                              </Tooltip>
+                            {!isODNCompleted && !isInactive && (
+                              <>
+                                <Tooltip title="Complete ODN">
+                                  <Button 
+                                    variant="contained" 
+                                    color="success" 
+                                    size="small" 
+                                    startIcon={<CheckCircleIcon />} 
+                                    onClick={() => handleCompleteODN(odn.id, proc.id)}
+                                    className="action-button"
+                                    sx={{ borderRadius: 2 }}
+                                  >
+                                    Complete
+                                  </Button>
+                                </Tooltip>
+                                <Tooltip title="Return to O2C for Corrections">
+                                  <Button 
+                                    variant="outlined" 
+                                    color="warning" 
+                                    size="small" 
+                                    startIcon={<ReplyIcon />} 
+                                    onClick={() => handleReturnToO2C(proc.id)}
+                                    className="action-button"
+                                    sx={{ borderRadius: 2 }}
+                                  >
+                                    Return
+                                  </Button>
+                                </Tooltip>
+                                <Tooltip title="View Details">
+                                  <Button 
+                                    variant="contained" 
+                                    color="primary" 
+                                    size="small" 
+                                    startIcon={<VisibilityIcon />} 
+                                    onClick={() => handleViewODNDetails(proc.id, f.facility_name, f, odn.odn_number)}
+                                    className="action-button"
+                                    sx={{ borderRadius: 2 }}
+                                  >
+                                    Detail
+                                  </Button>
+                                </Tooltip>
+                              </>
                             )}
-                            {!isInactive && (
-                              <Tooltip title="Return to O2C for Corrections">
-                                <Button 
-                                  variant="outlined" 
-                                  color="warning" 
-                                  size="small" 
-                                  startIcon={<ReplyIcon />} 
-                                  onClick={() => handleReturnToO2C(proc.id)}
-                                  className="action-button"
-                                  sx={{ borderRadius: 2 }}
-                                >
-                                  Return
-                                </Button>
-                              </Tooltip>
-                            )}
-                            <Tooltip title="View Details">
-                              <Button 
-                                variant="outlined" 
-                                color="info" 
+                            {isODNCompleted && (
+                              <Chip 
+                                label="ODN Completed"
                                 size="small" 
-                                startIcon={<VisibilityIcon />} 
-                                onClick={() => handleViewODNDetails(proc.id, f.facility_name, f, odn.odn_number)}
-                                className="action-button"
-                                sx={{ borderRadius: 2 }}
-                                disabled={isInactive}
-                              >
-                                Detail
-                              </Button>
-                            </Tooltip>
+                                icon={<CheckCircleIcon />}
+                                sx={{ 
+                                  bgcolor: 'grey.300',
+                                  color: 'grey.700',
+                                  '& .MuiChip-icon': { color: 'grey.600' }
+                                }}
+                              />
+                            )}
                             {isInactive && (
                               <Chip 
                                 label={`Passed to ${proc.status === 'ewm_completed' ? 'PI' : 
                                        proc.status === 'vehicle_requested' ? 'Dispatch' : 
                                        'Next Stage'}`}
-                                color="default" 
                                 size="small" 
                                 icon={<CheckCircleIcon />}
+                                sx={{ 
+                                  bgcolor: 'grey.300',
+                                  color: 'grey.700',
+                                  '& .MuiChip-icon': { color: 'grey.600' }
+                                }}
                               />
                             )}
                           </Stack>

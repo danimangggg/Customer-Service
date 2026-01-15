@@ -258,27 +258,30 @@ const updateQualityEvaluation = async (req, res) => {
         console.log('SQL Query:', updateQuery);
         console.log('Replacements:', replacements);
 
-        // First check if the employee exists
-        const employeeCheckQuery = 'SELECT id FROM employees WHERE id = ?';
-        const employeeExists = await db.sequelize.query(employeeCheckQuery, {
+        // First check if the user exists in the users table (not employees)
+        const userCheckQuery = 'SELECT id FROM users WHERE id = ?';
+        const userExists = await db.sequelize.query(userCheckQuery, {
           replacements: [evaluated_by],
           type: db.sequelize.QueryTypes.SELECT
         });
 
-        console.log('Employee exists check:', employeeExists);
+        console.log('User exists check:', userExists);
 
         let finalEvaluatedBy = null;
-        if (employeeExists.length > 0) {
+        if (userExists.length > 0) {
           finalEvaluatedBy = evaluated_by;
+          console.log(`User ${evaluated_by} exists in users table`);
         } else {
-          console.log(`Employee ${evaluated_by} does not exist, setting evaluated_by to NULL`);
-          // Try to find any existing employee as fallback
-          const anyEmployee = await db.sequelize.query('SELECT id FROM employees LIMIT 1', {
+          console.log(`User ${evaluated_by} does not exist in users table, setting evaluated_by to NULL`);
+          // Try to find any existing user as fallback
+          const anyUser = await db.sequelize.query('SELECT id FROM users LIMIT 1', {
             type: db.sequelize.QueryTypes.SELECT
           });
-          if (anyEmployee.length > 0) {
-            finalEvaluatedBy = anyEmployee[0].id;
-            console.log(`Using fallback employee ID: ${finalEvaluatedBy}`);
+          if (anyUser.length > 0) {
+            finalEvaluatedBy = anyUser[0].id;
+            console.log(`Using fallback user ID: ${finalEvaluatedBy}`);
+          } else {
+            console.log('No users found in database, will set to NULL');
           }
         }
 

@@ -323,7 +323,7 @@ const PIVehicleRequests = () => {
                   PI Vehicle Requests
                 </Typography>
                 <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Request vehicles for routes where ALL facilities have completed EWM
+                  Monitor routes and request vehicles when all facilities complete EWM
                 </Typography>
               </Box>
             </Stack>
@@ -346,7 +346,7 @@ const PIVehicleRequests = () => {
             title={
               <Stack direction="row" alignItems="center" spacing={1}>
                 <RouteIcon color="primary" />
-                <Typography variant="h6">Routes Ready for Vehicle Request</Typography>
+                <Typography variant="h6">Routes Status</Typography>
                 <Chip 
                   label={`${routeData.length} routes`} 
                   size="small" 
@@ -390,6 +390,10 @@ const PIVehicleRequests = () => {
               </TableHead>
               <TableBody>
                 {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => {
+                  // Calculate remaining facilities that need to complete EWM
+                  const remainingFacilities = route.total_facilities_in_route - route.ewm_completed_facilities - route.vehicle_requested_facilities;
+                  const allFacilitiesReady = remainingFacilities === 0;
+                  
                   // Route is inactive if it has passed PI stage (vehicle already requested/assigned)
                   const hasPassedPI = route.vehicle_requested === 1;
                   const isInactive = hasPassedPI;
@@ -424,14 +428,45 @@ const PIVehicleRequests = () => {
                     </TableCell>
                     <TableCell>
                       <Box>
-                        <Typography variant="body2" fontWeight="bold" color="success.main" sx={{ mb: 1 }}>
-                          {route.facilities.length} Facilities (All EWM Completed ✓)
-                        </Typography>
-                        {route.facilities.map((facility, idx) => (
-                          <Typography key={idx} variant="body2" sx={{ mb: 0.5 }}>
-                            • {facility.facility_name}
+                        {allFacilitiesReady ? (
+                          <Typography variant="body2" fontWeight="bold" color="success.main" sx={{ mb: 1 }}>
+                            {route.facilities.length} Facilities (All EWM Completed ✓)
                           </Typography>
-                        ))}
+                        ) : (
+                          <Box sx={{ mb: 1 }}>
+                            <Typography variant="body2" fontWeight="bold" color="warning.main">
+                              {route.facilities.length} Facilities
+                            </Typography>
+                            <Typography variant="caption" color="error.main" fontWeight="bold">
+                              {remainingFacilities} facility(ies) pending EWM completion
+                            </Typography>
+                          </Box>
+                        )}
+                        {route.facilities.map((facility, idx) => {
+                          const isCompleted = facility.process_status === 'ewm_completed' || facility.process_status === 'vehicle_requested';
+                          return (
+                            <Box key={idx} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                              <Typography variant="body2">
+                                • {facility.facility_name}
+                              </Typography>
+                              {isCompleted ? (
+                                <Chip 
+                                  label="✓" 
+                                  size="small" 
+                                  color="success" 
+                                  sx={{ ml: 1, height: 18, fontSize: '0.7rem' }}
+                                />
+                              ) : (
+                                <Chip 
+                                  label="Pending" 
+                                  size="small" 
+                                  color="warning" 
+                                  sx={{ ml: 1, height: 18, fontSize: '0.7rem' }}
+                                />
+                              )}
+                            </Box>
+                          );
+                        })}
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -488,17 +523,24 @@ const PIVehicleRequests = () => {
                           )}
                         </Stack>
                       ) : (
-                        <Button 
-                          variant="contained" 
-                          color="primary" 
-                          size="small" 
-                          startIcon={<RequestIcon />} 
-                          onClick={() => handleRequestVehicle(route.route_id, route.route_name)}
-                          sx={{ borderRadius: 2 }}
-                          disabled={isInactive}
-                        >
-                          Request Vehicle
-                        </Button>
+                        <Box>
+                          <Button 
+                            variant="contained" 
+                            color="primary" 
+                            size="small" 
+                            startIcon={<RequestIcon />} 
+                            onClick={() => handleRequestVehicle(route.route_id, route.route_name)}
+                            sx={{ borderRadius: 2 }}
+                            disabled={!allFacilitiesReady || isInactive}
+                          >
+                            Request Vehicle
+                          </Button>
+                          {!allFacilitiesReady && (
+                            <Typography variant="caption" color="error" display="block" sx={{ mt: 0.5 }}>
+                              {remainingFacilities} facility(ies) pending
+                            </Typography>
+                          )}
+                        </Box>
                       )}
                     </TableCell>
                   </TableRow>

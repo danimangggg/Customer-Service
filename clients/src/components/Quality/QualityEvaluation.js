@@ -188,11 +188,13 @@ const QualityEvaluation = () => {
   const handleSaveEdit = async () => {
     if (!editingODN) {
       console.error('No ODN selected for editing');
+      MySwal.fire('Error', 'No ODN selected for editing', 'error');
       return;
     }
 
     console.log('=== SAVE EDIT DEBUG ===');
     console.log('editingODN:', editingODN);
+    console.log('editingODN.odn_id:', editingODN.odn_id);
     console.log('editQualityConfirmed:', editQualityConfirmed);
     console.log('editFeedback:', editFeedback);
     console.log('loggedInUserId:', loggedInUserId);
@@ -205,8 +207,12 @@ const QualityEvaluation = () => {
         quality_feedback: editFeedback
       };
 
-      console.log('Sending update payload:', update);
+      console.log('Sending update payload:', JSON.stringify(update, null, 2));
       console.log('API URL:', `${api_url}/api/odns/bulk-quality-evaluation`);
+      console.log('Full request body:', JSON.stringify({
+        updates: [update],
+        evaluated_by: parseInt(loggedInUserId)
+      }, null, 2));
 
       const response = await axios.put(`${api_url}/api/odns/bulk-quality-evaluation`, {
         updates: [update],
@@ -215,26 +221,42 @@ const QualityEvaluation = () => {
 
       console.log('API Response:', response.data);
       console.log('Response status:', response.status);
+      
+      // Check if the update was successful
+      if (response.data.results && response.data.results.length > 0) {
+        const result = response.data.results[0];
+        console.log('Update result:', result);
+        
+        if (!result.success) {
+          console.error('Update failed on server:', result.error);
+          MySwal.fire('Error', `Failed to save: ${result.error}`, 'error');
+          return;
+        }
+      }
 
-      // Update ODN data
+      // Update local ODN data immediately with the new values
       console.log('Updating local ODN data...');
-      setODNData(prevData => 
-        prevData.map(odn => 
-          odn.odn_id === editingODN.odn_id 
-            ? { 
-                ...odn, 
-                quality_confirmed: editQualityConfirmed ? 1 : 0,
-                quality_feedback: editFeedback,
-                quality_evaluated_by: parseInt(loggedInUserId),
-                quality_evaluated_at: new Date().toISOString()
-              }
-            : odn
-        )
-      );
-
-      // Refresh data from server to ensure consistency
-      console.log('Refreshing data from server...');
-      await fetchQualityEvaluationODNs();
+      console.log('Before update - odnData:', odnData);
+      
+      setODNData(prevData => {
+        const updatedData = prevData.map(odn => {
+          if (odn.odn_id === editingODN.odn_id) {
+            console.log('Updating ODN:', odn.odn_id);
+            console.log('Old quality_confirmed:', odn.quality_confirmed);
+            console.log('New quality_confirmed:', editQualityConfirmed ? 1 : 0);
+            return { 
+              ...odn, 
+              quality_confirmed: editQualityConfirmed ? 1 : 0,
+              quality_feedback: editFeedback,
+              quality_evaluated_by: parseInt(loggedInUserId),
+              quality_evaluated_at: new Date().toISOString()
+            };
+          }
+          return odn;
+        });
+        console.log('After update - updatedData:', updatedData);
+        return updatedData;
+      });
 
       // Update stats
       console.log('Updating stats...');
@@ -261,7 +283,9 @@ const QualityEvaluation = () => {
       console.error('Error response:', err.response?.data);
       console.error('Error status:', err.response?.status);
       console.error('Error config:', err.config);
-      MySwal.fire('Error', 'Failed to save quality evaluation.', 'error');
+      
+      const errorMessage = err.response?.data?.error || err.message || 'Unknown error occurred';
+      MySwal.fire('Error', `Failed to save quality evaluation: ${errorMessage}`, 'error');
     } finally {
       setAutoSaving(false);
       console.log('=== SAVE EDIT END ===');

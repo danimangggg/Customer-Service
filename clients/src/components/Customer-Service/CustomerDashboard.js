@@ -288,39 +288,34 @@ const CustomerServiceDashboard = () => {
       <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
         <Box className="dashboard-card animate-fade-in" sx={{ mx: 'auto', maxWidth: '95%', minHeight: '100vh' }}>
           {/* Header Section */}
-          <Box className="header-gradient">
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Stack direction="row" alignItems="center" spacing={3}>
-                <Box sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.2)', 
-                  width: 80, 
-                  height: 80,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backdropFilter: 'blur(10px)',
-                  border: '2px solid rgba(255,255,255,0.3)'
-                }}>
-                  <TrendingUpIcon sx={{ fontSize: 40 }} />
-                </Box>
-                <Box>
-                  <Typography variant="h2" fontWeight="bold" sx={{ 
-                    textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    mb: 1
-                  }}>
-                    Customer Service Dashboard
-                  </Typography>
-                  <Typography variant="h5" sx={{ 
-                    opacity: 0.9, 
-                    fontWeight: 300,
-                    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                  }}>
-                    Real-time analytics and performance insights
-                  </Typography>
-                </Box>
-              </Stack>
-            </Box>
+          <Box sx={{ 
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+            color: 'white',
+            p: 4,
+            borderRadius: '20px 20px 0 0'
+          }}>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Box sx={{ 
+                bgcolor: 'rgba(255,255,255,0.15)', 
+                width: 56, 
+                height: 56,
+                borderRadius: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)'
+              }}>
+                <TrendingUpIcon sx={{ fontSize: 32 }} />
+              </Box>
+              <Box>
+                <Typography variant="h4" fontWeight="600" sx={{ mb: 0.5 }}>
+                  Customer Service Dashboard
+                </Typography>
+                <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                  Real-time analytics and performance insights
+                </Typography>
+              </Box>
+            </Stack>
           </Box>
 
           {/* Content Section */}
@@ -346,18 +341,22 @@ const CustomerServiceDashboard = () => {
                 {/* Enhanced Summary Cards */}
                 <Grid item xs={12} sm={6} md={4}>
                   <Box className="stats-card" sx={{ 
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                     color: 'white'
                   }}>
-                    <Stack direction="row" alignItems="center" spacing={3}>
-                      <Box className="metric-icon">
-                        <PeopleIcon sx={{ fontSize: 48 }} />
+                    <Stack direction="row" alignItems="center" spacing={2}>
+                      <Box className="metric-icon" sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.2)',
+                        p: 1.5,
+                        borderRadius: 2
+                      }}>
+                        <PeopleIcon sx={{ fontSize: 32 }} />
                       </Box>
                       <Box>
-                        <Typography variant="h3" fontWeight="bold">
+                        <Typography variant="h4" fontWeight="600">
                           {totalRegistrations.toLocaleString()}
                         </Typography>
-                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
                           Total Registrations
                         </Typography>
                       </Box>
@@ -367,18 +366,22 @@ const CustomerServiceDashboard = () => {
 
                 <Grid item xs={12} sm={6} md={4}>
                   <Box className="stats-card" sx={{ 
-                    background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
+                    background: 'linear-gradient(135deg, #2e7d32 0%, #388e3c 100%)',
                     color: 'white'
                   }}>
-                    <Stack direction="row" alignItems="center" spacing={3}>
-                      <Box className="metric-icon">
-                        <CheckCircleIcon sx={{ fontSize: 48 }} />
+                    <Stack direction="row" alignItems="center" spacing={2}>
+                      <Box className="metric-icon" sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.2)',
+                        p: 1.5,
+                        borderRadius: 2
+                      }}>
+                        <CheckCircleIcon sx={{ fontSize: 32 }} />
                       </Box>
                       <Box>
-                        <Typography variant="h3" fontWeight="bold">
+                        <Typography variant="h4" fontWeight="600">
                           {completedCustomers.toLocaleString()}
                         </Typography>
-                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
                           Tasks Completed
                         </Typography>
                       </Box>
@@ -388,18 +391,22 @@ const CustomerServiceDashboard = () => {
 
                 <Grid item xs={12} sm={6} md={4}>
                   <Box className="stats-card" sx={{ 
-                    background: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
+                    background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)',
                     color: 'white'
                   }}>
-                    <Stack direction="row" alignItems="center" spacing={3}>
-                      <Box className="metric-icon">
-                        <AccessTimeIcon sx={{ fontSize: 48 }} />
+                    <Stack direction="row" alignItems="center" spacing={2}>
+                      <Box className="metric-icon" sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.2)',
+                        p: 1.5,
+                        borderRadius: 2
+                      }}>
+                        <AccessTimeIcon sx={{ fontSize: 32 }} />
                       </Box>
                       <Box>
-                        <Typography variant="h3" fontWeight="bold">
+                        <Typography variant="h4" fontWeight="600">
                           {recentAverageWaitingTime}
                         </Typography>
-                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                        <Typography variant="body1" sx={{ opacity: 0.9 }}>
                           Avg. Wait Time (hrs)
                         </Typography>
                       </Box>
@@ -409,37 +416,37 @@ const CustomerServiceDashboard = () => {
 
                 {/* Enhanced Charts */}
                 <Grid item xs={12} md={6}>
-                  <Paper className="chart-card" sx={{ p: 4, minHeight: 450 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                  <Paper className="chart-card" sx={{ p: 3, minHeight: 420 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
                       <Box sx={{ 
                         bgcolor: 'primary.main', 
                         color: 'white',
-                        p: 1.5,
-                        borderRadius: 2,
+                        p: 1,
+                        borderRadius: 1.5,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>
-                        <TrendingUpIcon />
+                        <TrendingUpIcon fontSize="small" />
                       </Box>
-                      <Typography variant="h5" fontWeight="bold">
+                      <Typography variant="h6" fontWeight="600">
                         Daily Completed Tasks
                       </Typography>
                     </Stack>
-                    <ResponsiveContainer width="100%" height={350}>
-                      <BarChart data={dailyCompletedData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <ResponsiveContainer width="100%" height={330}>
+                      <BarChart data={dailyCompletedData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                         <XAxis 
                           dataKey="date" 
-                          tick={{ fill: '#666', fontSize: 12 }}
+                          tick={{ fill: '#666', fontSize: 11 }}
                           axisLine={{ stroke: '#e0e0e0' }}
                         />
                         <YAxis 
-                          tick={{ fill: '#666', fontSize: 12 }}
+                          tick={{ fill: '#666', fontSize: 11 }}
                           axisLine={{ stroke: '#e0e0e0' }}
                         />
                         <Tooltip content={renderTooltip} />
-                        <Legend />
+                        <Legend wrapperStyle={{ fontSize: '13px' }} />
                         <Bar 
                           dataKey="Completed Tasks" 
                           fill="url(#barGradient)"
@@ -447,8 +454,8 @@ const CustomerServiceDashboard = () => {
                         />
                         <defs>
                           <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#667eea" />
-                            <stop offset="100%" stopColor="#764ba2" />
+                            <stop offset="0%" stopColor="#1976d2" />
+                            <stop offset="100%" stopColor="#1565c0" />
                           </linearGradient>
                         </defs>
                       </BarChart>
@@ -457,24 +464,24 @@ const CustomerServiceDashboard = () => {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <Paper className="chart-card" sx={{ p: 4, minHeight: 450 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                  <Paper className="chart-card" sx={{ p: 3, minHeight: 420 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
                       <Box sx={{ 
                         bgcolor: 'success.main', 
                         color: 'white',
-                        p: 1.5,
-                        borderRadius: 2,
+                        p: 1,
+                        borderRadius: 1.5,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>
-                        <CheckCircleIcon />
+                        <CheckCircleIcon fontSize="small" />
                       </Box>
-                      <Typography variant="h5" fontWeight="bold">
+                      <Typography variant="h6" fontWeight="600">
                         Task Status Distribution
                       </Typography>
                     </Stack>
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={260}>
                       <PieChart>
                         <Pie
                           data={statusDistribution}
@@ -482,8 +489,8 @@ const CustomerServiceDashboard = () => {
                           nameKey="name"
                           cx="50%"
                           cy="50%"
-                          outerRadius={100}
-                          innerRadius={60}
+                          outerRadius={90}
+                          innerRadius={55}
                           paddingAngle={5}
                           fill="#8884d8"
                           labelLine={false}
@@ -500,44 +507,44 @@ const CustomerServiceDashboard = () => {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <Paper className="chart-card" sx={{ p: 4, minHeight: 400 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                  <Paper className="chart-card" sx={{ p: 3, minHeight: 380 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
                       <Box sx={{ 
                         bgcolor: 'warning.main', 
                         color: 'white',
-                        p: 1.5,
-                        borderRadius: 2,
+                        p: 1,
+                        borderRadius: 1.5,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>
-                        <AccessTimeIcon />
+                        <AccessTimeIcon fontSize="small" />
                       </Box>
-                      <Typography variant="h5" fontWeight="bold">
+                      <Typography variant="h6" fontWeight="600">
                         Average Waiting Time Trend
                       </Typography>
                     </Stack>
-                    <ResponsiveContainer width="100%" height={320}>
-                      <LineChart data={dailyAverageWaitingTime} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={dailyAverageWaitingTime} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                         <XAxis 
                           dataKey="date" 
-                          tick={{ fill: '#666', fontSize: 12 }}
+                          tick={{ fill: '#666', fontSize: 11 }}
                           axisLine={{ stroke: '#e0e0e0' }}
                         />
                         <YAxis 
-                          tick={{ fill: '#666', fontSize: 12 }}
+                          tick={{ fill: '#666', fontSize: 11 }}
                           axisLine={{ stroke: '#e0e0e0' }}
                         />
                         <Tooltip content={renderTooltip} />
-                        <Legend />
+                        <Legend wrapperStyle={{ fontSize: '13px' }} />
                         <Line
                           type="monotone"
                           dataKey="Average Waiting Time (hrs)"
-                          stroke="#ff9800"
-                          strokeWidth={3}
-                          dot={{ fill: '#ff9800', strokeWidth: 2, r: 6 }}
-                          activeDot={{ r: 8, stroke: '#ff9800', strokeWidth: 2 }}
+                          stroke="#ed6c02"
+                          strokeWidth={2.5}
+                          dot={{ fill: '#ed6c02', strokeWidth: 2, r: 5 }}
+                          activeDot={{ r: 7, stroke: '#ed6c02', strokeWidth: 2 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -545,44 +552,44 @@ const CustomerServiceDashboard = () => {
                 </Grid>
 
                 <Grid item xs={12} md={6}>
-                  <Paper className="chart-card" sx={{ p: 4, minHeight: 400 }}>
-                    <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
+                  <Paper className="chart-card" sx={{ p: 3, minHeight: 380 }}>
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
                       <Box sx={{ 
                         bgcolor: 'info.main', 
                         color: 'white',
-                        p: 1.5,
-                        borderRadius: 2,
+                        p: 1,
+                        borderRadius: 1.5,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>
-                        <PeopleIcon />
+                        <PeopleIcon fontSize="small" />
                       </Box>
-                      <Typography variant="h5" fontWeight="bold">
+                      <Typography variant="h6" fontWeight="600">
                         Daily Registration Trend
                       </Typography>
                     </Stack>
-                    <ResponsiveContainer width="100%" height={320}>
-                      <LineChart data={dailyRegistrationTrend} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={dailyRegistrationTrend} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                         <XAxis 
                           dataKey="date" 
-                          tick={{ fill: '#666', fontSize: 12 }}
+                          tick={{ fill: '#666', fontSize: 11 }}
                           axisLine={{ stroke: '#e0e0e0' }}
                         />
                         <YAxis 
-                          tick={{ fill: '#666', fontSize: 12 }}
+                          tick={{ fill: '#666', fontSize: 11 }}
                           axisLine={{ stroke: '#e0e0e0' }}
                         />
                         <Tooltip content={renderTooltip} />
-                        <Legend />
+                        <Legend wrapperStyle={{ fontSize: '13px' }} />
                         <Line
                           type="monotone"
                           dataKey="Daily Registrations"
-                          stroke="#2196f3"
-                          strokeWidth={3}
-                          dot={{ fill: '#2196f3', strokeWidth: 2, r: 6 }}
-                          activeDot={{ r: 8, stroke: '#2196f3', strokeWidth: 2 }}
+                          stroke="#0288d1"
+                          strokeWidth={2.5}
+                          dot={{ fill: '#0288d1', strokeWidth: 2, r: 5 }}
+                          activeDot={{ r: 7, stroke: '#0288d1', strokeWidth: 2 }}
                         />
                       </LineChart>
                     </ResponsiveContainer>

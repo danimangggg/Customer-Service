@@ -10,10 +10,14 @@ const DefaultRedirect = () => {
     if (token && token !== 'guest') {
       const jobTitle = localStorage.getItem('JobTitle');
       const accountType = localStorage.getItem('AccountType');
-      const position = localStorage.getItem('Position');
+      const department = localStorage.getItem('Department');
       
+      // Check for Transport Management department first
+      if (department === "Transport Management" || department === "Transportation Management") {
+        navigate('/hp-dashboard');
+      }
       // Redirect HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, Dispatchers, and TM Managers to HP Dashboard
-      if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") {
+      else if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") {
         navigate('/hp-dashboard');
       }
       // Redirect WIM Operators to picklists
@@ -29,8 +33,8 @@ const DefaultRedirect = () => {
         navigate('/customer-dashboard');
       }
     } else {
-      // Not logged in, stay on landing page
-      // The component will just render nothing and let the landing page show
+      // Not logged in, redirect to login page
+      navigate('/login');
     }
   }, [navigate]);
 

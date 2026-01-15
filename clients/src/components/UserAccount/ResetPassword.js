@@ -1,55 +1,95 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
   Typography,
-  IconButton,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
   Button,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
 
 const ResetPasswordForm = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const api_url = process.env.REACT_APP_API_URL;
-  const [user_name, setUsername] = useState('');
 
   useEffect(() => {
-    // Fetch users from the API
     const fetchUsers = async () => {
       try {
-        const response = await axios.get(`${api_url}/api/users`); // Adjust the endpoint as needed
-        setUsers(response.data);
+        setLoading(true);
+        setError(null);
+        const response = await axios.get(`${api_url}/api/users`);
+        console.log('Raw API response:', response);
+        console.log('Response data:', response.data);
+        console.log('Response data type:', typeof response.data);
+        console.log('Is array?', Array.isArray(response.data));
+        
+        const data = response.data;
+        
+        // Handle different response formats
+        if (Array.isArray(data)) {
+          console.log('Setting users - array format, count:', data.length);
+          setUsers(data);
+        } else if (typeof data === 'string') {
+          console.error('Received string instead of array:', data);
+          setError('Server returned invalid data format (string)');
+          setUsers([]);
+        } else if (data && typeof data === 'object') {
+          console.log('Received object, keys:', Object.keys(data));
+          if (data.users && Array.isArray(data.users)) {
+            console.log('Setting users from nested array');
+            setUsers(data.users);
+          } else if (data.data && Array.isArray(data.data)) {
+            console.log('Setting users from data property');
+            setUsers(data.data);
+          } else {
+            console.error('Object does not contain users array');
+            setError('Invalid data structure received from server');
+            setUsers([]);
+          }
+        } else {
+          console.error('Unexpected data type:', typeof data);
+          setError('Invalid data format received');
+          setUsers([]);
+        }
       } catch (error) {
         console.error('Error fetching users:', error);
+        console.error('Error response:', error.response);
+        setError(`Failed to load users: ${error.message}`);
+        setUsers([]);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchUsers();
-  }, []);
+  }, [api_url]);
 
   const handleChange = (event) => {
     setSelectedUser(event.target.value);
   };
 
   const handleResetPassword = async () => {
-    console.log(selectedUser)
-    // Implement the password reset logic here
-    const result = await axios.post(`${api_url}/api/resetPassword`,{user_name: selectedUser});
+    if (!selectedUser) {
+      alert('Please select a user first');
+      return;
+    }
     
-    alert(result.data.message)
-    window.location.reload()
-  };
-
-  const handleBack = () => {
-    navigate(-1);
+    try {
+      const result = await axios.post(`${api_url}/api/resetPassword`, { user_name: selectedUser });
+      alert(result.data.message || 'Password reset successfully');
+      setSelectedUser('');
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      alert(error.response?.data?.message || 'Failed to reset password. Please try again.');
+    }
   };
 
   return (
@@ -58,47 +98,62 @@ const ResetPasswordForm = () => {
       flexDirection="column"
       alignItems="center"
       justifyContent="center"
-      height="60vh"
-      sx={{ backgroundColor: 'white', padding: 2 }}
+      minHeight="60vh"
+      sx={{ backgroundColor: '#f5f5f5', padding: 2 }}
     >
-      <Paper elevation={3} sx={{ padding: 4, width: '400px', borderRadius: 2, position: 'relative' }}>
-        <IconButton
-          onClick={handleBack}
-          sx={{ position: 'absolute', top: 8, right: 8 }}
-        >
-          <CloseIcon />
-        </IconButton>
-        <Typography variant="h4" gutterBottom align="center">
-          Reset Password
+      <Paper elevation={3} sx={{ padding: 4, width: '100%', maxWidth: 500, borderRadius: 2 }}>
+        <Typography variant="h4" gutterBottom align="center" sx={{ mb: 3 }}>
+          Reset User Password
         </Typography>
-        <Box
-          component="form"
-          display="flex"
-          flexDirection="column"
-          alignItems="center"
-        >
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Select User</InputLabel>
-            <Select
-              value={selectedUser}
-              onChange={handleChange}
-            >
-              {users.map((user) => (
-                <MenuItem key={user.id} value={user.user_name}>
-                  {user.user_name}
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {loading ? (
+          <Box display="flex" justifyContent="center" alignItems="center" py={4}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box component="form" display="flex" flexDirection="column" gap={2}>
+            <FormControl fullWidth>
+              <InputLabel id="user-select-label">Select User</InputLabel>
+              <Select
+                labelId="user-select-label"
+                id="user-select"
+                value={selectedUser}
+                label="Select User"
+                onChange={handleChange}
+              >
+                <MenuItem value="">
+                  <em>-- Select a user --</em>
                 </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleResetPassword}
-            sx={{ marginTop: 2 }}
-          >
-            Reset Password
-          </Button>
-        </Box>
+                {users.map((user) => (
+                  <MenuItem key={user.id} value={user.user_name}>
+                    {user.user_name} {user.FullName ? `(${user.FullName})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+              {users.length} user(s) available
+            </Typography>
+
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleResetPassword}
+              disabled={!selectedUser}
+              size="large"
+              sx={{ mt: 2 }}
+            >
+              Reset Password
+            </Button>
+          </Box>
+        )}
       </Paper>
     </Box>
   );

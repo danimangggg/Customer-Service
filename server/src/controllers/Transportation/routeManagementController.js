@@ -149,6 +149,7 @@ const createRouteAssignment = async (req, res) => {
       vehicle_id,
       driver_id,
       deliverer_id,
+      departure_kilometer,
       scheduled_date,
       ethiopian_month,
       priority,
@@ -253,6 +254,7 @@ const createRouteAssignment = async (req, res) => {
       vehicle_id,
       driver_id,
       deliverer_id: deliverer_id || null,
+      departure_kilometer: departure_kilometer || null,
       assigned_by,
       scheduled_date: scheduled_date || null,
       ethiopian_month: ethiopian_month, // Use the provided month
@@ -656,9 +658,11 @@ const getReadyRoutes = async (req, res) => {
         r.route_name,
         COUNT(DISTINCT f.id) as total_facilities,
         COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as completed_facilities,
+        ra.id as assignment_id,
         ra.vehicle_id as assigned_vehicle_id,
         ra.driver_id as assigned_driver_id,
         ra.deliverer_id as assigned_deliverer_id,
+        ra.departure_kilometer,
         ra.notes,
         ra.status as assignment_status,
         v.vehicle_name,
@@ -678,7 +682,7 @@ const getReadyRoutes = async (req, res) => {
         ${search ? 'AND f.facility_name LIKE ?' : ''}
         ${status === 'Assigned' ? 'AND ra.status IS NOT NULL' : ''}
         ${status === 'Not Assigned' ? 'AND ra.status IS NULL' : ''}
-      GROUP BY r.id, r.route_name, ra.vehicle_id, ra.driver_id, ra.deliverer_id, ra.notes, ra.status, v.vehicle_name, v.plate_number, d.full_name, del.full_name
+      GROUP BY r.id, r.route_name, ra.id, ra.vehicle_id, ra.driver_id, ra.deliverer_id, ra.departure_kilometer, ra.notes, ra.status, v.vehicle_name, v.plate_number, d.full_name, del.full_name
       HAVING total_facilities > 0 AND total_facilities = completed_facilities
       ORDER BY r.route_name
       LIMIT ? OFFSET ?
