@@ -67,6 +67,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
@@ -111,7 +112,10 @@ const UserManagement = () => {
   const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
   const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher'];
-  const stores = ['AA1', 'AA2', 'AA3', 'AA4', 'AA5'];
+
+  useEffect(() => {
+    fetchStores();
+  }, []);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -121,6 +125,15 @@ const UserManagement = () => {
 
     return () => clearTimeout(timeoutId);
   }, [page, rowsPerPage, searchTerm, filterDepartment, filterStatus]);
+
+  const fetchStores = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/stores`);
+      setStores(response.data);
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -813,7 +826,9 @@ const UserManagement = () => {
                   >
                     <MenuItem value="">Select Store</MenuItem>
                     {stores.map((store) => (
-                      <MenuItem key={store} value={store}>{store}</MenuItem>
+                      <MenuItem key={store.id} value={store.store_name}>
+                        {store.store_name}
+                      </MenuItem>
                     ))}
                   </Select>
                 </FormControl>

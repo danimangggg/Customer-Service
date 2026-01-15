@@ -42,7 +42,8 @@ import {
   ManageAccounts,
   LocalShipping,
   Route,
-  Description
+  Description,
+  Store
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -176,8 +177,8 @@ const Sidebar = () => {
        <List sx={{ pt: 2, px: 1 }}>
          {/* DASHBOARDS SECTION - AT THE TOP */}
          
-         {/* HP Dashboard - for HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, Dispatchers, TM Managers, and Transport Management department */}
-         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || department === "Transport Management" || department === "Transportation Management") && (
+         {/* HP Dashboard - for HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, HP Dispatchers, TM Managers, and Transport Management department */}
+         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || department === "Transport Management" || department === "Transportation Management") && (
            <MenuTooltip title={"HP Dashboard"}>
              <ListItem 
                button 
@@ -259,23 +260,23 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Service Time Management - for O2C Officers, EWM Officers, and Customer Service Officers */}
-         {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer") && (
-           <MenuTooltip title={"Service Time Management"}>
+         {/* Register Customer - for Customer Service Officers */}
+         {jobTitle === "Customer Service Officer" && (
+           <MenuTooltip title={"Register Customer"}>
              <ListItem 
                button 
                component={Link} 
-               to="/service-time-management"
-               sx={getActiveStyles('/service-time-management')}
+               to="/register-customer"
+               sx={getActiveStyles('/register-customer')}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#2196f3' }} />
+                 <AddCircleOutline sx={{ color: '#4caf50' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Service Time"} 
+                 primary={"Register Customer"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/service-time-management') ? 600 : 500,
+                     fontWeight: isActivePath('/register-customer') ? 600 : 500,
                      fontSize: '0.95rem',
                      whiteSpace: 'nowrap',
                      overflow: 'hidden',
@@ -590,6 +591,34 @@ const Sidebar = () => {
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: isActivePath('/settings/organization-profile') ? 600 : 500,
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Store Management - Admin only */}
+         {isAdmin && (
+           <MenuTooltip title={"Store Management"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/settings/store-management"
+               sx={getActiveStyles('/settings/store-management')}
+             >
+               <ListItemIcon>
+                 <Store sx={{ color: '#9c27b0' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Store Management"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/settings/store-management') ? 600 : 500,
                      fontSize: '0.85rem',
                      lineHeight: 1.2,
                      whiteSpace: 'normal',

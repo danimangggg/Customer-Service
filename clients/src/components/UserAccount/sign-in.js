@@ -352,10 +352,15 @@ export default function SignIn() {
           console.log("✓ Routing to HP Dashboard - Transport Management department");
           navigate('/hp-dashboard');
         }
-        // Check for specific HP-related job titles
-        else if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
+        // Check for specific HP-related job titles (with - HP suffix)
+        else if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
           console.log("✓ Routing to HP Dashboard - HP job title");
           navigate('/hp-dashboard');
+        }
+        // Customer Service Dispatcher (without HP suffix) goes to Customer Dashboard
+        else if(response.data.JobTitle === "Dispatcher"){
+          console.log("→ Routing to Customer Dashboard - Customer Service Dispatcher");
+          navigate('/customer-dashboard');
         }
         // Handle Self Assessment and Admin account types
         else if(response.data.AccountType === "Self Assesment" || response.data.AccountType === "Admin"){
@@ -491,7 +496,6 @@ export default function SignIn() {
                 label="Username"
                 name="username"
                 autoComplete="username"
-                autoFocus
                 value={user_name}
                 onChange={(e) => setuserName(e.target.value)}
                 InputLabelProps={{ shrink: true }}
@@ -556,7 +560,7 @@ export default function SignIn() {
                 </StyledButton>
 
                 <Typography variant="body2" sx={{ mt: 3, color: 'text.secondary', textAlign: 'center' }}>
-                  © 2024 EPSS-AA1. All rights reserved.
+                  © 2025 EPSS-AA1. All rights reserved.
                 </Typography>
               </Box>
             </Box>

@@ -46,11 +46,11 @@ const getEmployeeById = async (req, res) => {
 // Update an employee
 const updateEmployee = async (req, res) => {
   try {
-    const { fullName, jobTitle, department } = req.body;
+    const { fullName, jobTitle, department, store } = req.body;
     const employee = await Employee.findByPk(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
 
-    await employee.update({ fullName, jobTitle, department });
+    await employee.update({ fullName, jobTitle, department, store });
     res.json(employee);
   } catch (error) {
     res.status(500).json({ message: 'Failed to update employee', error });

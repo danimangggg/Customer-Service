@@ -38,6 +38,7 @@ db.woreda = require("./CustomerService/woreda.js")(sequelize, Sequelize);
 
 // Settings models (includes vehicle)
 db.vehicle = require("./Settings/vehicle.js")(sequelize, Sequelize);
+db.store = require("./Settings/store.js")(sequelize, Sequelize);
 
 // Transportation models
 db.route = require("./Transportation/route.js")(sequelize, Sequelize);

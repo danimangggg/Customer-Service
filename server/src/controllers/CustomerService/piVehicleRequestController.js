@@ -7,11 +7,13 @@ const getPIVehicleRequests = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log('PI Vehicle Requests - Request params:', { month, year, page, limit, search });
-
     // Build the reporting month string
     const reportingMonth = `${month} ${year}`;
-    console.log('Looking for reporting month:', reportingMonth);
+
+    console.log('=== PI Vehicle Requests API Called ===');
+    console.log('Request params:', { month, year, page, limit, search });
+    console.log('Reporting month:', reportingMonth);
+    console.log('==========================================');
 
     // Check if pi_vehicle_requests table exists
     try {
@@ -27,18 +29,8 @@ const getPIVehicleRequests = async (req, res) => {
       });
     }
 
-    // Query to find routes where ALL facilities (for the current period) have EWM completed status
-    // We need to filter facilities by their period: Odd, Even, or Monthly
-    // Determine if the current month is Odd or Even
-    const ethiopianMonths = [
-      'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
-    ];
-    const monthIndex = ethiopianMonths.indexOf(month);
-    const isEvenMonth = (monthIndex + 1) % 2 === 0; // Meskerem=1(odd), Tikimt=2(even), etc.
-    const currentPeriod = isEvenMonth ? 'Even' : 'Odd';
-    
-    console.log(`Current period for ${month}: ${currentPeriod} (month index: ${monthIndex + 1})`);
-    
+    // Query to find routes that have at least one facility with EWM completed
+    // Show all such routes, but only enable "Request Vehicle" button when ALL facilities are ewm_completed
     const query = `
       SELECT 
         r.id as route_id,
@@ -46,23 +38,23 @@ const getPIVehicleRequests = async (req, res) => {
         COUNT(DISTINCT f.id) as total_facilities_in_route,
         COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END) as ewm_completed_facilities,
         COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as vehicle_requested_facilities,
-        COUNT(DISTINCT CASE WHEN p.status IS NULL OR (p.status != 'ewm_completed' AND p.status != 'vehicle_requested') THEN f.id END) as pending_facilities,
         CASE WHEN pvr.route_id IS NOT NULL OR MAX(CASE WHEN p.status = 'vehicle_requested' THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END as vehicle_requested,
-        CASE WHEN COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END) + COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) THEN 1 ELSE 0 END as all_facilities_ready
+        CASE WHEN COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END) = COUNT(DISTINCT f.id) THEN 1 ELSE 0 END as all_facilities_ready
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
-        AND (f.period = 'Monthly' OR f.period = ?)
-      LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+      INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
       LEFT JOIN pi_vehicle_requests pvr ON pvr.route_id = r.id AND pvr.month = ? AND pvr.year = ?
       WHERE f.route IS NOT NULL 
+        AND f.period IS NOT NULL
         ${search ? 'AND r.route_name LIKE ?' : ''}
       GROUP BY r.id, r.route_name, pvr.route_id
-      HAVING total_facilities_in_route > 0
+      HAVING total_facilities_in_route > 0 
+        AND (ewm_completed_facilities > 0 OR vehicle_requested_facilities > 0)
       ORDER BY all_facilities_ready DESC, r.route_name
       LIMIT ? OFFSET ?
     `;
 
-    let queryParams = [currentPeriod, reportingMonth, month, year];
+    let queryParams = [reportingMonth, month, year];
 
     if (search) {
       const searchPattern = `%${search}%`;
@@ -87,22 +79,20 @@ const getPIVehicleRequests = async (req, res) => {
 
     // For each route, get the facilities and their ODNs
     const routesWithDetails = await Promise.all(routes.map(async (route) => {
-      // Get ALL facilities for this route with their process status (filtered by period)
+      // Get ALL facilities for this route with their process status
       const facilitiesQuery = `
         SELECT DISTINCT 
           f.id,
           f.facility_name,
-          f.period,
-          COALESCE(p.status, 'no_process') as process_status
+          p.status as process_status
         FROM facilities f
-        LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+        INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
         WHERE f.route = ?
-          AND (f.period = 'Monthly' OR f.period = ?)
         ORDER BY f.facility_name
       `;
 
       const facilities = await db.sequelize.query(facilitiesQuery, {
-        replacements: [reportingMonth, route.route_name, currentPeriod],
+        replacements: [reportingMonth, route.route_name],
         type: db.sequelize.QueryTypes.SELECT
       });
       
@@ -144,16 +134,18 @@ const getPIVehicleRequests = async (req, res) => {
         SELECT r.id
         FROM routes r
         INNER JOIN facilities f ON f.route = r.route_name
-          AND (f.period = 'Monthly' OR f.period = ?)
-        LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+        INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
         WHERE f.route IS NOT NULL 
+          AND f.period IS NOT NULL
           ${search ? 'AND r.route_name LIKE ?' : ''}
         GROUP BY r.id
-        HAVING COUNT(DISTINCT f.id) > 0
+        HAVING COUNT(DISTINCT f.id) > 0 
+          AND (COUNT(DISTINCT CASE WHEN p.status = 'ewm_completed' THEN f.id END) > 0 
+               OR COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) > 0)
       ) as route_count
     `;
 
-    let countParams = [currentPeriod, reportingMonth];
+    let countParams = [reportingMonth];
     if (search) {
       const searchPattern = `%${search}%`;
       countParams.push(searchPattern);

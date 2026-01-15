@@ -32,6 +32,7 @@ const locationController = require('../controllers/CustomerService/locationContr
 
 //settings
 const vehicleController = require('../controllers/Settings/vehicleController');
+const storeController = require('../controllers/Settings/storeController');
 const userManagementController = require('../controllers/Settings/userManagementController');
 
 //transportation
@@ -99,6 +100,12 @@ let routes =  (app) => {
   router.post('/api/vehicles', vehicleController.createVehicle);
   router.put('/api/vehicles/:id', vehicleController.updateVehicle);
   router.delete('/api/vehicles/:id', vehicleController.deleteVehicle);
+
+  // Store Management routes
+  router.get('/api/stores', storeController.getAllStores);
+  router.post('/api/stores', storeController.createStore);
+  router.put('/api/stores/:id', storeController.updateStore);
+  router.delete('/api/stores/:id', storeController.deleteStore);
 
   // User Management routes
   router.get('/api/users-management', userManagementController.getAllUsers);

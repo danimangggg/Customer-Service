@@ -61,12 +61,14 @@ const CompletedPicklists = () => {
       const operator = employees.find(
         (e) => Number(e.id) === Number(p.operator_id)
       );
+      console.log('Picklist:', p.id, 'Facility:', p.facility);
       return {
         ...p,
         // facility is now provided directly from backend
         operator,
       };
     });
+    console.log('Combined picklists:', combined);
     setCombinedPicklists(combined);
   }, [picklists, employees]);
 

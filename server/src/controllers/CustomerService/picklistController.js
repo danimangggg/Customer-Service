@@ -10,72 +10,63 @@ const Picklist = db.picklist;
 const retrievePicklists = async (req, res) => {
   try {
     console.log('Fetching picklists...');
-    console.log('Picklist model:', Picklist);
     
     const baseUrl = `${req.protocol}://${req.get('host')}/picklists`;
     
-    // Get related models for joins
-    const Process = db.process;
-    const Facility = db.facility;
-    const Employee = db.employee;
+    // Use raw SQL query with proper JOINs to get facility information
+    // HP picklists use 'processes' table, AA picklists use 'customer_queue' table
+    const query = `
+      SELECT 
+        p.id,
+        p.odn,
+        p.url,
+        p.process_id,
+        p.operator_id,
+        p.store,
+        p.status,
+        e.id as operator_id_ref,
+        e.fullName as operator_name,
+        COALESCE(f_hp.id, f_aa.id) as facility_id,
+        COALESCE(f_hp.facility_name, f_aa.facility_name) as facility_name,
+        COALESCE(f_hp.woreda_name, f_aa.woreda_name) as woreda_name,
+        COALESCE(f_hp.zone_name, f_aa.zone_name) as zone_name,
+        COALESCE(f_hp.region_name, f_aa.region_name) as region_name
+      FROM picklist p
+      LEFT JOIN employee e ON p.operator_id = e.id
+      LEFT JOIN processes pr ON CAST(p.process_id AS UNSIGNED) = pr.id AND p.store = 'HP'
+      LEFT JOIN facilities f_hp ON pr.facility_id = f_hp.id
+      LEFT JOIN customer_queue cq ON CAST(p.process_id AS UNSIGNED) = cq.id AND p.store != 'HP'
+      LEFT JOIN facilities f_aa ON cq.facility_id = f_aa.id
+      ORDER BY p.id DESC
+    `;
+
+    const [results] = await db.sequelize.query(query);
     
-    const picklists = await Picklist.findAll({
-      order: [['id', 'DESC']],
-      attributes: ['id', 'odn', 'url', 'process_id', 'operator_id', 'store', 'status'],
-      include: [
-        {
-          model: Employee,
-          as: 'operator',
-          attributes: ['id', 'full_name'],
-          required: false
-        }
-      ]
-    });
+    console.log(`Found ${results.length} picklists`);
 
-    console.log(`Found ${picklists.length} picklists`);
+    // Format the results
+    const formatted = results.map(row => ({
+      id: row.id,
+      odn: row.odn,
+      url: row.url ? `${baseUrl}/${row.url}` : null,
+      process_id: row.process_id,
+      operator_id: row.operator_id,
+      store: row.store,
+      status: row.status,
+      operator: row.operator_id_ref ? {
+        id: row.operator_id_ref,
+        full_name: row.operator_name
+      } : null,
+      facility: row.facility_id ? {
+        id: row.facility_id,
+        facility_name: row.facility_name,
+        woreda_name: row.woreda_name,
+        zone_name: row.zone_name,
+        region_name: row.region_name
+      } : null
+    }));
 
-    // Get all processes and facilities to match with picklists
-    const processes = await Process.findAll({
-      attributes: ['id', 'facility_id']
-    });
-    
-    const facilities = await Facility.findAll({
-      attributes: ['id', 'facility_name', 'woreda_name', 'zone_name', 'region_name']
-    });
-
-    // Create lookup maps for better performance
-    const processMap = {};
-    processes.forEach(p => {
-      processMap[p.id] = p;
-    });
-
-    const facilityMap = {};
-    facilities.forEach(f => {
-      facilityMap[f.id] = f;
-    });
-
-    const formatted = picklists.map(p => {
-      const picklistData = p.toJSON();
-      
-      // Find the process using process_id from picklist
-      const process = processMap[picklistData.process_id];
-      
-      // Find the facility using facility_id from the process
-      const facility = process ? facilityMap[process.facility_id] : null;
-      
-      return {
-        ...picklistData,
-        url: picklistData.url ? `${baseUrl}/${picklistData.url}` : null,
-        facility: facility ? {
-          id: facility.id,
-          facility_name: facility.facility_name,
-          woreda_name: facility.woreda_name,
-          zone_name: facility.zone_name,
-          region_name: facility.region_name
-        } : null
-      };
-    });
-
+    console.log('Sample picklist with facility:', formatted[0]);
     console.log('Picklists formatted successfully with facility information');
     res.status(200).json(formatted);
     

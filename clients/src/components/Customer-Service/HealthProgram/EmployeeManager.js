@@ -25,11 +25,13 @@ const JOB_TITLES = [
 
 const EmployeeManager = () => {
   const [employees, setEmployees] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [editingId, setEditingId] = useState(null);
   const [tempJobTitle, setTempJobTitle] = useState("");
+  const [tempStore, setTempStore] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const fetchEmployees = async () => {
@@ -44,7 +46,19 @@ const EmployeeManager = () => {
     }
   };
 
-  useEffect(() => { fetchEmployees(); }, []);
+  const fetchStores = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/stores`);
+      setStores(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error("Error fetching stores:", err);
+    }
+  };
+
+  useEffect(() => { 
+    fetchEmployees(); 
+    fetchStores();
+  }, []);
 
   const showSnackbar = (message, severity = 'success') => {
     setSnackbar({ open: true, message, severity });
@@ -52,17 +66,16 @@ const EmployeeManager = () => {
 
   const handleSave = async (id) => {
     try {
-      // FIX: Changed to axios.put
-      // The ID goes in the URL, the data (jobTitle) goes in the BODY object
       await axios.put(`${API_URL}/api/update-employee/${id}`, {
-        jobTitle: tempJobTitle 
+        jobTitle: tempJobTitle,
+        store: tempStore
       });
 
-      showSnackbar("Job title updated successfully!");
+      showSnackbar("Employee information updated successfully!");
       setEditingId(null);
       fetchEmployees();
     } catch (err) {
-      showSnackbar("Update failed. Make sure backend accepts req.body.jobTitle", "error");
+      showSnackbar("Update failed", "error");
     }
   };
 
@@ -85,12 +98,13 @@ const EmployeeManager = () => {
               <TableCell sx={{ fontWeight: 'bold' }}>USER NAME</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>FULL NAME</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>JOB TITLE</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>STORE</TableCell>
               <TableCell align="right" sx={{ fontWeight: 'bold' }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={4} align="center" sx={{ py: 10 }}><CircularProgress /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} align="center" sx={{ py: 10 }}><CircularProgress /></TableCell></TableRow>
             ) : employees.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((emp) => (
               <TableRow key={emp.id} hover>
                 <TableCell>
@@ -111,6 +125,27 @@ const EmployeeManager = () => {
                     <Chip label={emp.jobTitle || 'N/A'} color="primary" variant="outlined" size="small" />
                   )}
                 </TableCell>
+                <TableCell>
+                  {editingId === emp.id ? (
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                      <Select value={tempStore} onChange={(e) => setTempStore(e.target.value)} displayEmpty>
+                        <MenuItem value=""><em>None</em></MenuItem>
+                        {stores.map((store) => (
+                          <MenuItem key={store.id} value={store.store_name}>
+                            {store.store_name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Chip 
+                      label={emp.store || 'N/A'} 
+                      color="secondary" 
+                      variant="outlined" 
+                      size="small" 
+                    />
+                  )}
+                </TableCell>
                 <TableCell align="right">
                   {editingId === emp.id ? (
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
@@ -118,7 +153,11 @@ const EmployeeManager = () => {
                       <IconButton color="error" onClick={() => setEditingId(null)}><CloseIcon /></IconButton>
                     </Box>
                   ) : (
-                    <IconButton onClick={() => { setEditingId(emp.id); setTempJobTitle(emp.jobTitle || ""); }}>
+                    <IconButton onClick={() => { 
+                      setEditingId(emp.id); 
+                      setTempJobTitle(emp.jobTitle || ""); 
+                      setTempStore(emp.store || "");
+                    }}>
                       <EditIcon fontSize="small" />
                     </IconButton>
                   )}
