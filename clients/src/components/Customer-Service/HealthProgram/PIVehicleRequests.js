@@ -444,6 +444,7 @@ const PIVehicleRequests = () => {
                         )}
                         {route.facilities.map((facility, idx) => {
                           const isCompleted = facility.process_status === 'ewm_completed' || facility.process_status === 'vehicle_requested';
+                          const isPending = facility.process_status === 'no_process' || (!isCompleted && facility.process_status !== 'vehicle_requested');
                           return (
                             <Box key={idx} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                               <Typography variant="body2">
@@ -458,7 +459,7 @@ const PIVehicleRequests = () => {
                                 />
                               ) : (
                                 <Chip 
-                                  label="Pending" 
+                                  label={facility.process_status === 'no_process' ? 'Not Started' : 'Pending'} 
                                   size="small" 
                                   color="warning" 
                                   sx={{ ml: 1, height: 18, fontSize: '0.7rem' }}

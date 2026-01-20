@@ -34,9 +34,8 @@ const RouteAnalysis = ({ data }) => {
   // Calculate totals
   const totalFacilities = routeStats.reduce((sum, r) => sum + parseInt(r.facilities_count || 0), 0);
   const totalODNs = routeStats.reduce((sum, r) => sum + parseInt(r.odns_count || 0), 0);
-  const totalDispatched = routeStats.reduce((sum, r) => sum + parseInt(r.dispatched_count || 0), 0);
   const totalPOD = routeStats.reduce((sum, r) => sum + parseInt(r.pod_confirmed_count || 0), 0);
-  const totalKilometers = routeStats.reduce((sum, r) => sum + parseFloat(r.arrival_kilometer || 0), 0);
+  const totalKilometers = routeStats.reduce((sum, r) => sum + parseFloat(r.total_kilometers || 0), 0);
 
   // Chart data - Top 10 routes by facilities
   const topRoutesByFacilities = [...routeStats]
@@ -50,25 +49,16 @@ const RouteAnalysis = ({ data }) => {
 
   // Chart data - Top 10 routes by kilometers
   const topRoutesByKm = [...routeStats]
-    .filter(r => r.arrival_kilometer > 0)
-    .sort((a, b) => parseFloat(b.arrival_kilometer) - parseFloat(a.arrival_kilometer))
+    .filter(r => r.total_kilometers > 0)
+    .sort((a, b) => parseFloat(b.total_kilometers) - parseFloat(a.total_kilometers))
     .slice(0, 10)
     .map(r => ({
       name: r.route_name,
-      kilometers: parseFloat(r.arrival_kilometer || 0)
+      kilometers: parseFloat(r.total_kilometers || 0)
     }));
 
-  // Dispatch status distribution
-  const dispatchStatusData = routeStats.reduce((acc, route) => {
-    const status = route.dispatch_status || 'Not Assigned';
-    const existing = acc.find(item => item.name === status);
-    if (existing) {
-      existing.value += 1;
-    } else {
-      acc.push({ name: status, value: 1 });
-    }
-    return acc;
-  }, []);
+  // Dispatch status distribution - removed since we're removing dispatch status
+  const dispatchStatusData = [];
 
   const COLORS = ['#4caf50', '#ff9800', '#f44336', '#2196f3', '#9c27b0'];
 
@@ -123,7 +113,7 @@ const RouteAnalysis = ({ data }) => {
           <StatCard
             title="Total ODNs"
             value={totalODNs}
-            subtitle={`${totalDispatched} dispatched`}
+            subtitle={`${totalPOD} POD confirmed`}
             icon={<LocalShippingIcon sx={{ fontSize: 40, color: '#ff9800' }} />}
             color="#ff9800"
           />
@@ -161,30 +151,16 @@ const RouteAnalysis = ({ data }) => {
           </Card>
         </Grid>
 
-        {/* Dispatch Status Distribution */}
+        {/* Assignment Status Distribution */}
         <Grid item xs={12} md={4}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Dispatch Status</Typography>
-              <ResponsiveContainer width="100%" height={350}>
-                <PieChart>
-                  <Pie
-                    data={dispatchStatusData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {dispatchStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              <Typography variant="h6" gutterBottom>Route Assignment Status</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 350 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Assignment tracking available in route details table
+                </Typography>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -234,10 +210,9 @@ const RouteAnalysis = ({ data }) => {
                   <TableCell sx={{ fontWeight: 'bold' }}>Route Name</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>Facilities</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>ODNs</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Dispatched</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>POD Confirmed</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>Kilometers</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Dispatch Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Assigned By</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -265,9 +240,6 @@ const RouteAnalysis = ({ data }) => {
                           <Chip label={route.odns_count} size="small" color="info" />
                         </TableCell>
                         <TableCell align="center">
-                          <Chip label={route.dispatched_count} size="small" color="warning" />
-                        </TableCell>
-                        <TableCell align="center">
                           <Stack spacing={0.5}>
                             <Chip label={route.pod_confirmed_count} size="small" color="success" />
                             <LinearProgress
@@ -280,28 +252,22 @@ const RouteAnalysis = ({ data }) => {
                         <TableCell align="center">
                           <Chip
                             icon={<SpeedIcon />}
-                            label={`${parseFloat(route.arrival_kilometer || 0).toFixed(1)} km`}
+                            label={`${parseFloat(route.total_kilometers || 0).toFixed(1)} km`}
                             size="small"
                             variant="outlined"
                           />
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={route.dispatch_status || 'Not Assigned'}
-                            size="small"
-                            color={
-                              route.dispatch_status === 'completed' ? 'success' :
-                              route.dispatch_status === 'in_progress' ? 'warning' :
-                              'default'
-                            }
-                          />
+                          <Typography variant="body2">
+                            {route.assigned_by_name || 'Not Assigned'}
+                          </Typography>
                         </TableCell>
                       </TableRow>
                     );
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={6} align="center">
                       <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                         No routes found
                       </Typography>

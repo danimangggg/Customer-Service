@@ -18,7 +18,9 @@ const getHPDashboardData = async (req, res) => {
     });
 
     // For month-dependent metrics, filter by reporting month
-    const odnWhere = {};
+    const odnWhere = {
+      odn_number: { [Op.ne]: 'RRF not sent' } // Exclude "RRF not sent" from ODN count
+    };
     if (reportingMonth) {
       // Find processes for the specific month/year and get their ODNs
       const processes = await Process.findAll({
@@ -33,29 +35,46 @@ const getHPDashboardData = async (req, res) => {
       }
     }
 
-    // Get total ODNs (month dependent if filter applied)
+    // Get total ODNs (month dependent if filter applied, excluding "RRF not sent")
     const totalODNs = await ODN.count({ where: odnWhere });
 
-    // Get RRF Sent count (facilities that have processes - meaning they sent RRF)
+    // Get RRF Sent count (facilities that have processes but NOT "RRF not sent" ODN)
     // Only count HP facilities (those with routes) and filter by month if specified
-    const processWhere = reportingMonth ? { reporting_month: reportingMonth } : {};
-    const facilitiesWithProcesses = await Process.findAll({
-      include: [{
-        model: Facility,
-        as: 'facility',
-        where: {
-          route: { [Op.ne]: null },
-          route: { [Op.ne]: '' }
-        }
-      }],
-      where: processWhere,
-      attributes: ['facility_id'],
-      group: ['facility_id']
+    let rrfSentQuery = `
+      SELECT COUNT(DISTINCT p.facility_id) as count
+      FROM processes p
+      INNER JOIN facilities f ON p.facility_id = f.id
+      WHERE f.route IS NOT NULL AND f.route != ''
+    `;
+    
+    const rrfQueryParams = [];
+    if (reportingMonth) {
+      rrfSentQuery += ` AND p.reporting_month = ?
+        AND p.facility_id NOT IN (
+          SELECT DISTINCT p2.facility_id 
+          FROM processes p2 
+          INNER JOIN odns o ON p2.id = o.process_id 
+          WHERE o.odn_number = 'RRF not sent' AND p2.reporting_month = ?
+        )`;
+      rrfQueryParams.push(reportingMonth, reportingMonth);
+    } else {
+      rrfSentQuery += `
+        AND p.facility_id NOT IN (
+          SELECT DISTINCT p2.facility_id 
+          FROM processes p2 
+          INNER JOIN odns o ON p2.id = o.process_id 
+          WHERE o.odn_number = 'RRF not sent'
+        )`;
+    }
+
+    const [rrfResult] = await db.sequelize.query(rrfSentQuery, {
+      replacements: rrfQueryParams,
+      type: db.sequelize.QueryTypes.SELECT
     });
-    const rrfSent = facilitiesWithProcesses.length;
+    const rrfSent = rrfResult.count;
 
     // Get dispatched ODNs (ODNs from processes that have vehicle assigned/dispatched)
-    // Count ODNs where the route has been assigned and dispatched
+    // Count ODNs where the route has been assigned and dispatched, excluding "RRF not sent"
     let dispatchedODNsQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
@@ -65,6 +84,7 @@ const getHPDashboardData = async (req, res) => {
       INNER JOIN route_assignments ra ON ra.route_id = r.id
       WHERE p.status IN ('vehicle_requested', 'ewm_completed')
         AND ra.status IN ('Dispatched', 'Completed')
+        AND o.odn_number != 'RRF not sent'
     `;
     
     const dispatchedQueryParams = [];

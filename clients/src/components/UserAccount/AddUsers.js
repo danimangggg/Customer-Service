@@ -15,19 +15,11 @@ const CreateUserForm = () => {
     user_name: '',
     password: '',
     account_type: '',
-    job_title: '',
-    department: '',
-    position: '',
+    job_title: ''
   });
 
   const accountTypes = ['Admin', 'Credit Manager', 'Pod Manager', 'Self Assesment'];
-  const departments = [
-    'ICT Department', 'Finance', 'Human Resource',
-    'Transport Management', 'Demand', 'EWM', "Executive"
-  ];
-  const positions = ['Officer', 'Coordinator', 'Manager'];
-  const job_title = ['Camera man', 'Wearhouse manager', 'Oditor', "ICT Officer", "Database Adminstrator",
-   "Data Clerk", "Branch Manager", "Customer Service", "Other"];
+  const job_title = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Camera man', 'Wearhouse manager', 'Oditor', 'ICT Officer', 'Database Adminstrator', 'Data Clerk', 'Branch Manager', 'Customer Service', 'Other'];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -122,51 +114,6 @@ const CreateUserForm = () => {
                 autoComplete="new-password"
                 InputProps={{ sx: { height: 50 } }}
               />
-            </Grid>
-
-
-            {/* Position */}
-            <Grid item xs={6}>
-              <FormControl fullWidth required>
-                <Select
-                  name="position"
-                  value={formData.position}
-                  onChange={handleChange}
-                  displayEmpty
-                  sx={{ height: 50 }}
-                >
-                  <MenuItem value="" disabled>
-                    Select Position
-                  </MenuItem>
-                  {positions.map((pos) => (
-                    <MenuItem key={pos} value={pos}>
-                      {pos}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {/* Department */}
-            <Grid item xs={6}>
-              <FormControl fullWidth required>
-                <Select
-                  name="department"
-                  value={formData.department}
-                  onChange={handleChange}
-                  displayEmpty
-                  sx={{ height: 50 }}
-                >
-                  <MenuItem value="" disabled>
-                    Select Department
-                  </MenuItem>
-                  {departments.map((dept) => (
-                    <MenuItem key={dept} value={dept}>
-                      {dept}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
             </Grid>
 
                {/* job title */}

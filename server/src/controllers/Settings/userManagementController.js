@@ -10,13 +10,12 @@ const getAllUsers = async (req, res) => {
       page = 1, 
       limit = 10, 
       search = '', 
-      department = '', 
       account_status = '',
       jobTitle = '',
       store = ''
     } = req.query;
     
-    console.log('Search parameters received:', { search, department, account_status }); // Debug log
+    console.log('Search parameters received:', { search, account_status }); // Debug log
     
     const offset = (page - 1) * limit;
     let whereClause = {};
@@ -27,14 +26,8 @@ const getAllUsers = async (req, res) => {
       whereClause[Op.or] = [
         { full_name: { [Op.like]: `%${search}%` } },
         { user_name: { [Op.like]: `%${search}%` } },
-        { jobTitle: { [Op.like]: `%${search}%` } },
-        { department: { [Op.like]: `%${search}%` } }
+        { jobTitle: { [Op.like]: `%${search}%` } }
       ];
-    }
-
-    // Filter by department
-    if (department) {
-      whereClause.department = department;
     }
 
     // Filter by account status
@@ -102,8 +95,6 @@ const createUser = async (req, res) => {
       password, 
       jobTitle, 
       account_type, 
-      position, 
-      department, 
       account_status,
       store,
       email,
@@ -131,8 +122,6 @@ const createUser = async (req, res) => {
       password: hashedPassword,
       jobTitle: jobTitle || null,
       account_type: account_type || 'Standard',
-      position: position || null,
-      department: department || null,
       account_status: account_status || 'Active',
       store: store || null,
       email: email?.trim() || null,
@@ -168,8 +157,6 @@ const updateUser = async (req, res) => {
       password, 
       jobTitle, 
       account_type, 
-      position, 
-      department, 
       account_status,
       store,
       email,
@@ -200,8 +187,6 @@ const updateUser = async (req, res) => {
       user_name: user_name?.trim().toLowerCase() || user.user_name,
       jobTitle: jobTitle !== undefined ? jobTitle : user.jobTitle,
       account_type: account_type || user.account_type,
-      position: position !== undefined ? position : user.position,
-      department: department !== undefined ? department : user.department,
       account_status: account_status || user.account_status,
       store: store !== undefined ? store : user.store,
       email: email !== undefined ? email?.trim() : user.email,
@@ -264,21 +249,12 @@ const getUserStats = async (req, res) => {
     const inactiveUsers = await Employee.count({ where: { account_status: 'Inactive' } });
     const suspendedUsers = await Employee.count({ where: { account_status: 'Suspended' } });
 
-    const usersByDepartment = await Employee.findAll({
+    const usersByJobTitle = await Employee.findAll({
       attributes: [
-        'department',
+        'jobTitle',
         [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
       ],
-      group: ['department'],
-      raw: true
-    });
-
-    const usersByPosition = await Employee.findAll({
-      attributes: [
-        'position',
-        [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-      ],
-      group: ['position'],
+      group: ['jobTitle'],
       raw: true
     });
 
@@ -296,8 +272,7 @@ const getUserStats = async (req, res) => {
       activeUsers,
       inactiveUsers,
       suspendedUsers,
-      usersByDepartment,
-      usersByPosition,
+      usersByJobTitle,
       usersByStore
     });
   } catch (error) {

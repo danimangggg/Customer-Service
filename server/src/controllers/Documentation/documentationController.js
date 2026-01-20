@@ -306,6 +306,8 @@ const bulkUpdatePODConfirmation = async (req, res) => {
 
     // Process each update
     const results = [];
+    const routeKilometerUpdates = new Map(); // Track route-wide kilometer updates
+
     for (const update of updates) {
       const { odn_id, pod_confirmed, pod_reason, pod_number, arrival_kilometer, route_assignment_id } = update;
 
@@ -347,18 +349,27 @@ const bulkUpdatePODConfirmation = async (req, res) => {
           });
 
           // Update route_assignments table if we have arrival_kilometer and route_assignment_id
+          // This ensures the destination kilometer is applied to the entire route
           if (arrival_kilometer !== undefined && route_assignment_id) {
-            const raUpdateQuery = `
-              UPDATE route_assignments 
-              SET arrival_kilometer = ?
-              WHERE id = ?
-            `;
+            // Check if we've already updated this route assignment in this batch
+            if (!routeKilometerUpdates.has(route_assignment_id)) {
+              const raUpdateQuery = `
+                UPDATE route_assignments 
+                SET arrival_kilometer = ?
+                WHERE id = ?
+              `;
 
-            await db.sequelize.query(raUpdateQuery, {
-              replacements: [arrival_kilometer, route_assignment_id],
-              type: db.sequelize.QueryTypes.UPDATE,
-              transaction
-            });
+              await db.sequelize.query(raUpdateQuery, {
+                replacements: [arrival_kilometer, route_assignment_id],
+                type: db.sequelize.QueryTypes.UPDATE,
+                transaction
+              });
+
+              // Mark this route as updated to avoid duplicate updates
+              routeKilometerUpdates.set(route_assignment_id, arrival_kilometer);
+
+              console.log(`Updated route assignment ${route_assignment_id} with destination kilometer: ${arrival_kilometer}`);
+            }
           }
 
           // Commit the transaction
@@ -370,7 +381,8 @@ const bulkUpdatePODConfirmation = async (req, res) => {
             pod_confirmed,
             pod_reason: pod_reason || null,
             pod_number: pod_number || null,
-            arrival_kilometer: arrival_kilometer || null
+            arrival_kilometer: arrival_kilometer || null,
+            route_assignment_id: route_assignment_id || null
           });
         } catch (error) {
           // Rollback the transaction on error
@@ -386,12 +398,18 @@ const bulkUpdatePODConfirmation = async (req, res) => {
       }
     }
 
+    // Log route-wide updates for debugging
+    if (routeKilometerUpdates.size > 0) {
+      console.log('Route-wide destination kilometer updates:', Array.from(routeKilometerUpdates.entries()));
+    }
+
     res.json({
       message: 'Bulk POD confirmation update completed',
       results,
       total_processed: results.length,
       successful: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length
+      failed: results.filter(r => !r.success).length,
+      route_updates: routeKilometerUpdates.size
     });
 
   } catch (error) {

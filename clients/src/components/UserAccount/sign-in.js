@@ -331,8 +331,6 @@ export default function SignIn() {
       localStorage.setItem('token', token);
       localStorage.setItem("FullName", response.data.FullName);
       localStorage.setItem("AccountType", response.data.AccountType);
-      localStorage.setItem("Department", response.data.Department);
-      localStorage.setItem("Position", response.data.Position);
       localStorage.setItem("JobTitle", response.data.JobTitle);
       localStorage.setItem("UserId", response.data.UserId);
       localStorage.setItem("UserName", user_name); // Store username for browser access
@@ -341,19 +339,12 @@ export default function SignIn() {
       // Redirect to a protected route based on user roles
       console.log("=== LOGIN ROUTING DEBUG ===");
       console.log("AccountType:", response.data.AccountType);
-      console.log("Position:", response.data.Position);
-      console.log("Department:", response.data.Department);
       console.log("JobTitle:", response.data.JobTitle);
       console.log("========================");
       
       setTimeout(() => {
-        // Check for Transport Management department first
-        if(response.data.Department === "Transport Management" || response.data.Department === "Transportation Management"){
-          console.log("✓ Routing to HP Dashboard - Transport Management department");
-          navigate('/hp-dashboard');
-        }
         // Check for specific HP-related job titles (with - HP suffix)
-        else if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
+        if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
           console.log("✓ Routing to HP Dashboard - HP job title");
           navigate('/hp-dashboard');
         }
@@ -364,10 +355,7 @@ export default function SignIn() {
         }
         // Handle Self Assessment and Admin account types
         else if(response.data.AccountType === "Self Assesment" || response.data.AccountType === "Admin"){
-          if(response.data.Position === "Admin"){
-            console.log("→ Routing to Customer Dashboard - Admin position");
-            navigate('/customer-dashboard');
-          } else if(response.data.Position === "Officer" && response.data.JobTitle === "WIM Operator"){
+          if(response.data.JobTitle === "WIM Operator"){
             console.log("→ Routing to Picklists - WIM Operator");
             navigate(`/all-picklists`);
           } else {

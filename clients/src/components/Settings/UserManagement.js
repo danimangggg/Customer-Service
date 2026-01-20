@@ -56,9 +56,6 @@ import {
   VisibilityOff as HideIcon,
   Visibility,
   VisibilityOff,
-  Email as EmailIcon,
-  Phone as PhoneIcon,
-  Business as DepartmentIcon,
   Work as JobIcon
 } from '@mui/icons-material';
 import axios from 'axios';
@@ -86,7 +83,6 @@ const UserManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterDepartment, setFilterDepartment] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
   // Form state
@@ -96,11 +92,8 @@ const UserManagement = () => {
     password: '',
     jobTitle: '',
     account_type: 'Standard',
-    department: '',
     account_status: 'Active',
-    store: '',
-    email: '',
-    phone: ''
+    store: ''
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -108,10 +101,9 @@ const UserManagement = () => {
     confirmPassword: ''
   });
 
-  const departments = ['IT', 'HR', 'Finance', 'Operations', 'Customer Service', 'Logistics', 'Pharmacy', 'Administration'];
   const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
-  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher'];
+  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher'];
 
   useEffect(() => {
     fetchStores();
@@ -124,7 +116,7 @@ const UserManagement = () => {
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [page, rowsPerPage, searchTerm, filterDepartment, filterStatus]);
+  }, [page, rowsPerPage, searchTerm, filterStatus]);
 
   const fetchStores = async () => {
     try {
@@ -144,7 +136,6 @@ const UserManagement = () => {
           page: page + 1,
           limit: rowsPerPage,
           search: searchTerm,
-          department: filterDepartment,
           account_status: filterStatus
         }
       });
@@ -249,11 +240,8 @@ const UserManagement = () => {
         password: '',
         jobTitle: user.jobTitle || '',
         account_type: user.account_type || 'Standard',
-        department: user.department || '',
         account_status: user.account_status || 'Active',
-        store: user.store || '',
-        email: user.email || '',
-        phone: user.phone || ''
+        store: user.store || ''
       });
     } else {
       setEditingUser(null);
@@ -263,11 +251,8 @@ const UserManagement = () => {
         password: '',
         jobTitle: '',
         account_type: 'Standard',
-        department: '',
         account_status: 'Active',
-        store: '',
-        email: '',
-        phone: ''
+        store: ''
       });
     }
     setOpenDialog(true);
@@ -546,25 +531,10 @@ const UserManagement = () => {
                       </InputAdornment>
                     ),
                   }}
-                  helperText={`Search works by full name, username, job title, and department${searchTerm ? ` - Found ${totalCount} results` : ''}`}
+                  helperText={`Search works by full name, username, and job title${searchTerm ? ` - Found ${totalCount} results` : ''}`}
                 />
               </Grid>
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth>
-                  <InputLabel>Department</InputLabel>
-                  <Select
-                    value={filterDepartment}
-                    label="Department"
-                    onChange={(e) => setFilterDepartment(e.target.value)}
-                  >
-                    <MenuItem value="">All Departments</MenuItem>
-                    {departments.map((dept) => (
-                      <MenuItem key={dept} value={dept}>{dept}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>Status</InputLabel>
                   <Select
@@ -598,7 +568,6 @@ const UserManagement = () => {
                     <TableCell>Full Name</TableCell>
                     <TableCell>Username</TableCell>
                     <TableCell>Job Title</TableCell>
-                    <TableCell>Department</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
@@ -613,11 +582,6 @@ const UserManagement = () => {
                           </Avatar>
                           <Box>
                             <Typography fontWeight="bold">{user.full_name}</Typography>
-                            {user.email && (
-                              <Typography variant="caption" color="text.secondary">
-                                {user.email}
-                              </Typography>
-                            )}
                           </Box>
                         </Stack>
                       </TableCell>
@@ -630,7 +594,6 @@ const UserManagement = () => {
                         />
                       </TableCell>
                       <TableCell>{user.jobTitle || 'N/A'}</TableCell>
-                      <TableCell>{user.department || 'N/A'}</TableCell>
                       <TableCell>
                         <Chip
                           icon={getStatusIcon(user.account_status)}
@@ -764,15 +727,6 @@ const UserManagement = () => {
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
                   <InputLabel>Job Title</InputLabel>
                   <Select
@@ -783,21 +737,6 @@ const UserManagement = () => {
                     <MenuItem value="">Select Job Title</MenuItem>
                     {jobTitles.map((title) => (
                       <MenuItem key={title} value={title}>{title}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Department</InputLabel>
-                  <Select
-                    value={formData.department}
-                    label="Department"
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                  >
-                    <MenuItem value="">Select Department</MenuItem>
-                    {departments.map((dept) => (
-                      <MenuItem key={dept} value={dept}>{dept}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -832,14 +771,6 @@ const UserManagement = () => {
                     ))}
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
               </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>

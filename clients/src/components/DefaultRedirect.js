@@ -10,14 +10,9 @@ const DefaultRedirect = () => {
     if (token && token !== 'guest') {
       const jobTitle = localStorage.getItem('JobTitle');
       const accountType = localStorage.getItem('AccountType');
-      const department = localStorage.getItem('Department');
       
-      // Check for Transport Management department first
-      if (department === "Transport Management" || department === "Transportation Management") {
-        navigate('/hp-dashboard');
-      }
       // Redirect HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, HP Dispatchers, and TM Managers to HP Dashboard
-      else if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") {
+      if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") {
         navigate('/hp-dashboard');
       }
       // Customer Service Dispatcher (without HP suffix) goes to Customer Dashboard

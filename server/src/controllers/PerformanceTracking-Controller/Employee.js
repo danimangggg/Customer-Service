@@ -10,9 +10,8 @@ const CreateEmployee = async (req, res) => {
       password: req.body.password,	
       jobTitle: req.body.jobTitle,	
       account_type: req.body.account_type,	
-      position: req.body.position,	
-      department: req.body.department,	
-      account_status: req.body.account_status 
+      account_status: req.body.account_status,
+      store: req.body.store
     });
  
     res.status(201).json(employee);
@@ -46,11 +45,11 @@ const getEmployeeById = async (req, res) => {
 // Update an employee
 const updateEmployee = async (req, res) => {
   try {
-    const { fullName, jobTitle, department, store } = req.body;
+    const { full_name, jobTitle, store, account_type, account_status } = req.body;
     const employee = await Employee.findByPk(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
 
-    await employee.update({ fullName, jobTitle, department, store });
+    await employee.update({ full_name, jobTitle, store, account_type, account_status });
     res.json(employee);
   } catch (error) {
     res.status(500).json({ message: 'Failed to update employee', error });

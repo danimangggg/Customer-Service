@@ -19,20 +19,9 @@ const UserList = () => {
       try {
         const userRes = await axios.get(`${process.env.REACT_APP_API_URL}/api/get-employee`);
 
-        let selfAssessmentUsers = userRes.data.filter(
+        const selfAssessmentUsers = userRes.data.filter(
           (user) => user.account_type === 'Self Assesment'
         );
-
-        const position = localStorage.getItem("Position");
-        const department = localStorage.getItem("Department");
-
-        // Filter by department for coordinators
-        if (position?.toLowerCase() === 'coordinator') {
-          selfAssessmentUsers = selfAssessmentUsers.filter(
-            (user) =>
-              user.department?.trim().toLowerCase() === department?.trim().toLowerCase()
-          );
-        }
 
         const enhancedUsers = selfAssessmentUsers.map((user, index) => ({
           ...user,
@@ -54,25 +43,25 @@ const UserList = () => {
     { field: 'serialId', headerName: "No", width: 70, headerClassName: 'bold-header' },
     { field: 'full_name', headerName: "Full Name", flex: 1, headerClassName: 'bold-header' },
     {
-      field: 'department',
-      headerName: "Department",
+      field: 'jobTitle',
+      headerName: "Job Title",
       flex: 1,
       headerClassName: 'bold-header',
-      valueGetter: (params) => params.row.department || '-',
+      valueGetter: (params) => params.row.jobTitle || '-',
     },
     {
-      field: 'position',
-      headerName: "Position",
+      field: 'account_type',
+      headerName: "Account Type",
       flex: 1,
       headerClassName: 'bold-header',
-      valueGetter: (params) => params.row.position || '-',
+      valueGetter: (params) => params.row.account_type || '-',
     },
     {
-      field: 'email',
-      headerName: "Email",
+      field: 'store',
+      headerName: "Store",
       flex: 1,
       headerClassName: 'bold-header',
-      valueGetter: (params) => params.row.email || '-',
+      valueGetter: (params) => params.row.store || '-',
     },
     {
       field: 'actions',

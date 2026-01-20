@@ -5,7 +5,7 @@ const Employee = db.employee;
 const retriveUsers = async (req, res) => {
   try {
     const data = await Employee.findAll({
-      attributes: ['id', 'user_name', 'full_name', 'account_type', 'jobTitle', 'department']
+      attributes: ['id', 'user_name', 'full_name', 'account_type', 'jobTitle']
     });
     
     // Map to match expected frontend format
@@ -16,8 +16,7 @@ const retriveUsers = async (req, res) => {
         user_name: emp.user_name,
         FullName: emp.full_name,
         AccountType: emp.account_type,
-        JobTitle: emp.jobTitle,
-        Department: emp.department
+        JobTitle: emp.jobTitle
       };
     });
     

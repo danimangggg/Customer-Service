@@ -256,8 +256,21 @@ const DocumentationManagement = () => {
     const currentODN = odnData.find(odn => odn.odn_id === odnId);
     const currentReason = pendingUpdates[odnId]?.pod_reason || currentODN?.pod_reason || '';
 
-    // If confirming POD, collect POD number and arrival kilometer
+    // If confirming POD, collect POD number and check if arrival kilometer is already set for this route
     if (confirmed) {
+      // Find all ODNs on the same route
+      const sameRouteODNs = odnData.filter(odn => 
+        odn.route_name === currentODN?.route_name && 
+        odn.route_assignment_id === currentODN?.route_assignment_id
+      );
+      
+      // Check if arrival kilometer is already set for this route
+      const existingArrivalKm = sameRouteODNs.find(odn => 
+        odn.arrival_kilometer || pendingUpdates[odn.odn_id]?.arrival_kilometer
+      )?.arrival_kilometer || pendingUpdates[sameRouteODNs.find(odn => 
+        pendingUpdates[odn.odn_id]?.arrival_kilometer
+      )?.odn_id]?.arrival_kilometer;
+
       const { value: formValues } = await MySwal.fire({
         title: 'POD Confirmation Details',
         html: `
@@ -265,13 +278,15 @@ const DocumentationManagement = () => {
             <label style="display: block; margin-bottom: 5px; font-weight: bold;">POD Number:</label>
             <input id="pod-number" class="swal2-input" placeholder="Enter POD number..." value="${currentODN?.pod_number || ''}" style="margin-bottom: 15px;">
             
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Arrival Kilometer:</label>
-            <input id="arrival-km" class="swal2-input" type="number" step="0.01" min="0" placeholder="Enter arrival kilometer..." value="${currentODN?.arrival_kilometer || ''}" style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Destination Kilometer (for entire route):</label>
+            <input id="arrival-km" class="swal2-input" type="number" step="0.01" min="0" placeholder="Enter destination kilometer..." value="${existingArrivalKm || currentODN?.arrival_kilometer || ''}" style="margin-bottom: 15px;">
             
             <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
               <small style="color: #666;">
                 <strong>Route:</strong> ${currentODN?.route_name || 'Unknown'}<br>
-                <strong>Facility:</strong> ${currentODN?.facility_name || 'Unknown'}
+                <strong>Facility:</strong> ${currentODN?.facility_name || 'Unknown'}<br>
+                ${existingArrivalKm ? `<strong>Note:</strong> This route already has destination kilometer: ${existingArrivalKm} km` : ''}
+                ${sameRouteODNs.length > 1 ? `<br><strong>Info:</strong> This will apply to all ${sameRouteODNs.length} ODNs on this route` : ''}
               </small>
             </div>
           </div>
@@ -290,7 +305,7 @@ const DocumentationManagement = () => {
           }
           
           if (!arrivalKm || parseFloat(arrivalKm) < 0) {
-            MySwal.showValidationMessage('Valid arrival kilometer is required');
+            MySwal.showValidationMessage('Valid destination kilometer is required');
             return false;
           }
           
@@ -1127,114 +1142,172 @@ const DocumentationManagement = () => {
                   // Check if this ODN has passed documentation stage (POD confirmed)
                   const isInactive = Boolean(Number(odn.pod_confirmed));
                   
+                  // Check if this is the first ODN of a new route
+                  const prevODN = index > 0 ? odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)[index - 1] : null;
+                  const isNewRoute = !prevODN || prevODN.route_name !== odn.route_name || prevODN.route_assignment_id !== odn.route_assignment_id;
+                  
+                  // Count ODNs on same route
+                  const sameRouteODNs = odnData.filter(o => 
+                    o.route_name === odn.route_name && 
+                    o.route_assignment_id === odn.route_assignment_id
+                  );
+                  
                   return (
-                  <TableRow 
-                    key={`${odn.odn_id}-${odn.pod_confirmed}-${pendingUpdates[odn.odn_id]?.pod_confirmed || 'none'}`}
-                    hover 
-                    sx={{ 
-                      '&:hover': { bgcolor: 'grey.50' },
-                      bgcolor: isInactive ? 'grey.100' : (pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit'),
-                      opacity: isInactive ? 0.6 : 1,
-                      borderLeft: pendingUpdates[odn.odn_id] ? '3px solid orange' : 'none'
-                    }}
-                  >
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold" color="primary">
-                        {odn.odn_number}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {odn.facility_name}
+                  <React.Fragment key={`${odn.odn_id}-${odn.pod_confirmed}-${pendingUpdates[odn.odn_id]?.pod_confirmed || 'none'}`}>
+                    {/* Route separator row */}
+                    {isNewRoute && sameRouteODNs.length > 1 && (
+                      <TableRow sx={{ bgcolor: 'primary.50' }}>
+                        <TableCell colSpan={6} sx={{ py: 1, borderBottom: '2px solid', borderColor: 'primary.200' }}>
+                          <Stack direction="row" alignItems="center" spacing={2}>
+                            <RouteIcon color="primary" fontSize="small" />
+                            <Typography variant="subtitle2" color="primary" fontWeight="bold">
+                              Route: {odn.route_name}
+                            </Typography>
+                            <Chip 
+                              label={`${sameRouteODNs.length} ODNs`} 
+                              size="small" 
+                              color="primary" 
+                              variant="outlined"
+                            />
+                            {sameRouteODNs.some(o => o.arrival_kilometer) && (
+                              <Chip 
+                                label={`Destination: ${sameRouteODNs.find(o => o.arrival_kilometer)?.arrival_kilometer} km`} 
+                                size="small" 
+                                color="info" 
+                                variant="filled"
+                              />
+                            )}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    
+                    {/* ODN data row */}
+                    <TableRow 
+                      hover 
+                      sx={{ 
+                        '&:hover': { bgcolor: 'grey.50' },
+                        bgcolor: isInactive ? 'grey.100' : (pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit'),
+                        opacity: isInactive ? 0.6 : 1,
+                        borderLeft: pendingUpdates[odn.odn_id] ? '3px solid orange' : (sameRouteODNs.length > 1 ? '3px solid #e3f2fd' : 'none')
+                      }}
+                    >
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="bold" color="primary">
+                          {odn.odn_number}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {odn.region_name} • {odn.zone_name} • {odn.woreda_name}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {odn.route_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      {isInactive ? (
-                        <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                          <Chip 
-                            label="✓ Confirmed" 
-                            color="success" 
-                            size="small" 
-                            variant="outlined"
-                          />
-                          <Chip 
-                            label="Passed to Follow-up" 
-                            color="info" 
-                            size="small" 
-                            variant="outlined"
-                          />
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold">
+                            {odn.facility_name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {odn.region_name} • {odn.zone_name} • {odn.woreda_name}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="body2">
+                            {odn.route_name}
+                          </Typography>
+                          {sameRouteODNs.length > 1 && (
+                            <Chip 
+                              label={`${sameRouteODNs.length} ODNs`} 
+                              size="small" 
+                              variant="outlined" 
+                              color="primary"
+                              sx={{ fontSize: '0.7rem', height: '20px' }}
+                            />
+                          )}
                         </Stack>
-                      ) : (
-                        <PODCheckbox 
-                          odn={odn}
-                          pendingUpdates={pendingUpdates}
-                          onPODChange={handlePODConfirmationChange}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        {(odn.pod_number || pendingUpdates[odn.odn_id]?.pod_number) && (
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
-                            <strong>POD #:</strong> {pendingUpdates[odn.odn_id]?.pod_number || odn.pod_number}
-                          </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        {isInactive ? (
+                          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
+                            <Chip 
+                              label="✓ Confirmed" 
+                              color="success" 
+                              size="small" 
+                              variant="outlined"
+                            />
+                            <Chip 
+                              label="Passed to Follow-up" 
+                              color="info" 
+                              size="small" 
+                              variant="outlined"
+                            />
+                          </Stack>
+                        ) : (
+                          <PODCheckbox 
+                            odn={odn}
+                            pendingUpdates={pendingUpdates}
+                            onPODChange={handlePODConfirmationChange}
+                          />
                         )}
-                        {(odn.arrival_kilometer || pendingUpdates[odn.odn_id]?.arrival_kilometer) && (
-                          <Typography variant="body2" color="text.secondary">
-                            <strong>Arrival KM:</strong> {pendingUpdates[odn.odn_id]?.arrival_kilometer || odn.arrival_kilometer}
+                      </TableCell>
+                      <TableCell>
+                        <Box>
+                          {(odn.pod_number || pendingUpdates[odn.odn_id]?.pod_number) && (
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              <strong>POD #:</strong> {pendingUpdates[odn.odn_id]?.pod_number || odn.pod_number}
+                            </Typography>
+                          )}
+                          {(odn.arrival_kilometer || pendingUpdates[odn.odn_id]?.arrival_kilometer) && (
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>Destination KM:</strong> {pendingUpdates[odn.odn_id]?.arrival_kilometer || odn.arrival_kilometer}
+                              <Chip 
+                                label="Route-wide" 
+                                size="small" 
+                                variant="outlined" 
+                                color="info"
+                                sx={{ ml: 1, fontSize: '0.7rem', height: '18px' }}
+                              />
+                            </Typography>
+                          )}
+                          {!odn.pod_number && !pendingUpdates[odn.odn_id]?.pod_number && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                              No POD details yet
+                            </Typography>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        {isInactive ? (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            POD confirmed - no reason needed
                           </Typography>
+                        ) : (
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Enter reason if POD not confirmed..."
+                            value={getPODReason(odn)}
+                            onChange={(e) => handleReasonChange(odn.odn_id, e.target.value)}
+                            disabled={pendingUpdates[odn.odn_id]?.pod_confirmed || Boolean(Number(odn.pod_confirmed))}
+                            multiline
+                            rows={2}
+                            required={!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed}
+                            error={
+                              (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
+                              !getPODReason(odn).trim()
+                            }
+                            helperText={
+                              (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
+                              !getPODReason(odn).trim() ? 
+                              'Reason required when POD not confirmed' : ''
+                            }
+                            sx={{ 
+                              '& .MuiInputBase-input': { 
+                                fontSize: '0.875rem' 
+                              } 
+                            }}
+                          />
                         )}
-                        {!odn.pod_number && !pendingUpdates[odn.odn_id]?.pod_number && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                            No POD details yet
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {isInactive ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                          POD confirmed - no reason needed
-                        </Typography>
-                      ) : (
-                        <TextField
-                          fullWidth
-                          size="small"
-                          placeholder="Enter reason if POD not confirmed..."
-                          value={getPODReason(odn)}
-                          onChange={(e) => handleReasonChange(odn.odn_id, e.target.value)}
-                          disabled={pendingUpdates[odn.odn_id]?.pod_confirmed || Boolean(Number(odn.pod_confirmed))}
-                          multiline
-                          rows={2}
-                          required={!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed}
-                          error={
-                            (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
-                            !getPODReason(odn).trim()
-                          }
-                          helperText={
-                            (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
-                            !getPODReason(odn).trim() ? 
-                            'Reason required when POD not confirmed' : ''
-                          }
-                          sx={{ 
-                            '& .MuiInputBase-input': { 
-                              fontSize: '0.875rem' 
-                            } 
-                          }}
-                        />
-                      )}
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                   );
                 })}
               </TableBody>

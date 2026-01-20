@@ -17,10 +17,10 @@ import axios from 'axios';
 // Import sub-pages
 import ODNPODDetailReport from './HPReport/ODNPODDetailReport';
 import ReportOverview from './HPReport/ReportOverview';
-import FacilitiesDetail from './HPReport/FacilitiesDetail';
+import ServiceUnitsDetail from './HPReport/FacilitiesDetail';
 import RouteAnalysis from './HPReport/RouteAnalysis';
-import TimeTrend from './HPReport/TimeTrend';
-import PODTracking from './HPReport/PODTracking';
+import AllPicklists from '../Customer-Service/AllPicklists';
+import OrganizationProfileView from './OrganizationProfileView';
 
 const HPComprehensiveReport = () => {
   const navigate = useNavigate();
@@ -28,7 +28,6 @@ const HPComprehensiveReport = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [reportData, setReportData] = useState(null);
-  const [timeTrendData, setTimeTrendData] = useState(null);
 
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -72,7 +71,6 @@ const HPComprehensiveReport = () => {
 
   useEffect(() => {
     fetchReportData();
-    fetchTimeTrendData();
   }, [selectedMonth, selectedYear]);
 
   const fetchReportData = async () => {
@@ -94,15 +92,6 @@ const HPComprehensiveReport = () => {
     }
   };
 
-  const fetchTimeTrendData = async () => {
-    try {
-      const response = await axios.get(`${api_url}/api/hp-report/time-trend`);
-      setTimeTrendData(response.data);
-    } catch (err) {
-      console.error('Error fetching time trend:', err);
-    }
-  };
-
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
   };
@@ -114,11 +103,11 @@ const HPComprehensiveReport = () => {
 
   const tabs = [
     { label: 'ODN/POD Details', icon: <AssignmentIcon /> },
-    { label: 'Overview', icon: <AssessmentIcon /> },
-    { label: 'Facilities Detail', icon: <TableChartIcon /> },
+    { label: 'ODN/RRF', icon: <AssessmentIcon /> },
+    { label: 'Service Units Detail', icon: <TableChartIcon /> },
     { label: 'Route Analysis', icon: <RouteIcon /> },
-    { label: 'POD Tracking', icon: <TrendingUpIcon /> },
-    { label: 'Time Trend', icon: <TimelineIcon /> }
+    { label: 'All Picklists', icon: <TrendingUpIcon /> },
+    { label: 'Organization Profile', icon: <TimelineIcon /> }
   ];
 
   return (
@@ -140,14 +129,6 @@ const HPComprehensiveReport = () => {
                 </Typography>
               </Box>
             </Stack>
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
-              onClick={handleExportReport}
-              sx={{ bgcolor: 'white', color: 'primary.main', '&:hover': { bgcolor: 'grey.100' } }}
-            >
-              Export Report
-            </Button>
           </Stack>
         </CardContent>
       </Card>
@@ -233,10 +214,10 @@ const HPComprehensiveReport = () => {
           <CardContent sx={{ p: 3 }}>
             {activeTab === 0 && <ODNPODDetailReport />}
             {activeTab === 1 && <ReportOverview data={reportData} />}
-            {activeTab === 2 && <FacilitiesDetail data={reportData} />}
+            {activeTab === 2 && <ServiceUnitsDetail data={reportData} />}
             {activeTab === 3 && <RouteAnalysis data={reportData} />}
-            {activeTab === 4 && <PODTracking data={reportData} />}
-            {activeTab === 5 && <TimeTrend data={timeTrendData} />}
+            {activeTab === 4 && <AllPicklists />}
+            {activeTab === 5 && <OrganizationProfileView />}
           </CardContent>
         </Card>
       )}

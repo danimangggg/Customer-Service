@@ -258,8 +258,10 @@ const RouteManagement = () => {
         return;
       }
 
+      const loggedInUserId = localStorage.getItem('UserId');
       const assignmentData = {
         ...formData,
+        assigned_by: loggedInUserId,
         ethiopian_month: currentEthiopianMonth,
         ethiopian_year: currentEthiopianYear
       };
