@@ -359,8 +359,8 @@ export default function SignIn() {
             console.log("→ Routing to Picklists - WIM Operator");
             navigate(`/all-picklists`);
           } else {
-            console.log("→ Routing to Customer Dashboard - Self Assessment/Admin");
-            navigate('/customer-dashboard');
+            console.log("→ Routing to HP Dashboard - Admin");
+            navigate('/hp-dashboard');
           }
         } 
         // Handle Credit Manager
@@ -417,13 +417,10 @@ export default function SignIn() {
               </Box>
               
               <Typography variant="h2" sx={{ fontWeight: 900, mb: 1.5, textShadow: '0 4px 8px rgba(0,0,0,0.2)', letterSpacing: '-1px', fontSize: '3rem' }}>
-                EPSS-AA1
+                EPSS
               </Typography>
-              <Typography variant="h6" sx={{ mb: 0.5, opacity: 0.95, fontWeight: 500 }}>
+              <Typography variant="h6" sx={{ mb: 3, opacity: 0.95, fontWeight: 500 }}>
                 Ethiopian Pharmaceutical Supply Service
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 3, opacity: 0.85, fontWeight: 300 }}>
-                Addis Ababa Branch 1
               </Typography>
 
               <Box sx={{ mt: 3 }}>
@@ -548,7 +545,7 @@ export default function SignIn() {
                 </StyledButton>
 
                 <Typography variant="body2" sx={{ mt: 3, color: 'text.secondary', textAlign: 'center' }}>
-                  © 2025 EPSS-AA1. All rights reserved.
+                  © 2025 EPSS. All rights reserved.
                 </Typography>
               </Box>
             </Box>

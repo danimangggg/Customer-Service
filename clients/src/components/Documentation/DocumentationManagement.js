@@ -186,7 +186,7 @@ const DocumentationManagement = () => {
         
         // Show informative message if no ODNs found
         if (response.data.odns.length === 0) {
-          setError(`No ODNs found for ${selectedMonth} ${selectedYear}. ${response.data.message || 'Try selecting a different month/year.'}`);
+          setError(`No ODNs found for the selected period.`);
         }
       } else {
         setODNData([]);
@@ -967,32 +967,6 @@ const DocumentationManagement = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="primary"
-                startIcon={<SaveIcon />}
-                onClick={handleSaveUpdates}
-                disabled={Object.keys(pendingUpdates).length === 0}
-                sx={{ 
-                  height: 56,
-                  bgcolor: Object.keys(pendingUpdates).length > 0 ? 'warning.main' : 'success.main',
-                  '&:hover': {
-                    bgcolor: Object.keys(pendingUpdates).length > 0 ? 'warning.dark' : 'success.dark'
-                  }
-                }}
-              >
-                {Object.keys(pendingUpdates).length > 0 ? 'Save Remaining' : 'All Saved'}
-                {Object.keys(pendingUpdates).length > 0 && (
-                  <Chip 
-                    label={Object.keys(pendingUpdates).length} 
-                    size="small" 
-                    sx={{ ml: 1, bgcolor: 'rgba(255,255,255,0.3)' }}
-                  />
-                )}
-              </Button>
-            </Grid>
           </Grid>
         </Card>
 
@@ -1067,11 +1041,6 @@ const DocumentationManagement = () => {
             <Typography variant="body2" gutterBottom>
               {error}
             </Typography>
-            {error.includes('No ODNs found') && (
-              <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-                💡 Try selecting "Tahsas 2018" or "Hidar 2018" - these months have available data.
-              </Typography>
-            )}
           </Alert>
         )}
 
@@ -1154,34 +1123,6 @@ const DocumentationManagement = () => {
                   
                   return (
                   <React.Fragment key={`${odn.odn_id}-${odn.pod_confirmed}-${pendingUpdates[odn.odn_id]?.pod_confirmed || 'none'}`}>
-                    {/* Route separator row */}
-                    {isNewRoute && sameRouteODNs.length > 1 && (
-                      <TableRow sx={{ bgcolor: 'primary.50' }}>
-                        <TableCell colSpan={6} sx={{ py: 1, borderBottom: '2px solid', borderColor: 'primary.200' }}>
-                          <Stack direction="row" alignItems="center" spacing={2}>
-                            <RouteIcon color="primary" fontSize="small" />
-                            <Typography variant="subtitle2" color="primary" fontWeight="bold">
-                              Route: {odn.route_name}
-                            </Typography>
-                            <Chip 
-                              label={`${sameRouteODNs.length} ODNs`} 
-                              size="small" 
-                              color="primary" 
-                              variant="outlined"
-                            />
-                            {sameRouteODNs.some(o => o.arrival_kilometer) && (
-                              <Chip 
-                                label={`Destination: ${sameRouteODNs.find(o => o.arrival_kilometer)?.arrival_kilometer} km`} 
-                                size="small" 
-                                color="info" 
-                                variant="filled"
-                              />
-                            )}
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    
                     {/* ODN data row */}
                     <TableRow 
                       hover 
