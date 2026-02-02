@@ -55,6 +55,10 @@ import {
   Public,
   Domain,
 } from '@mui/icons-material';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const OrganizationProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -70,6 +74,10 @@ const OrganizationProfile = () => {
   const [facilitiesRowsPerPage, setFacilitiesRowsPerPage] = useState(10);
   const [woredasPage, setWoredasPage] = useState(0);
   const [woredasRowsPerPage, setWoredasRowsPerPage] = useState(10);
+  
+  // Search states
+  const [facilitiesSearch, setFacilitiesSearch] = useState('');
+  const [woredasSearch, setWoredasSearch] = useState('');
   
   const api_url = process.env.REACT_APP_API_URL;
   
@@ -158,10 +166,58 @@ const OrganizationProfile = () => {
     setEditData({ ...orgData });
   };
 
-  const handleSave = () => {
-    setOrgData({ ...editData });
-    setIsEditing(false);
-    // Here you would typically make an API call to save the data
+  const handleSave = async () => {
+    try {
+      setOrgData({ ...editData });
+      setIsEditing(false);
+      // Here you would typically make an API call to save the data
+      
+      // Success message
+      await MySwal.fire({
+        title: 'Profile Updated!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+              🏢
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Organization profile has been successfully updated.
+            </p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+              <p style="font-size: 16px; font-weight: bold; color: #1976d2; margin-bottom: 0;">
+                ${editData.name}
+              </p>
+            </div>
+          </div>
+        `,
+        icon: 'success',
+        confirmButtonColor: '#4caf50',
+        confirmButtonText: 'Great!',
+        timer: 3000,
+        timerProgressBar: true
+      });
+      
+    } catch (err) {
+      console.error('Error saving organization profile:', err);
+      
+      // Error message
+      await MySwal.fire({
+        title: 'Error!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+              ❌
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Failed to save organization profile. Please try again.
+            </p>
+          </div>
+        `,
+        icon: 'error',
+        confirmButtonColor: '#f44336',
+        confirmButtonText: 'OK'
+      });
+    }
   };
 
   const handleCancel = () => {
@@ -189,7 +245,8 @@ const OrganizationProfile = () => {
           name: item.facility_name,
           code: '',
           type: item.facility_type || '',
-          parentId: woredas.find(w => w.name === item.woreda_name)?.id || ''
+          parentId: woredas.find(w => w.name === item.woreda_name)?.id || '',
+          facilityId: item.facility_id || ''
         });
       } else {
         setNewItem({
@@ -200,7 +257,7 @@ const OrganizationProfile = () => {
         });
       }
     } else {
-      setNewItem({ name: '', code: '', type: '', parentId: '' });
+      setNewItem({ name: '', code: '', type: '', parentId: '', facilityId: '' });
     }
     setOpenDialog(true);
   };
@@ -213,6 +270,10 @@ const OrganizationProfile = () => {
 
   const handleSaveItem = async () => {
     try {
+      let itemName = newItem.name;
+      let emoji = '';
+      let action = selectedItem ? 'updated' : 'created';
+      
       if (dialogType === 'facility') {
         const facilityData = {
           facility_name: newItem.name,
@@ -221,6 +282,11 @@ const OrganizationProfile = () => {
           zone_name: zones.find(z => z.id === woredas.find(w => w.id === newItem.parentId)?.zoneId)?.name || '',
           region_name: regions.find(r => r.id === zones.find(z => z.id === woredas.find(w => w.id === newItem.parentId)?.zoneId)?.regionId)?.name || ''
         };
+
+        // Only include custom ID when creating new facility
+        if (!selectedItem && newItem.facilityId) {
+          facilityData.id = newItem.facilityId;
+        }
 
         if (selectedItem) {
           // Update existing facility
@@ -232,6 +298,7 @@ const OrganizationProfile = () => {
         
         // Refresh facilities data
         await fetchAllData();
+        emoji = '🏥';
       }
       // For regions, zones, woredas - these would need separate API endpoints
       // For now, we'll handle them locally as before
@@ -241,45 +308,193 @@ const OrganizationProfile = () => {
         } else {
           setRegions(prev => [...prev, { id: Date.now(), ...newItem }]);
         }
+        emoji = '🌍';
       } else if (dialogType === 'zone') {
         if (selectedItem) {
           setZones(prev => prev.map(z => z.id === selectedItem.id ? { ...z, name: newItem.name, regionId: newItem.parentId } : z));
         } else {
           setZones(prev => [...prev, { id: Date.now(), name: newItem.name, regionId: newItem.parentId }]);
         }
+        emoji = '📍';
       } else if (dialogType === 'woreda') {
         if (selectedItem) {
           setWoredas(prev => prev.map(w => w.id === selectedItem.id ? { ...w, name: newItem.name, zoneId: newItem.parentId } : w));
         } else {
           setWoredas(prev => [...prev, { id: Date.now(), name: newItem.name, zoneId: newItem.parentId }]);
         }
+        emoji = '🏘️';
       }
       
       handleCloseDialog();
+      
+      // Success message
+      await MySwal.fire({
+        title: `${dialogType.charAt(0).toUpperCase() + dialogType.slice(1)} ${action.charAt(0).toUpperCase() + action.slice(1)}!`,
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+              ${emoji}
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              ${dialogType.charAt(0).toUpperCase() + dialogType.slice(1)} <strong>"${itemName}"</strong> has been successfully ${action}.
+            </p>
+          </div>
+        `,
+        icon: 'success',
+        confirmButtonColor: '#4caf50',
+        confirmButtonText: 'Great!',
+        timer: 3000,
+        timerProgressBar: true
+      });
+      
     } catch (err) {
       console.error('Error saving item:', err);
-      setError('Failed to save item');
+      
+      // Error message
+      await MySwal.fire({
+        title: 'Error!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+              ❌
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Failed to save ${dialogType}. Please try again.
+            </p>
+          </div>
+        `,
+        icon: 'error',
+        confirmButtonColor: '#f44336',
+        confirmButtonText: 'OK'
+      });
     }
   };
 
   const handleDeleteItem = async (type, id) => {
-    try {
-      if (type === 'facility') {
-        await axios.delete(`${api_url}/api/facilities/${id}`);
-        await fetchAllData(); // Refresh data
-      } else {
-        // Handle local deletion for regions, zones, woredas
-        if (type === 'region') {
-          setRegions(prev => prev.filter(r => r.id !== id));
-        } else if (type === 'zone') {
-          setZones(prev => prev.filter(z => z.id !== id));
-        } else if (type === 'woreda') {
-          setWoredas(prev => prev.filter(w => w.id !== id));
+    // Find the item details for display
+    let itemName = '';
+    let itemDetails = '';
+    let emoji = '';
+    
+    if (type === 'facility') {
+      const facility = facilities.find(f => f.id === id);
+      itemName = facility?.facility_name || 'Unknown Facility';
+      itemDetails = `${facility?.facility_type || 'N/A'} • ${facility?.region_name || 'N/A'}`;
+      emoji = '🏥';
+    } else if (type === 'region') {
+      const region = regions.find(r => r.id === id);
+      itemName = region?.name || 'Unknown Region';
+      itemDetails = 'Administrative Region';
+      emoji = '🌍';
+    } else if (type === 'zone') {
+      const zone = zones.find(z => z.id === id);
+      itemName = zone?.name || 'Unknown Zone';
+      itemDetails = 'Administrative Zone';
+      emoji = '📍';
+    } else if (type === 'woreda') {
+      const woreda = woredas.find(w => w.id === id);
+      itemName = woreda?.name || 'Unknown Woreda';
+      itemDetails = 'Administrative Woreda';
+      emoji = '🏘️';
+    }
+
+    const result = await MySwal.fire({
+      title: `Delete ${type.charAt(0).toUpperCase() + type.slice(1)}?`,
+      html: `
+        <div style="text-align: center; padding: 20px;">
+          <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+            ${emoji}
+          </div>
+          <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+            Are you sure you want to delete this ${type}?
+          </p>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <p style="font-size: 20px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">
+              ${itemName}
+            </p>
+            <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+              ${itemDetails}
+            </p>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+            This action cannot be undone and will remove all ${type} data.
+          </p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#f44336',
+      cancelButtonColor: '#2196f3',
+      confirmButtonText: `Yes, Delete ${type.charAt(0).toUpperCase() + type.slice(1)}!`,
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-custom-popup',
+        title: 'swal-custom-title',
+        confirmButton: 'swal-custom-confirm',
+        cancelButton: 'swal-custom-cancel'
+      },
+      buttonsStyling: true,
+      focusConfirm: false,
+      focusCancel: true
+    });
+
+    if (result.isConfirmed) {
+      try {
+        if (type === 'facility') {
+          await axios.delete(`${api_url}/api/facilities/${id}`);
+          await fetchAllData(); // Refresh data
+        } else {
+          // Handle local deletion for regions, zones, woredas
+          if (type === 'region') {
+            setRegions(prev => prev.filter(r => r.id !== id));
+          } else if (type === 'zone') {
+            setZones(prev => prev.filter(z => z.id !== id));
+          } else if (type === 'woreda') {
+            setWoredas(prev => prev.filter(w => w.id !== id));
+          }
         }
+        
+        // Success animation
+        await MySwal.fire({
+          title: 'Deleted!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                ${type.charAt(0).toUpperCase() + type.slice(1)} <strong>"${itemName}"</strong> has been successfully deleted.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
+        
+      } catch (err) {
+        console.error('Error deleting item:', err);
+        
+        // Error animation
+        await MySwal.fire({
+          title: 'Error!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+                ❌
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Failed to delete ${type}. Please try again.
+              </p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonColor: '#f44336',
+          confirmButtonText: 'OK'
+        });
       }
-    } catch (err) {
-      console.error('Error deleting item:', err);
-      setError('Failed to delete item');
     }
   };
 
@@ -306,13 +521,26 @@ const OrganizationProfile = () => {
     setWoredasPage(0);
   };
 
-  // Get paginated data
-  const paginatedFacilities = facilities.slice(
+  // Get filtered and paginated data
+  const filteredFacilities = facilities.filter(facility =>
+    facility.facility_name?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
+    facility.facility_type?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
+    facility.woreda_name?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
+    facility.zone_name?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
+    facility.region_name?.toLowerCase().includes(facilitiesSearch.toLowerCase())
+  );
+
+  const paginatedFacilities = filteredFacilities.slice(
     facilitiesPage * facilitiesRowsPerPage,
     facilitiesPage * facilitiesRowsPerPage + facilitiesRowsPerPage
   );
 
-  const paginatedWoredas = woredas.slice(
+  const filteredWoredas = woredas.filter(woreda =>
+    woreda.name?.toLowerCase().includes(woredasSearch.toLowerCase()) ||
+    getZoneName(woreda.zoneId)?.toLowerCase().includes(woredasSearch.toLowerCase())
+  );
+
+  const paginatedWoredas = filteredWoredas.slice(
     woredasPage * woredasRowsPerPage,
     woredasPage * woredasRowsPerPage + woredasRowsPerPage
   );
@@ -515,6 +743,43 @@ const OrganizationProfile = () => {
           .action-button:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+          }
+          
+          /* Custom SweetAlert Styles */
+          .swal-custom-popup {
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+            border: none !important;
+          }
+          .swal-custom-title {
+            font-size: 28px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+            margin-bottom: 20px !important;
+          }
+          .swal-custom-confirm {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-confirm:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4) !important;
+          }
+          .swal-custom-cancel {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-cancel:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
           }
         `}
       </style>
@@ -852,6 +1117,19 @@ const OrganizationProfile = () => {
                     Add Woreda
                   </Button>
                 </Stack>
+                
+                {/* Search Field for Woredas */}
+                <Box sx={{ mb: 2 }}>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder="Search woredas by name or zone..."
+                    value={woredasSearch}
+                    onChange={(e) => setWoredasSearch(e.target.value)}
+                    sx={{ maxWidth: 400 }}
+                  />
+                </Box>
+                
                 <TableContainer component={Paper} className="info-card">
                   <Table>
                     <TableHead>
@@ -880,7 +1158,7 @@ const OrganizationProfile = () => {
                   </Table>
                   <TablePagination
                     component="div"
-                    count={woredas.length}
+                    count={filteredWoredas.length}
                     page={woredasPage}
                     onPageChange={handleWoredasPageChange}
                     rowsPerPage={woredasRowsPerPage}
@@ -911,11 +1189,25 @@ const OrganizationProfile = () => {
                     Add Facility
                   </Button>
                 </Stack>
+                
+                {/* Search Field for Facilities */}
+                <Box sx={{ mb: 2 }}>
+                  <TextField
+                    fullWidth
+                    variant="outlined"
+                    placeholder="Search facilities by name, type, woreda, zone, or region..."
+                    value={facilitiesSearch}
+                    onChange={(e) => setFacilitiesSearch(e.target.value)}
+                    sx={{ maxWidth: 500 }}
+                  />
+                </Box>
+                
                 <TableContainer component={Paper} className="info-card">
                   <Table>
                     <TableHead>
                       <TableRow>
                         <TableCell><strong>Facility Name</strong></TableCell>
+                        <TableCell><strong>Facility ID</strong></TableCell>
                         <TableCell><strong>Type</strong></TableCell>
                         <TableCell><strong>Woreda</strong></TableCell>
                         <TableCell><strong>Zone</strong></TableCell>
@@ -927,6 +1219,11 @@ const OrganizationProfile = () => {
                       {paginatedFacilities.map((facility) => (
                         <TableRow key={facility.id}>
                           <TableCell>{facility.facility_name}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" color="primary.main" fontFamily="monospace" fontWeight="bold">
+                              {facility.id}
+                            </Typography>
+                          </TableCell>
                           <TableCell>
                             <Chip 
                               label={facility.facility_type || 'N/A'} 
@@ -951,7 +1248,7 @@ const OrganizationProfile = () => {
                   </Table>
                   <TablePagination
                     component="div"
-                    count={facilities.length}
+                    count={filteredFacilities.length}
                     page={facilitiesPage}
                     onPageChange={handleFacilitiesPageChange}
                     rowsPerPage={facilitiesRowsPerPage}
@@ -982,6 +1279,25 @@ const OrganizationProfile = () => {
                 onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
                 variant="outlined"
               />
+              
+              {dialogType === 'facility' && (
+                <TextField
+                  fullWidth
+                  label="Facility ID"
+                  value={selectedItem ? selectedItem.id : (newItem.facilityId || '')}
+                  onChange={selectedItem ? undefined : (e) => setNewItem(prev => ({ ...prev, facilityId: e.target.value }))}
+                  variant="outlined"
+                  placeholder={selectedItem ? "Auto-generated ID" : "Enter facility ID"}
+                  helperText={selectedItem ? "Database-generated ID (read-only)" : "Unique identifier for the facility"}
+                  disabled={!!selectedItem}
+                  InputProps={{
+                    style: { 
+                      fontFamily: 'monospace',
+                      backgroundColor: selectedItem ? '#f5f5f5' : 'inherit'
+                    }
+                  }}
+                />
+              )}
               
               {dialogType === 'region' && (
                 <TextField

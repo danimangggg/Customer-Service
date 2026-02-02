@@ -5,7 +5,7 @@ const { Op } = require('sequelize');
 // Get all vehicles
 const getAllVehicles = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', type = '', status = '' } = req.query;
+    const { page = 1, limit = 100, search = '', type = '', status = '' } = req.query;
     const offset = (page - 1) * limit;
 
     const whereClause = {};

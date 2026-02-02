@@ -12,6 +12,10 @@ import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import RouteIcon from '@mui/icons-material/Route';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const HPFacilities = () => {
   // --- STATE MANAGEMENT ---
@@ -56,13 +60,31 @@ const HPFacilities = () => {
       console.error("Error status:", err.response?.status);
       
       // Show user-friendly error message
+      let errorMessage = '';
       if (err.response?.status === 500) {
-        alert("Failed to load route data. Please check if the database is running and try again.");
+        errorMessage = "Failed to load route data. Please check if the database is running and try again.";
       } else if (err.response?.status === 404) {
-        alert("Route API endpoint not found. Please contact system administrator.");
+        errorMessage = "Route API endpoint not found. Please contact system administrator.";
       } else {
-        alert(`Failed to load route data: ${err.message}`);
+        errorMessage = `Failed to load route data: ${err.message}`;
       }
+      
+      await MySwal.fire({
+        title: 'Error Loading Routes',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+              🛣️
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              ${errorMessage}
+            </p>
+          </div>
+        `,
+        icon: 'error',
+        confirmButtonColor: '#f44336',
+        confirmButtonText: 'OK'
+      });
     }
   };
 
@@ -95,10 +117,47 @@ const HPFacilities = () => {
       if (res.status === 200) {
         setOpenEdit(false);
         fetchFacilities(); // Refresh table
+        
+        // Success message
+        await MySwal.fire({
+          title: 'Updated!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                🏥
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Facility <strong>"${selectedFacility.facility_name}"</strong> has been successfully updated.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
       }
     } catch (err) {
       console.error("Save failed:", err.response?.data || err.message);
-      alert("Error saving data. Check console for details.");
+      
+      // Error message
+      await MySwal.fire({
+        title: 'Error!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+              ❌
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Error saving data. Please check console for details.
+            </p>
+          </div>
+        `,
+        icon: 'error',
+        confirmButtonColor: '#f44336',
+        confirmButtonText: 'OK'
+      });
     }
   };
 

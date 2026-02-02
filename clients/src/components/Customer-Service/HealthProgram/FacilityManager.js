@@ -10,6 +10,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BusinessIcon from '@mui/icons-material/Business';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const FacilityManager = () => {
   // --- STATE MANAGEMENT ---
@@ -65,20 +69,138 @@ const FacilityManager = () => {
       if (res.status === 200) {
         setOpenEdit(false);
         fetchFacilities(); // Refresh table
+        
+        // Success message
+        await MySwal.fire({
+          title: 'Updated!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Facility <strong>"${selectedFacility.facility_name}"</strong> has been successfully updated.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
       }
     } catch (err) {
       console.error("Save failed:", err.response?.data || err.message);
-      alert("Error saving data. Check console for details.");
+      
+      // Error message
+      await MySwal.fire({
+        title: 'Error!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+              ❌
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Error saving data. Please check console for details.
+            </p>
+          </div>
+        `,
+        icon: 'error',
+        confirmButtonColor: '#f44336',
+        confirmButtonText: 'OK'
+      });
     }
   };
 
   // --- DELETE LOGIC ---
-  const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this facility?")) {
+  const handleDelete = async (facility) => {
+    const result = await MySwal.fire({
+      title: 'Delete Facility?',
+      html: `
+        <div style="text-align: center; padding: 20px;">
+          <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+            🏥
+          </div>
+          <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+            Are you sure you want to delete this facility?
+          </p>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <p style="font-size: 20px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">
+              ${facility.facility_name}
+            </p>
+            <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+              ${facility.facility_type || 'N/A'} • ${facility.region_name || 'N/A'}
+            </p>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+            This action cannot be undone and will remove all facility data.
+          </p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#f44336',
+      cancelButtonColor: '#2196f3',
+      confirmButtonText: 'Yes, Delete Facility!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-custom-popup',
+        title: 'swal-custom-title',
+        confirmButton: 'swal-custom-confirm',
+        cancelButton: 'swal-custom-cancel'
+      },
+      buttonsStyling: true,
+      focusConfirm: false,
+      focusCancel: true
+    });
+
+    if (result.isConfirmed) {
       try {
-        await axios.delete(`${api_url}/api/facilities/${id}`);
+        await axios.delete(`${api_url}/api/facilities/${facility.id}`);
+        
+        // Success animation
+        await MySwal.fire({
+          title: 'Deleted!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Facility <strong>"${facility.facility_name}"</strong> has been successfully deleted.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
+        
         fetchFacilities();
-      } catch (err) { console.error("Delete error:", err); }
+      } catch (err) {
+        console.error("Delete error:", err);
+        
+        // Error animation
+        await MySwal.fire({
+          title: 'Error!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+                ❌
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Failed to delete facility. Please try again.
+              </p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonColor: '#f44336',
+          confirmButtonText: 'OK'
+        });
+      }
     }
   };
 
@@ -89,7 +211,49 @@ const FacilityManager = () => {
   );
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <>
+      <style>
+        {`
+          /* Custom SweetAlert Styles */
+          .swal-custom-popup {
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+            border: none !important;
+          }
+          .swal-custom-title {
+            font-size: 28px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+            margin-bottom: 20px !important;
+          }
+          .swal-custom-confirm {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-confirm:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4) !important;
+          }
+          .swal-custom-cancel {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-cancel:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
+          }
+        `}
+      </style>
+      
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Search & Header Section */}
       <Card sx={{ p: 3, mb: 3, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
@@ -153,7 +317,7 @@ const FacilityManager = () => {
                 <TableCell align="center">
                   <Box display="flex" justifyContent="center" gap={1}>
                     <IconButton onClick={() => handleEditOpen(f)} color="primary" size="small" sx={{ border: '1px solid #e0e0e0' }}><EditIcon fontSize="small" /></IconButton>
-                    <IconButton onClick={() => handleDelete(f.id)} color="error" size="small" sx={{ border: '1px solid #e0e0e0' }}><DeleteIcon fontSize="small" /></IconButton>
+                    <IconButton onClick={() => handleDelete(f)} color="error" size="small" sx={{ border: '1px solid #e0e0e0' }}><DeleteIcon fontSize="small" /></IconButton>
                   </Box>
                 </TableCell>
               </TableRow>
@@ -205,6 +369,7 @@ const FacilityManager = () => {
         </DialogActions>
       </Dialog>
     </Container>
+    </>
   );
 };
 

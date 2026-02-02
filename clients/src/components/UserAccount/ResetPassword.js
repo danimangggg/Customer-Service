@@ -12,6 +12,10 @@ import {
   Alert,
 } from '@mui/material';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const ResetPasswordForm = () => {
   const [users, setUsers] = useState([]);
@@ -78,17 +82,105 @@ const ResetPasswordForm = () => {
 
   const handleResetPassword = async () => {
     if (!selectedUser) {
-      alert('Please select a user first');
+      await MySwal.fire({
+        title: 'No User Selected',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #ff9800; margin-bottom: 20px;">
+              ⚠️
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Please select a user first
+            </p>
+          </div>
+        `,
+        icon: 'warning',
+        confirmButtonColor: '#ff9800',
+        confirmButtonText: 'OK'
+      });
       return;
     }
     
-    try {
-      const result = await axios.post(`${api_url}/api/resetPassword`, { user_name: selectedUser });
-      alert(result.data.message || 'Password reset successfully');
-      setSelectedUser('');
-    } catch (error) {
-      console.error('Error resetting password:', error);
-      alert(error.response?.data?.message || 'Failed to reset password. Please try again.');
+    // Confirmation dialog
+    const result = await MySwal.fire({
+      title: 'Reset Password?',
+      html: `
+        <div style="text-align: center; padding: 20px;">
+          <div style="font-size: 60px; color: #ff9800; margin-bottom: 20px;">
+            🔑
+          </div>
+          <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+            Are you sure you want to reset the password for:
+          </p>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <p style="font-size: 20px; font-weight: bold; color: #1976d2; margin-bottom: 0;">
+              ${selectedUser}
+            </p>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+            The password will be reset to the default value.
+          </p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#ff9800',
+      cancelButtonColor: '#2196f3',
+      confirmButtonText: 'Yes, Reset Password!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const response = await axios.post(`${api_url}/api/resetPassword`, { user_name: selectedUser });
+        
+        // Success message
+        await MySwal.fire({
+          title: 'Password Reset!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                ${response.data.message || 'Password reset successfully'}
+              </p>
+              <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+                <p style="font-size: 16px; font-weight: bold; color: #1976d2; margin-bottom: 0;">
+                  User: ${selectedUser}
+                </p>
+              </div>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 4000,
+          timerProgressBar: true
+        });
+        
+        setSelectedUser('');
+      } catch (error) {
+        console.error('Error resetting password:', error);
+        
+        // Error message
+        await MySwal.fire({
+          title: 'Error!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+                ❌
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                ${error.response?.data?.message || 'Failed to reset password. Please try again.'}
+              </p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonColor: '#f44336',
+          confirmButtonText: 'OK'
+        });
+      }
     }
   };
 

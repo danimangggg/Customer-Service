@@ -872,8 +872,8 @@ const Sidebar = () => {
 
 
 
-         {/* Reports - for all HP-related roles and Admin */}
-         {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || isAdmin) && (
+         {/* Reports - for all HP-related roles, Admin, Coordinator, and Manager */}
+         {(jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance" || jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || isAdmin || jobTitle === "Coordinator" || jobTitle === "Manager") && (
            <MenuTooltip title={"Reports"}>
              <ListItem 
                button 

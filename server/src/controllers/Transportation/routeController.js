@@ -26,8 +26,24 @@ const getAllRoutes = async (req, res) => {
       order: [['route_name', 'ASC']]
     });
 
+    // Fetch facilities for each route
+    const routesWithFacilities = await Promise.all(
+      rows.map(async (route) => {
+        const facilities = await db.facility.findAll({
+          where: { route: route.route_name },
+          attributes: ['id', 'facility_name', 'facility_type', 'region_name', 'zone_name', 'woreda_name'],
+          order: [['facility_name', 'ASC']]
+        });
+        
+        return {
+          ...route.toJSON(),
+          facilities
+        };
+      })
+    );
+
     res.json({
-      routes: rows,
+      routes: routesWithFacilities,
       totalCount: count,
       totalPages: Math.ceil(count / limit),
       currentPage: parseInt(page)
@@ -179,7 +195,17 @@ const getRouteStats = async (req, res) => {
   try {
     const totalRoutes = await Route.count();
     
-    const routesWithAssignments = await db.sequelize.query(`
+    // Count all routes that have assignments (active routes)
+    const activeRoutesCount = await db.sequelize.query(`
+      SELECT COUNT(DISTINCT r.id) as count
+      FROM routes r
+      INNER JOIN route_assignments ra ON r.id = ra.route_id
+    `, {
+      type: db.sequelize.QueryTypes.SELECT
+    });
+
+    // Get top 5 routes with most assignments (for display purposes)
+    const topRoutesWithAssignments = await db.sequelize.query(`
       SELECT r.id, r.route_name, COUNT(ra.id) as assignment_count
       FROM routes r
       LEFT JOIN route_assignments ra ON r.id = ra.route_id
@@ -197,7 +223,8 @@ const getRouteStats = async (req, res) => {
 
     res.json({
       totalRoutes,
-      routesWithAssignments,
+      activeRoutes: activeRoutesCount[0]?.count || 0,
+      routesWithAssignments: topRoutesWithAssignments, // Keep for backward compatibility
       recentRoutes
     });
   } catch (error) {

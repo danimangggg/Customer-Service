@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TextField, Button, MenuItem, Select, FormControl,
   Box, Typography, Paper, IconButton, Grid
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const CreateUserForm = () => {
   const api_url = process.env.REACT_APP_API_URL;
+  const [stores, setStores] = useState([]);
 
   const [formData, setFormData] = useState({
     first_name: '',
@@ -15,11 +20,25 @@ const CreateUserForm = () => {
     user_name: '',
     password: '',
     account_type: '',
-    job_title: ''
+    job_title: '',
+    store: ''
   });
 
   const accountTypes = ['Admin', 'Credit Manager', 'Pod Manager', 'Self Assesment'];
-  const job_title = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Camera man', 'Wearhouse manager', 'Oditor', 'ICT Officer', 'Database Adminstrator', 'Data Clerk', 'Branch Manager', 'Customer Service', 'Other'];
+  const job_title = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Camera man', 'Wearhouse manager', 'Oditor', 'ICT Officer', 'Database Adminstrator', 'Data Clerk', 'Branch Manager', 'Customer Service', 'Coordinator', 'Manager', 'TV Operator', 'Other'];
+
+  useEffect(() => {
+    fetchStores();
+  }, []);
+
+  const fetchStores = async () => {
+    try {
+      const response = await axios.get(`${api_url}/api/stores`);
+      setStores(response.data);
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -28,12 +47,89 @@ const CreateUserForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation for EWM officers - store is mandatory
+    if ((formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP') && !formData.store) {
+      await MySwal.fire({
+        title: 'Store Required!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #ff9800; margin-bottom: 20px;">
+              🏪
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Store selection is mandatory for EWM Officers.
+            </p>
+            <p style="font-size: 14px; color: #666;">
+              Please select a store before creating the user.
+            </p>
+          </div>
+        `,
+        icon: 'warning',
+        confirmButtonColor: '#ff9800',
+        confirmButtonText: 'OK',
+        customClass: {
+          popup: 'swal-custom-popup',
+          title: 'swal-custom-title',
+          confirmButton: 'swal-custom-confirm'
+        },
+        buttonsStyling: true
+      });
+      return;
+    }
+    
     try {
       const result = await axios.post(`${api_url}/api/addUser`, formData);
-      alert(result.data.message);
+      
+      // Success message
+      await MySwal.fire({
+        title: 'User Created!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+              👤
+            </div>
+            <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+              ${result.data.message}
+            </p>
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+              <p style="font-size: 16px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">
+                ${formData.first_name} ${formData.last_name}
+              </p>
+              <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+                ${formData.job_title} • ${formData.account_type}
+              </p>
+            </div>
+          </div>
+        `,
+        icon: 'success',
+        confirmButtonColor: '#4caf50',
+        confirmButtonText: 'Great!',
+        timer: 4000,
+        timerProgressBar: true
+      });
+      
       window.location.reload();
     } catch (e) {
       console.log(`the error is ${e}`);
+      
+      // Error message
+      await MySwal.fire({
+        title: 'Error!',
+        html: `
+          <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+              ❌
+            </div>
+            <p style="font-size: 18px; color: #333;">
+              Failed to create user. Please try again.
+            </p>
+          </div>
+        `,
+        icon: 'error',
+        confirmButtonColor: '#f44336',
+        confirmButtonText: 'OK'
+      });
     }
   };
 
@@ -42,12 +138,61 @@ const CreateUserForm = () => {
   };
 
   return (
-    <Box
-      display="flex"
-      flexDirection="column"
-      alignItems="center"
-      justifyContent="center"
-      height="100vh"
+    <>
+      <style>
+        {`
+          /* Custom SweetAlert Styles */
+          .swal2-container {
+            z-index: 9999 !important;
+          }
+          .swal2-backdrop-show {
+            z-index: 9998 !important;
+          }
+          .swal-custom-popup {
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+            border: none !important;
+            z-index: 9999 !important;
+          }
+          .swal-custom-title {
+            font-size: 28px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+            margin-bottom: 20px !important;
+          }
+          .swal-custom-confirm {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-confirm:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4) !important;
+          }
+          .swal-custom-cancel {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-cancel:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
+          }
+        `}
+      </style>
+      
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        height="100vh"
       sx={{ backgroundColor: '#f5f5f5', padding: 2 }}
     >
       <Paper
@@ -160,6 +305,37 @@ const CreateUserForm = () => {
               </FormControl>
             </Grid>
 
+            {/* Store - Show for all users, required for EWM Officers */}
+            <Grid item xs={12}>
+              <FormControl 
+                fullWidth 
+                required={formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP'}
+              >
+                <Select
+                  name="store"
+                  value={formData.store}
+                  onChange={handleChange}
+                  displayEmpty
+                  sx={{ 
+                    height: 50,
+                    backgroundColor: (formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP') ? '#fff3e0' : 'inherit'
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    {(formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP') 
+                      ? 'Select Store (Required for EWM Officers)' 
+                      : 'Select Store (Optional)'
+                    }
+                  </MenuItem>
+                  {stores.map((store) => (
+                    <MenuItem key={store.id} value={store.store_name}>
+                      {store.store_name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
             {/* Submit */}
             <Grid item xs={12}>
               <Button type="submit" variant="contained" color="error" fullWidth sx={{ height: 50 }}>
@@ -170,6 +346,7 @@ const CreateUserForm = () => {
         </Box>
       </Paper>
     </Box>
+    </>
   );
 };
 

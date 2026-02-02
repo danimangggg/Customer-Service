@@ -35,6 +35,10 @@ import {
   CheckCircle as ActiveIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -43,8 +47,6 @@ const StoreManagement = () => {
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingStore, setEditingStore] = useState(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [storeToDelete, setStoreToDelete] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   
   const [page, setPage] = useState(0);
@@ -116,16 +118,93 @@ const StoreManagement = () => {
     }
   };
 
-  const handleDelete = async () => {
-    try {
-      await axios.delete(`${API_URL}/api/stores/${storeToDelete.id}`);
-      showSnackbar('Store deleted successfully', 'success');
-      fetchStores();
-      setDeleteConfirmOpen(false);
-      setStoreToDelete(null);
-    } catch (error) {
-      console.error('Error deleting store:', error);
-      showSnackbar('Failed to delete store', 'error');
+  const handleDelete = async (store) => {
+    const result = await MySwal.fire({
+      title: 'Delete Store?',
+      html: `
+        <div style="text-align: center; padding: 20px;">
+          <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+            🏪
+          </div>
+          <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+            Are you sure you want to delete this store?
+          </p>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <p style="font-size: 20px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">
+              ${store.store_name}
+            </p>
+            <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+              ${store.location || 'No location specified'}
+            </p>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+            This action cannot be undone and will remove all store data.
+          </p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#f44336',
+      cancelButtonColor: '#2196f3',
+      confirmButtonText: 'Yes, Delete Store!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-custom-popup',
+        title: 'swal-custom-title',
+        confirmButton: 'swal-custom-confirm',
+        cancelButton: 'swal-custom-cancel'
+      },
+      buttonsStyling: true,
+      focusConfirm: false,
+      focusCancel: true
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await axios.delete(`${API_URL}/api/stores/${store.id}`);
+        
+        // Success animation
+        await MySwal.fire({
+          title: 'Deleted!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Store <strong>"${store.store_name}"</strong> has been successfully deleted.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
+        
+        fetchStores();
+      } catch (error) {
+        console.error('Error deleting store:', error);
+        
+        // Error animation
+        await MySwal.fire({
+          title: 'Error!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+                ❌
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Failed to delete store. Please try again.
+              </p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonColor: '#f44336',
+          confirmButtonText: 'OK'
+        });
+      }
     }
   };
 
@@ -143,7 +222,49 @@ const StoreManagement = () => {
   );
 
   return (
-    <Box sx={{ p: 3 }}>
+    <>
+      <style>
+        {`
+          /* Custom SweetAlert Styles */
+          .swal-custom-popup {
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+            border: none !important;
+          }
+          .swal-custom-title {
+            font-size: 28px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+            margin-bottom: 20px !important;
+          }
+          .swal-custom-confirm {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-confirm:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4) !important;
+          }
+          .swal-custom-cancel {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-cancel:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
+          }
+        `}
+      </style>
+      
+      <Box sx={{ p: 3 }}>
       <Card elevation={3} sx={{ mb: 3, borderRadius: 3 }}>
         <CardContent>
           <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
@@ -216,10 +337,7 @@ const StoreManagement = () => {
                       </IconButton>
                       <IconButton
                         size="small"
-                        onClick={() => {
-                          setStoreToDelete(store);
-                          setDeleteConfirmOpen(true);
-                        }}
+                        onClick={() => handleDelete(store)}
                         sx={{ color: '#d32f2f' }}
                       >
                         <DeleteIcon />
@@ -292,22 +410,6 @@ const StoreManagement = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to delete store "{storeToDelete?.store_name}"?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button onClick={handleDelete} color="error" variant="contained">
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
@@ -324,6 +426,7 @@ const StoreManagement = () => {
         </Alert>
       </Snackbar>
     </Box>
+    </>
   );
 };
 

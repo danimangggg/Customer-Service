@@ -38,10 +38,15 @@ import {
   CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const VehicleManagement = () => {
   const [vehicles, setVehicles] = useState([]);
   const [filteredVehicles, setFilteredVehicles] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [openDialog, setOpenDialog] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentVehicle, setCurrentVehicle] = useState({
@@ -54,33 +59,60 @@ const VehicleManagement = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const api_url = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
-    fetchVehicles();
-  }, []);
+    // Debounce search to avoid too many API calls
+    const timeoutId = setTimeout(() => {
+      setPage(0); // Reset to first page when searching
+      fetchVehicles();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   useEffect(() => {
-    const filtered = vehicles.filter(vehicle =>
-      vehicle.plate_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.vehicle_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.vehicle_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vehicle.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredVehicles(filtered);
-    setPage(0);
-  }, [searchTerm, vehicles]);
+    fetchVehicles();
+  }, [page, rowsPerPage]);
+
+  // Remove client-side filtering since we're doing server-side pagination
+  // useEffect(() => {
+  //   const filtered = vehicles.filter(vehicle =>
+  //     vehicle.plate_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     vehicle.vehicle_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     vehicle.vehicle_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  //     vehicle.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  //   );
+  //   setFilteredVehicles(filtered);
+  //   setPage(0);
+  // }, [searchTerm, vehicles]);
 
   const fetchVehicles = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/vehicles`);
-      // The Settings controller returns { vehicles: [...], totalCount, ... }
-      const vehiclesData = response.data.vehicles || response.data;
-      setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
-      setFilteredVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
+      const response = await axios.get(`${api_url}/api/vehicles`, {
+        params: {
+          page: page + 1, // Backend uses 1-based pagination, frontend uses 0-based
+          limit: rowsPerPage,
+          search: searchTerm
+        }
+      });
+      
+      // Handle the response structure
+      if (response.data.vehicles) {
+        // Structured response with pagination info
+        setVehicles(response.data.vehicles);
+        setFilteredVehicles(response.data.vehicles);
+        setTotalCount(response.data.totalCount || response.data.vehicles.length);
+      } else {
+        // Simple array response (fallback)
+        const vehiclesData = Array.isArray(response.data) ? response.data : [];
+        setVehicles(vehiclesData);
+        setFilteredVehicles(vehiclesData);
+        setTotalCount(vehiclesData.length);
+      }
     } catch (error) {
       console.error('Error fetching vehicles:', error);
       showSnackbar('Error fetching vehicles', 'error');
@@ -96,11 +128,14 @@ const VehicleManagement = () => {
   };
 
   const handleOpenDialog = (vehicle = null) => {
+    console.log('Opening dialog with vehicle:', vehicle);
+    
     if (vehicle) {
       setCurrentVehicle({
         ...vehicle
       });
       setEditMode(true);
+      console.log('Set to EDIT mode');
     } else {
       setCurrentVehicle({
         id: '',
@@ -111,12 +146,14 @@ const VehicleManagement = () => {
         description: ''
       });
       setEditMode(false);
+      console.log('Set to CREATE mode');
     }
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
+    setEditMode(false);
     setCurrentVehicle({
       id: '',
       vehicle_name: '',
@@ -125,6 +162,7 @@ const VehicleManagement = () => {
       status: 'Active',
       description: ''
     });
+    console.log('Dialog closed and form reset');
   };
 
   const handleInputChange = (field, value) => {
@@ -136,15 +174,47 @@ const VehicleManagement = () => {
 
   const handleSave = async () => {
     try {
+      // Basic validation
+      if (!currentVehicle.vehicle_name?.trim()) {
+        showSnackbar('Vehicle name is required', 'error');
+        return;
+      }
+      
+      if (!currentVehicle.plate_number?.trim()) {
+        showSnackbar('Plate number is required', 'error');
+        return;
+      }
+
       // Prepare the data for saving
-      const vehicleData = {
-        ...currentVehicle
+      let vehicleData = {
+        vehicle_name: currentVehicle.vehicle_name.trim(),
+        plate_number: currentVehicle.plate_number.trim(),
+        vehicle_type: currentVehicle.vehicle_type,
+        status: currentVehicle.status,
+        description: currentVehicle.description?.trim() || ''
       };
 
+      // For CREATE mode, explicitly exclude the id field
+      if (!editMode) {
+        // Remove id field completely for new vehicles
+        delete vehicleData.id;
+      } else {
+        // For EDIT mode, include the id
+        vehicleData.id = currentVehicle.id;
+      }
+
+      console.log('Saving vehicle:', { 
+        editMode, 
+        currentVehicleId: currentVehicle.id,
+        vehicleData 
+      });
+
       if (editMode) {
+        console.log(`Making PUT request to: ${api_url}/api/vehicles/${currentVehicle.id}`);
         await axios.put(`${api_url}/api/vehicles/${currentVehicle.id}`, vehicleData);
         showSnackbar('Vehicle updated successfully');
       } else {
+        console.log(`Making POST request to: ${api_url}/api/vehicles`);
         await axios.post(`${api_url}/api/vehicles`, vehicleData);
         showSnackbar('Vehicle added successfully');
       }
@@ -152,19 +222,105 @@ const VehicleManagement = () => {
       handleCloseDialog();
     } catch (error) {
       console.error('Error saving vehicle:', error);
-      showSnackbar('Error saving vehicle', 'error');
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      // Show specific error message from server
+      const errorMessage = error.response?.data?.error || 'Error saving vehicle';
+      showSnackbar(errorMessage, 'error');
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this vehicle?')) {
+  const handleDelete = async (vehicle) => {
+    const result = await MySwal.fire({
+      title: 'Delete Vehicle?',
+      html: `
+        <div style="text-align: center; padding: 20px;">
+          <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+            🚗
+          </div>
+          <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+            Are you sure you want to delete this vehicle?
+          </p>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <p style="font-size: 20px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">
+              ${vehicle.plate_number}
+            </p>
+            <p style="font-size: 16px; color: #666; margin-bottom: 5px;">
+              ${vehicle.vehicle_name}
+            </p>
+            <p style="font-size: 14px; color: #888; margin-bottom: 0;">
+              ${vehicle.vehicle_type} • ${vehicle.status}
+            </p>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+            This action cannot be undone and will remove all vehicle data.
+          </p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#f44336',
+      cancelButtonColor: '#2196f3',
+      confirmButtonText: 'Yes, Delete Vehicle!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-custom-popup',
+        title: 'swal-custom-title',
+        confirmButton: 'swal-custom-confirm',
+        cancelButton: 'swal-custom-cancel'
+      },
+      buttonsStyling: true,
+      focusConfirm: false,
+      focusCancel: true
+    });
+
+    if (result.isConfirmed) {
       try {
-        await axios.delete(`${api_url}/api/vehicles/${id}`);
-        showSnackbar('Vehicle deleted successfully');
+        await axios.delete(`${api_url}/api/vehicles/${vehicle.id}`);
+        
+        // Success animation
+        await MySwal.fire({
+          title: 'Deleted!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Vehicle <strong>"${vehicle.plate_number}"</strong> has been successfully deleted.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
+        
         fetchVehicles();
       } catch (error) {
         console.error('Error deleting vehicle:', error);
-        showSnackbar('Error deleting vehicle', 'error');
+        const message = error.response?.data?.error || 'Failed to delete vehicle';
+        
+        // Error animation
+        await MySwal.fire({
+          title: 'Error!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+                ❌
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                ${message}
+              </p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonColor: '#f44336',
+          confirmButtonText: 'OK'
+        });
       }
     }
   };
@@ -188,7 +344,49 @@ const VehicleManagement = () => {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+    <>
+      <style>
+        {`
+          /* Custom SweetAlert Styles */
+          .swal-custom-popup {
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+            border: none !important;
+          }
+          .swal-custom-title {
+            font-size: 28px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+            margin-bottom: 20px !important;
+          }
+          .swal-custom-confirm {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-confirm:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4) !important;
+          }
+          .swal-custom-cancel {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-cancel:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
+          }
+        `}
+      </style>
+      
+      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       {/* Header Section */}
       <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)' }}>
         <CardContent>
@@ -309,9 +507,7 @@ const VehicleManagement = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredVehicles
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((vehicle) => (
+            {filteredVehicles.map((vehicle) => (
                 <TableRow key={vehicle.id} hover>
                   <TableCell>
                     <Box display="flex" alignItems="center" gap={1}>
@@ -352,7 +548,7 @@ const VehicleManagement = () => {
                       <EditIcon />
                     </IconButton>
                     <IconButton 
-                      onClick={() => handleDelete(vehicle.id)}
+                      onClick={() => handleDelete(vehicle)}
                       color="error"
                       size="small"
                     >
@@ -364,9 +560,9 @@ const VehicleManagement = () => {
           </TableBody>
         </Table>
         <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[10, 25, 50, 100]}
           component="div"
-          count={filteredVehicles.length}
+          count={totalCount}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={(event, newPage) => setPage(newPage)}
@@ -469,6 +665,7 @@ const VehicleManagement = () => {
         </Alert>
       </Snackbar>
     </Container>
+    </>
   );
 };
 

@@ -225,6 +225,30 @@ const AccountTypesManagement = () => {
       ],
       color: "#673ab7",
       icon: <GroupIcon />
+    },
+    {
+      jobTitle: "Coordinator",
+      accountType: "Coordinator",
+      description: "Coordination role with reports access only",
+      permissions: [
+        "Reports access",
+        "HP Comprehensive reports",
+        "Dashboard viewing"
+      ],
+      color: "#00bcd4",
+      icon: <PersonIcon />
+    },
+    {
+      jobTitle: "Manager",
+      accountType: "Manager",
+      description: "Management role with reports access only",
+      permissions: [
+        "Reports access",
+        "HP Comprehensive reports",
+        "Dashboard viewing"
+      ],
+      color: "#ff5722",
+      icon: <AdminIcon />
     }
   ];
 
@@ -342,7 +366,7 @@ const AccountTypesManagement = () => {
                 </Avatar>
                 <Box>
                   <Typography variant="h4" fontWeight="bold">
-                    {accountTypes.filter(a => ['Dispatcher', 'Documentation', 'Quality'].includes(a.accountType)).length}
+                    {accountTypes.filter(a => ['Dispatcher', 'Documentation', 'Quality', 'Coordinator', 'Manager'].includes(a.accountType)).length}
                   </Typography>
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Specialized Roles

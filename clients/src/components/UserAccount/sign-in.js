@@ -343,24 +343,39 @@ export default function SignIn() {
       console.log("========================");
       
       setTimeout(() => {
+        // Handle Admin account type FIRST (highest priority)
+        if(response.data.AccountType === "Admin"){
+          if(response.data.JobTitle === "WIM Operator"){
+            console.log("→ Routing to Picklists - Admin WIM Operator");
+            navigate(`/all-picklists`);
+          } else {
+            console.log("→ Routing to HP Dashboard - Admin");
+            navigate('/hp-dashboard');
+          }
+        }
         // Check for specific HP-related job titles (with - HP suffix)
-        if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
+        else if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
           console.log("✓ Routing to HP Dashboard - HP job title");
           navigate('/hp-dashboard');
+        }
+        // Coordinator and Manager users go to HP Reports
+        else if(response.data.JobTitle === "Coordinator" || response.data.JobTitle === "Manager"){
+          console.log("→ Routing to HP Reports - Coordinator/Manager");
+          navigate('/reports/hp-comprehensive');
         }
         // Customer Service Dispatcher (without HP suffix) goes to Customer Dashboard
         else if(response.data.JobTitle === "Dispatcher"){
           console.log("→ Routing to Customer Dashboard - Customer Service Dispatcher");
           navigate('/customer-dashboard');
         }
-        // Handle Self Assessment and Admin account types
-        else if(response.data.AccountType === "Self Assesment" || response.data.AccountType === "Admin"){
+        // Handle Self Assessment account type
+        else if(response.data.AccountType === "Self Assesment"){
           if(response.data.JobTitle === "WIM Operator"){
             console.log("→ Routing to Picklists - WIM Operator");
             navigate(`/all-picklists`);
           } else {
-            console.log("→ Routing to HP Dashboard - Admin");
-            navigate('/hp-dashboard');
+            console.log("→ Routing to Customer Dashboard - Self Assessment");
+            navigate('/customer-dashboard');
           }
         } 
         // Handle Credit Manager

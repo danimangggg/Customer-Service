@@ -59,6 +59,10 @@ import {
   Work as JobIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
@@ -69,8 +73,6 @@ const UserManagement = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [openPasswordDialog, setOpenPasswordDialog] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState(null);
   const [userForPassword, setUserForPassword] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [stats, setStats] = useState({});
@@ -103,7 +105,7 @@ const UserManagement = () => {
 
   const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
-  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher'];
+  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator'];
 
   useEffect(() => {
     fetchStores();
@@ -161,6 +163,36 @@ const UserManagement = () => {
 
   const handleSubmit = async () => {
     try {
+      // Validation for EWM officers - store is mandatory
+      if ((formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') && !formData.store) {
+        await MySwal.fire({
+          title: 'Store Required!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #ff9800; margin-bottom: 20px;">
+                🏪
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Store selection is mandatory for EWM Officers.
+              </p>
+              <p style="font-size: 14px; color: #666;">
+                Please select a store before saving the user.
+              </p>
+            </div>
+          `,
+          icon: 'warning',
+          confirmButtonColor: '#ff9800',
+          confirmButtonText: 'OK',
+          customClass: {
+            popup: 'swal-custom-popup',
+            title: 'swal-custom-title',
+            confirmButton: 'swal-custom-confirm'
+          },
+          buttonsStyling: true
+        });
+        return;
+      }
+      
       if (editingUser) {
         await axios.put(`${API_URL}/api/users-management/${editingUser.id}`, formData);
         showSnackbar('User updated successfully', 'success');
@@ -177,17 +209,94 @@ const UserManagement = () => {
     }
   };
 
-  const handleDelete = async () => {
-    try {
-      await axios.delete(`${API_URL}/api/users-management/${userToDelete.id}`);
-      showSnackbar('User deleted successfully', 'success');
-      setDeleteConfirmOpen(false);
-      setUserToDelete(null);
-      fetchUsers();
-      fetchStats();
-    } catch (error) {
-      const message = error.response?.data?.error || 'Failed to delete user';
-      showSnackbar(message, 'error');
+  const handleDelete = async (user) => {
+    const result = await MySwal.fire({
+      title: 'Delete User?',
+      html: `
+        <div style="text-align: center; padding: 20px;">
+          <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+            👤
+          </div>
+          <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+            Are you sure you want to delete this user?
+          </p>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <p style="font-size: 20px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">
+              ${user.full_name}
+            </p>
+            <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+              ${user.jobTitle} • ${user.account_type}
+            </p>
+          </div>
+          <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+            This action cannot be undone and will remove all user data.
+          </p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#f44336',
+      cancelButtonColor: '#2196f3',
+      confirmButtonText: 'Yes, Delete User!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-custom-popup',
+        title: 'swal-custom-title',
+        confirmButton: 'swal-custom-confirm',
+        cancelButton: 'swal-custom-cancel'
+      },
+      buttonsStyling: true,
+      focusConfirm: false,
+      focusCancel: true
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await axios.delete(`${API_URL}/api/users-management/${user.id}`);
+        
+        // Success animation
+        await MySwal.fire({
+          title: 'Deleted!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                User <strong>"${user.full_name}"</strong> has been successfully deleted.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
+        
+        fetchUsers();
+        fetchStats();
+      } catch (error) {
+        const message = error.response?.data?.error || 'Failed to delete user';
+        
+        // Error animation
+        await MySwal.fire({
+          title: 'Error!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+                ❌
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                ${message}
+              </p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonColor: '#f44336',
+          confirmButtonText: 'OK'
+        });
+      }
     }
   };
 
@@ -265,8 +374,7 @@ const UserManagement = () => {
   };
 
   const handleDeleteClick = (user) => {
-    setUserToDelete(user);
-    setDeleteConfirmOpen(true);
+    handleDelete(user);
   };
 
   const handlePasswordResetClick = (user) => {
@@ -363,6 +471,50 @@ const UserManagement = () => {
           .stats-card:hover {
             transform: translateY(-4px) scale(1.02);
             box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+          }
+          
+          /* Custom SweetAlert Styles */
+          .swal-custom-popup {
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+            border: none !important;
+            z-index: 9999 !important;
+          }
+          .swal2-container {
+            z-index: 9999 !important;
+          }
+          .swal2-backdrop-show {
+            z-index: 9998 !important;
+          }
+          .swal-custom-title {
+            font-size: 28px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+            margin-bottom: 20px !important;
+          }
+          .swal-custom-confirm {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-confirm:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4) !important;
+          }
+          .swal-custom-cancel {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-cancel:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
           }
         `}
       </style>
@@ -756,14 +908,27 @@ const UserManagement = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Store</InputLabel>
+                <FormControl 
+                  fullWidth 
+                  required={formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP'}
+                >
+                  <InputLabel>
+                    Store {(formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') && '*'}
+                  </InputLabel>
                   <Select
                     value={formData.store}
-                    label="Store"
+                    label={`Store ${(formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') ? '*' : ''}`}
                     onChange={(e) => setFormData({ ...formData, store: e.target.value })}
+                    sx={{
+                      backgroundColor: (formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') ? '#fff3e0' : 'inherit'
+                    }}
                   >
-                    <MenuItem value="">Select Store</MenuItem>
+                    <MenuItem value="">
+                      {(formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') 
+                        ? 'Select Store (Required for EWM Officers)' 
+                        : 'Select Store'
+                      }
+                    </MenuItem>
                     {stores.map((store) => (
                       <MenuItem key={store.id} value={store.store_name}>
                         {store.store_name}
@@ -823,23 +988,6 @@ const UserManagement = () => {
             <Button onClick={() => setOpenPasswordDialog(false)}>Cancel</Button>
             <Button onClick={handlePasswordReset} variant="contained" color="warning">
               Reset Password
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-          <DialogTitle>Confirm Delete</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to delete the user "{userToDelete?.full_name}"? 
-              This action cannot be undone.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-            <Button onClick={handleDelete} color="error" variant="contained">
-              Delete
             </Button>
           </DialogActions>
         </Dialog>

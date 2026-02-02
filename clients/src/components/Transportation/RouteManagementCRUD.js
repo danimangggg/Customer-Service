@@ -36,6 +36,10 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import dayjs from 'dayjs';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
+
+const MySwal = withReactContent(Swal);
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -44,7 +48,6 @@ const RouteManagementCRUD = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRoute, setEditingRoute] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [stats, setStats] = useState({});
   
   // Pagination and filtering
   const [page, setPage] = useState(0);
@@ -65,10 +68,6 @@ const RouteManagementCRUD = () => {
     return () => clearTimeout(timeoutId);
   }, [page, rowsPerPage, searchTerm]);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   const fetchRoutes = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/routes-crud`, {
@@ -86,15 +85,6 @@ const RouteManagementCRUD = () => {
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/routes-crud/stats`);
-      setStats(response.data);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
-
   const handleSubmit = async () => {
     try {
       if (editingRoute) {
@@ -106,7 +96,6 @@ const RouteManagementCRUD = () => {
       }
       handleCloseDialog();
       fetchRoutes();
-      fetchStats();
     } catch (error) {
       const message = error.response?.data?.error || 'Operation failed';
       showSnackbar(message, 'error');
@@ -122,15 +111,86 @@ const RouteManagementCRUD = () => {
   };
 
   const handleDelete = async (route) => {
-    if (window.confirm(`Are you sure you want to delete "${route.route_name}"?`)) {
+    const result = await MySwal.fire({
+      title: 'Delete Route?',
+      html: `
+        <div style="text-align: center; padding: 20px;">
+          <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+            🗑️
+          </div>
+          <p style="font-size: 18px; color: #333; margin-bottom: 10px;">
+            Are you sure you want to delete
+          </p>
+          <p style="font-size: 20px; font-weight: bold; color: #1976d2; margin-bottom: 15px;">
+            "${route.route_name}"?
+          </p>
+          <p style="font-size: 14px; color: #666; margin-bottom: 0;">
+            This action cannot be undone and will remove all associated data.
+          </p>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#f44336',
+      cancelButtonColor: '#2196f3',
+      confirmButtonText: 'Yes, Delete It!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-custom-popup',
+        title: 'swal-custom-title',
+        confirmButton: 'swal-custom-confirm',
+        cancelButton: 'swal-custom-cancel'
+      },
+      buttonsStyling: true,
+      focusConfirm: false,
+      focusCancel: true
+    });
+
+    if (result.isConfirmed) {
       try {
         await axios.delete(`${API_URL}/api/routes-crud/${route.id}`);
-        showSnackbar('Route deleted successfully', 'success');
+        
+        // Success animation
+        await MySwal.fire({
+          title: 'Deleted!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ✅
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                Route <strong>"${route.route_name}"</strong> has been successfully deleted.
+              </p>
+            </div>
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
+        
         fetchRoutes();
-        fetchStats();
       } catch (error) {
         const message = error.response?.data?.error || 'Failed to delete route';
-        showSnackbar(message, 'error');
+        
+        // Error animation
+        await MySwal.fire({
+          title: 'Error!',
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #f44336; margin-bottom: 20px;">
+                ❌
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                ${message}
+              </p>
+            </div>
+          `,
+          icon: 'error',
+          confirmButtonColor: '#f44336',
+          confirmButtonText: 'OK'
+        });
       }
     }
   };
@@ -210,6 +270,43 @@ const RouteManagementCRUD = () => {
             transform: translateY(-4px) scale(1.02);
             box-shadow: 0 12px 40px rgba(0,0,0,0.15);
           }
+          
+          /* Custom SweetAlert Styles */
+          .swal-custom-popup {
+            border-radius: 20px !important;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+            border: none !important;
+          }
+          .swal-custom-title {
+            font-size: 28px !important;
+            font-weight: bold !important;
+            color: #333 !important;
+            margin-bottom: 20px !important;
+          }
+          .swal-custom-confirm {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-confirm:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4) !important;
+          }
+          .swal-custom-cancel {
+            border-radius: 25px !important;
+            padding: 12px 30px !important;
+            font-weight: bold !important;
+            font-size: 16px !important;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+            transition: all 0.3s ease !important;
+          }
+          .swal-custom-cancel:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
+          }
         `}
       </style>
       
@@ -272,68 +369,8 @@ const RouteManagementCRUD = () => {
             </Box>
           </Box>
 
-          {/* Stats Cards */}
-          <Box sx={{ p: 4, pb: 2 }}>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6} md={4}>
-                <Card className="stats-card" sx={{ 
-                  background: 'linear-gradient(135deg, #2196f3 0%, #42a5f5 100%)',
-                  color: 'white'
-                }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <RouteIcon sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {stats.totalRoutes || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Total Routes
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} sm={6} md={4}>
-                <Card className="stats-card" sx={{ 
-                  background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
-                  color: 'white'
-                }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <AssignmentIcon sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {stats.routesWithAssignments?.length || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Active Routes
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} sm={6} md={4}>
-                <Card className="stats-card" sx={{ 
-                  background: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
-                  color: 'white'
-                }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <AddIcon sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {stats.recentRoutes?.length || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Recent Routes
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-            </Grid>
-
-            {/* Search */}
+          {/* Search */}
+          <Box sx={{ p: 4 }}>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} md={6}>
                 <TextField
@@ -356,55 +393,158 @@ const RouteManagementCRUD = () => {
             <TableContainer component={Paper} sx={{ borderRadius: 2, overflow: 'hidden' }}>
               <Table>
                 <TableHead sx={{ 
-                  bgcolor: '#2196f3',
+                  bgcolor: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
                   '& .MuiTableCell-head': {
-                    backgroundColor: '#2196f3',
+                    background: 'linear-gradient(135deg, #2196f3 0%, #1976d2 100%)',
                     color: '#ffffff',
                     fontWeight: 'bold',
                     fontSize: '1.1rem',
-                    borderBottom: '2px solid #ffffff'
+                    borderBottom: 'none',
+                    py: 3,
+                    textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                   }
                 }}>
                   <TableRow>
-                    <TableCell>Route Name</TableCell>
-                    <TableCell>Created Date</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell align="center">Actions</TableCell>
+                    <TableCell sx={{ width: '30%' }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <RouteIcon />
+                        <span>Route Information</span>
+                      </Stack>
+                    </TableCell>
+                    <TableCell sx={{ width: '50%' }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <AssignmentIcon />
+                        <span>Assigned Facilities</span>
+                      </Stack>
+                    </TableCell>
+                    <TableCell align="center" sx={{ width: '20%' }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {routes.map((route) => (
-                    <TableRow key={route.id} hover>
-                      <TableCell>
+                    <TableRow key={route.id} hover sx={{ '&:hover': { bgcolor: 'rgba(25, 118, 210, 0.04)' } }}>
+                      <TableCell sx={{ py: 3 }}>
                         <Stack direction="row" alignItems="center" spacing={2}>
-                          <RouteIcon color="primary" />
-                          <Typography fontWeight="bold">{route.route_name}</Typography>
+                          <Avatar sx={{ 
+                            bgcolor: 'primary.main', 
+                            width: 40, 
+                            height: 40,
+                            boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)'
+                          }}>
+                            <RouteIcon />
+                          </Avatar>
+                          <Box>
+                            <Typography variant="h6" fontWeight="bold" color="primary.main">
+                              {route.route_name}
+                            </Typography>
+                          </Box>
                         </Stack>
                       </TableCell>
-                      <TableCell>
-                        {dayjs(route.created_at).format('MMM DD, YYYY')}
+                      <TableCell sx={{ py: 3, maxWidth: 400 }}>
+                        {route.facilities && route.facilities.length > 0 ? (
+                          <Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                              {route.facilities.length} {route.facilities.length === 1 ? 'facility' : 'facilities'} assigned
+                            </Typography>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              flexWrap: 'wrap', 
+                              gap: 1,
+                              maxHeight: 120,
+                              overflowY: 'auto',
+                              '&::-webkit-scrollbar': {
+                                width: '4px',
+                              },
+                              '&::-webkit-scrollbar-track': {
+                                background: '#f1f1f1',
+                                borderRadius: '4px',
+                              },
+                              '&::-webkit-scrollbar-thumb': {
+                                background: '#c1c1c1',
+                                borderRadius: '4px',
+                              },
+                            }}>
+                              {route.facilities.map((facility, index) => (
+                                <Chip
+                                  key={index}
+                                  label={facility.facility_name}
+                                  size="small"
+                                  variant="outlined"
+                                  color="primary"
+                                  sx={{
+                                    borderRadius: 2,
+                                    fontWeight: 500,
+                                    '&:hover': {
+                                      bgcolor: 'primary.light',
+                                      color: 'white',
+                                      transform: 'translateY(-1px)',
+                                      boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
+                                    },
+                                    transition: 'all 0.2s ease'
+                                  }}
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        ) : (
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            py: 2,
+                            px: 3,
+                            bgcolor: 'grey.50',
+                            borderRadius: 2,
+                            border: '2px dashed',
+                            borderColor: 'grey.300'
+                          }}>
+                            <Stack alignItems="center" spacing={1}>
+                              <AssignmentIcon color="disabled" fontSize="large" />
+                              <Typography variant="body2" color="text.secondary" fontWeight="500">
+                                No facilities assigned
+                              </Typography>
+                              <Typography variant="caption" color="text.disabled">
+                                Assign facilities to this route
+                              </Typography>
+                            </Stack>
+                          </Box>
+                        )}
                       </TableCell>
-                      <TableCell>
-                        <Chip
-                          label="Active"
-                          color="success"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton
-                          color="primary"
-                          onClick={() => handleEdit(route)}
-                          sx={{ mr: 1 }}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          color="error"
-                          onClick={() => handleDelete(route)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                      <TableCell align="center" sx={{ py: 3 }}>
+                        <Stack direction="row" spacing={1} justifyContent="center">
+                          <IconButton
+                            color="primary"
+                            onClick={() => handleEdit(route)}
+                            sx={{ 
+                              bgcolor: 'primary.light',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'primary.main',
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.4)'
+                              },
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton
+                            color="error"
+                            onClick={() => handleDelete(route)}
+                            sx={{ 
+                              bgcolor: 'error.light',
+                              color: 'white',
+                              '&:hover': {
+                                bgcolor: 'error.main',
+                                transform: 'translateY(-2px)',
+                                boxShadow: '0 4px 12px rgba(244, 67, 54, 0.4)'
+                              },
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Stack>
                       </TableCell>
                     </TableRow>
                   ))}
