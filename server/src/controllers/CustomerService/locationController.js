@@ -2,6 +2,7 @@ const db = require('../../models');
 const Region = db.region;
 const Zone = db.zone;
 const Woreda = db.woreda;
+const Facility = db.facility;
 
 // Get all regions
 const getRegions = async (req, res) => {
@@ -16,10 +17,18 @@ const getRegions = async (req, res) => {
   }
 };
 
-// Get all zones
+// Get all zones (optionally filtered by region)
 const getZones = async (req, res) => {
   try {
+    const { region } = req.query;
+    let whereClause = {};
+    
+    if (region) {
+      whereClause.region_name = region;
+    }
+    
     const zones = await Zone.findAll({
+      where: whereClause,
       order: [['zone_name', 'ASC']]
     });
     res.json(zones);
@@ -29,10 +38,18 @@ const getZones = async (req, res) => {
   }
 };
 
-// Get all woredas
+// Get all woredas (optionally filtered by zone)
 const getWoredas = async (req, res) => {
   try {
+    const { zone } = req.query;
+    let whereClause = {};
+    
+    if (zone) {
+      whereClause.zone_name = zone;
+    }
+    
     const woredas = await Woreda.findAll({
+      where: whereClause,
       order: [['woreda_name', 'ASC']]
     });
     res.json(woredas);
@@ -75,10 +92,32 @@ const createWoreda = async (req, res) => {
   }
 };
 
+// Get facilities (optionally filtered by woreda)
+const getFacilities = async (req, res) => {
+  try {
+    const { woreda } = req.query;
+    let whereClause = {};
+    
+    if (woreda) {
+      whereClause.woreda_name = woreda;
+    }
+    
+    const facilities = await Facility.findAll({
+      where: whereClause,
+      order: [['facility_name', 'ASC']]
+    });
+    res.json(facilities);
+  } catch (error) {
+    console.error('Error fetching facilities:', error);
+    res.status(500).json({ message: 'Failed to fetch facilities', error: error.message });
+  }
+};
+
 module.exports = {
   getRegions,
   getZones,
   getWoredas,
+  getFacilities,
   createRegion,
   createZone,
   createWoreda

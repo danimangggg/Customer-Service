@@ -19,6 +19,7 @@ const OutstandingCustomers = () => {
     const [customers, setCustomers] = useState([]);
     const [facilities, setFacilities] = useState([]);
     const [employees, setEmployees] = useState([]);
+    const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const jobTitle = localStorage.getItem("JobTitle");
@@ -125,15 +126,17 @@ const OutstandingCustomers = () => {
 
     const fetchStaticData = async () => {
         try {
-            const [facilityRes, employeeRes] = await Promise.all([
+            const [facilityRes, employeeRes, storeRes] = await Promise.all([
                 axios.get(`${api_url}/api/facilities`),
                 axios.get(`${api_url}/api/get-employee`),
+                axios.get(`${api_url}/api/stores`),
             ]);
             setFacilities(facilityRes.data);
             setEmployees(employeeRes.data);
+            setStores(storeRes.data);
         } catch (error) {
             console.error("Error fetching static data:", error.response ? error.response.data : error.message);
-            Swal.fire('Error', 'Failed to fetch facility or employee data.', 'error');
+            Swal.fire('Error', 'Failed to fetch facility, employee, or store data.', 'error');
         }
     };
 
@@ -472,13 +475,26 @@ const OutstandingCustomers = () => {
             let nextServicePoint = selectedRole;
 
             if (selectedRole === 'EWM') {
+                // Filter stores to only show the ones that match the existing database structure
+                const availableStores = stores.filter(store => 
+                    ['AA1', 'AA2', 'AA3'].includes(store.store_name)
+                );
+
+                if (availableStores.length === 0) {
+                    Swal.fire('Error', 'No compatible stores found in database. Please ensure AA1, AA2, or AA3 stores exist.', 'error');
+                    return;
+                }
+
+                // Generate store checkboxes dynamically from available stores
+                const storeCheckboxes = availableStores.map(store => 
+                    `<label><input type="checkbox" id="store${store.store_name}" value="${store.store_name}"> ${store.store_name} - ${store.description || 'No description'}</label>`
+                ).join('<br/>');
+
                 const { value: selectedStores, isConfirmed: storeConfirmed } = await Swal.fire({
                     title: 'Select Store(s)',
                     html: `
                         <div style="text-align:left;line-height:1.9">
-                          <label><input type="checkbox" id="storeAA1" value="AA1"> AA1</label><br/>
-                          <label><input type="checkbox" id="storeAA2" value="AA2"> AA2</label><br/>
-                          <label><input type="checkbox" id="storeAA3" value="AA3"> AA3</label>
+                          ${storeCheckboxes}
                         </div>
                     `,
                     focusConfirm: false,
@@ -486,12 +502,12 @@ const OutstandingCustomers = () => {
                     confirmButtonText: 'Next',
                     preConfirm: () => {
                         const picks = [];
-                        const a1 = document.getElementById('storeAA1');
-                        const a2 = document.getElementById('storeAA2');
-                        const a3 = document.getElementById('storeAA3');
-                        if (a1 && a1.checked) picks.push('AA1');
-                        if (a2 && a2.checked) picks.push('AA2');
-                        if (a3 && a3.checked) picks.push('AA3');
+                        availableStores.forEach(store => {
+                            const checkbox = document.getElementById(`store${store.store_name}`);
+                            if (checkbox && checkbox.checked) {
+                                picks.push(store.store_name);
+                            }
+                        });
                         return picks;
                     }
                 });

@@ -42,6 +42,12 @@ const RegisterCustomer = () => {
   const [facilities, setFacilities] = useState([]);
   const [officers, setOfficers] = useState([]);
   
+  // Loading states
+  const [loadingRegions, setLoadingRegions] = useState(true);
+  const [loadingZones, setLoadingZones] = useState(false);
+  const [loadingWoredas, setLoadingWoredas] = useState(false);
+  const [loadingFacilities, setLoadingFacilities] = useState(false);
+  
   // New state to store customer counts for each officer
   const [assignedCustomerCounts, setAssignedCustomerCounts] = useState({});
 
@@ -68,42 +74,101 @@ const RegisterCustomer = () => {
 
   /* ---------------- Fetching Data ---------------- */
   useEffect(() => {
-    axios.get(`${api_url}/api/regions`).then(res => setRegions(res.data));
+    setLoadingRegions(true);
+    axios.get(`${api_url}/api/regions`).then(res => {
+      console.log('Fetched regions:', res.data);
+      setRegions(res.data);
+      setLoadingRegions(false);
+    }).catch(err => {
+      console.error('Error fetching regions:', err);
+      setSnackbarMessage('Failed to load regions.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      setLoadingRegions(false);
+    });
   }, []);
 
   useEffect(() => {
     if (selectedRegion) {
-      axios.get(`${api_url}/api/zones`).then(res => {
-        const filtered = res.data.filter(z => z.region_name === selectedRegion);
-        setZones(filtered);
-        setSelectedZone('');
-        setSelectedWoreda('');
-        setSelectedFacility('');
-        setWoredas([]);
-        setFacilities([]);
+      setLoadingZones(true);
+      setZones([]);
+      setWoredas([]);
+      setFacilities([]);
+      setSelectedZone('');
+      setSelectedWoreda('');
+      setSelectedFacility('');
+      
+      // Use query parameter to filter zones by region
+      axios.get(`${api_url}/api/zones?region=${encodeURIComponent(selectedRegion)}`).then(res => {
+        console.log('Filtered zones for region', selectedRegion, ':', res.data);
+        setZones(res.data);
+        setLoadingZones(false);
+      }).catch(err => {
+        console.error('Error fetching zones:', err);
+        setSnackbarMessage('Failed to load zones.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        setLoadingZones(false);
       });
+    } else {
+      setZones([]);
+      setWoredas([]);
+      setFacilities([]);
+      setSelectedZone('');
+      setSelectedWoreda('');
+      setSelectedFacility('');
     }
   }, [selectedRegion]);
 
   useEffect(() => {
     if (selectedZone) {
-      axios.get(`${api_url}/api/woredas`).then(res => {
-        const filtered = res.data.filter(w => w.zone_name === selectedZone);
-        setWoredas(filtered);
-        setSelectedWoreda('');
-        setSelectedFacility('');
-        setFacilities([]);
+      setLoadingWoredas(true);
+      setWoredas([]);
+      setFacilities([]);
+      setSelectedWoreda('');
+      setSelectedFacility('');
+      
+      // Use query parameter to filter woredas by zone
+      axios.get(`${api_url}/api/woredas?zone=${encodeURIComponent(selectedZone)}`).then(res => {
+        console.log('Filtered woredas for zone', selectedZone, ':', res.data);
+        setWoredas(res.data);
+        setLoadingWoredas(false);
+      }).catch(err => {
+        console.error('Error fetching woredas:', err);
+        setSnackbarMessage('Failed to load woredas.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        setLoadingWoredas(false);
       });
+    } else {
+      setWoredas([]);
+      setFacilities([]);
+      setSelectedWoreda('');
+      setSelectedFacility('');
     }
   }, [selectedZone]);
 
   useEffect(() => {
     if (selectedWoreda) {
-      axios.get(`${api_url}/api/facilities`).then(res => {
-        const filtered = res.data.filter(f => f.woreda_name === selectedWoreda);
-        setFacilities(filtered);
-        setSelectedFacility('');
+      setLoadingFacilities(true);
+      setFacilities([]);
+      setSelectedFacility('');
+      
+      // Use the filtered facilities endpoint
+      axios.get(`${api_url}/api/filtered-facilities?woreda=${encodeURIComponent(selectedWoreda)}`).then(res => {
+        console.log('Filtered facilities for woreda', selectedWoreda, ':', res.data);
+        setFacilities(res.data);
+        setLoadingFacilities(false);
+      }).catch(err => {
+        console.error('Error fetching facilities:', err);
+        setSnackbarMessage('Failed to load facilities.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+        setLoadingFacilities(false);
       });
+    } else {
+      setFacilities([]);
+      setSelectedFacility('');
     }
   }, [selectedWoreda]);
 
@@ -359,6 +424,7 @@ const RegisterCustomer = () => {
                           value={selectedRegion}
                           onChange={e => setSelectedRegion(e.target.value)}
                           className="form-field"
+                          disabled={loadingRegions}
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 2,
@@ -369,11 +435,17 @@ const RegisterCustomer = () => {
                             }
                           }}
                         >
-                          {regions.map(r => (
-                            <MenuItem key={r.id} value={r.region_name}>
-                              {r.region_name}
-                            </MenuItem>
-                          ))}
+                          {loadingRegions ? (
+                            <MenuItem disabled>Loading regions...</MenuItem>
+                          ) : regions.length === 0 ? (
+                            <MenuItem disabled>No regions available</MenuItem>
+                          ) : (
+                            regions.map(r => (
+                              <MenuItem key={r.id} value={r.region_name}>
+                                {r.region_name}
+                              </MenuItem>
+                            ))
+                          )}
                         </TextField>
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -384,6 +456,7 @@ const RegisterCustomer = () => {
                           value={selectedZone}
                           onChange={e => setSelectedZone(e.target.value)}
                           className="form-field"
+                          disabled={!selectedRegion || loadingZones}
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 2,
@@ -394,11 +467,19 @@ const RegisterCustomer = () => {
                             }
                           }}
                         >
-                          {zones.map(z => (
-                            <MenuItem key={z.id} value={z.zone_name}>
-                              {z.zone_name}
-                            </MenuItem>
-                          ))}
+                          {loadingZones ? (
+                            <MenuItem disabled>Loading zones...</MenuItem>
+                          ) : !selectedRegion ? (
+                            <MenuItem disabled>Please select a region first</MenuItem>
+                          ) : zones.length === 0 ? (
+                            <MenuItem disabled>No zones available for selected region</MenuItem>
+                          ) : (
+                            zones.map(z => (
+                              <MenuItem key={z.id} value={z.zone_name}>
+                                {z.zone_name}
+                              </MenuItem>
+                            ))
+                          )}
                         </TextField>
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -409,6 +490,7 @@ const RegisterCustomer = () => {
                           value={selectedWoreda}
                           onChange={e => setSelectedWoreda(e.target.value)}
                           className="form-field"
+                          disabled={!selectedZone || loadingWoredas}
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 2,
@@ -419,11 +501,19 @@ const RegisterCustomer = () => {
                             }
                           }}
                         >
-                          {woredas.map(w => (
-                            <MenuItem key={w.id} value={w.woreda_name}>
-                              {w.woreda_name}
-                            </MenuItem>
-                          ))}
+                          {loadingWoredas ? (
+                            <MenuItem disabled>Loading woredas...</MenuItem>
+                          ) : !selectedZone ? (
+                            <MenuItem disabled>Please select a zone first</MenuItem>
+                          ) : woredas.length === 0 ? (
+                            <MenuItem disabled>No woredas available for selected zone</MenuItem>
+                          ) : (
+                            woredas.map(w => (
+                              <MenuItem key={w.id} value={w.woreda_name}>
+                                {w.woreda_name}
+                              </MenuItem>
+                            ))
+                          )}
                         </TextField>
                       </Grid>
                       <Grid item xs={12} md={6}>
@@ -434,6 +524,7 @@ const RegisterCustomer = () => {
                           value={selectedFacility}
                           onChange={e => setSelectedFacility(e.target.value)}
                           className="form-field"
+                          disabled={!selectedWoreda || loadingFacilities}
                           sx={{
                             '& .MuiOutlinedInput-root': {
                               borderRadius: 2,
@@ -444,11 +535,19 @@ const RegisterCustomer = () => {
                             }
                           }}
                         >
-                          {facilities.map(f => (
-                            <MenuItem key={f.id} value={f.id}>
-                              {f.facility_name}
-                            </MenuItem>
-                          ))}
+                          {loadingFacilities ? (
+                            <MenuItem disabled>Loading facilities...</MenuItem>
+                          ) : !selectedWoreda ? (
+                            <MenuItem disabled>Please select a woreda first</MenuItem>
+                          ) : facilities.length === 0 ? (
+                            <MenuItem disabled>No facilities available for selected woreda</MenuItem>
+                          ) : (
+                            facilities.map(f => (
+                              <MenuItem key={f.id} value={f.id}>
+                                {f.facility_name}
+                              </MenuItem>
+                            ))
+                          )}
                         </TextField>
                       </Grid>
                     </Grid>

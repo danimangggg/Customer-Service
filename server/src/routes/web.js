@@ -88,6 +88,7 @@ let routes =  (app) => {
   router.get('/api/regions', locationController.getRegions);
   router.get('/api/zones', locationController.getZones);
   router.get('/api/woredas', locationController.getWoredas);
+  router.get('/api/filtered-facilities', locationController.getFacilities);
   router.post('/api/regions', locationController.createRegion);
   router.post('/api/zones', locationController.createZone);
   router.post('/api/woredas', locationController.createWoreda);
