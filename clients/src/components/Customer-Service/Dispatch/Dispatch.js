@@ -161,8 +161,70 @@ const DispatcherAccount = () => {
                 next_service_point: nextPoint,
                 [storeCompletionField]: statusValue 
             };
+            
+            // Add dispatcher tracking if completing
+            if (isFinalStep) {
+                const dispatchEndTime = new Date().toISOString();
+                payload.dispatch_completed_at = dispatchEndTime;
+                if (!item.dispatcher_id) {
+                    payload.dispatcher_id = localStorage.getItem('EmployeeID');
+                    payload.dispatcher_name = localStorage.getItem('FullName');
+                }
+                if (!item.dispatch_started_at) {
+                    payload.dispatch_started_at = dispatchEndTime;
+                }
+            }
 
             await axios.put(`${API_URL}/api/update-service-point`, payload); 
+            
+            // Record dispatcher service time if completing
+            if (isFinalStep) {
+                try {
+                    const ewmEndTime = item.ewm_completed_at || item.started_at;
+                    const dispatchStartTime = item.dispatch_started_at || new Date().toISOString();
+                    const dispatchEndTime = new Date().toISOString();
+                    
+                    // Calculate waiting time
+                    let waitingMinutes = 0;
+                    if (ewmEndTime && dispatchStartTime) {
+                        const ewmEnd = new Date(ewmEndTime);
+                        const dispatchStart = new Date(dispatchStartTime);
+                        const diffMs = dispatchStart - ewmEnd;
+                        waitingMinutes = Math.floor(diffMs / 60000);
+                        if (waitingMinutes < 0) waitingMinutes = 0;
+                    }
+                    
+                    // Format datetime for MySQL
+                    const formatForMySQL = (dateValue) => {
+                        if (!dateValue) return null;
+                        const d = new Date(dateValue);
+                        return d.getFullYear() + '-' +
+                               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                               String(d.getDate()).padStart(2, '0') + ' ' +
+                               String(d.getHours()).padStart(2, '0') + ':' +
+                               String(d.getMinutes()).padStart(2, '0') + ':' +
+                               String(d.getSeconds()).padStart(2, '0');
+                    };
+                    
+                    const serviceTimeData = {
+                        process_id: item.id,
+                        service_unit: 'Dispatcher',
+                        start_time: formatForMySQL(dispatchStartTime),
+                        end_time: formatForMySQL(dispatchEndTime),
+                        waiting_minutes: waitingMinutes,
+                        officer_id: localStorage.getItem('EmployeeID'),
+                        officer_name: localStorage.getItem('FullName'),
+                        status: 'completed',
+                        notes: `Dispatch completed for store ${store}`
+                    };
+                    
+                    const serviceTimeResponse = await axios.post(`${API_URL}/api/service-time`, serviceTimeData);
+                    console.log('✅ Dispatcher service time recorded:', serviceTimeResponse.data);
+                } catch (err) {
+                    console.error('❌ Failed to record Dispatcher service time:', err);
+                    console.error('Error details:', err.response?.data);
+                }
+            }
             
             setSnackbar({ 
                 open: true, 

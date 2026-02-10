@@ -5,6 +5,10 @@ module.exports = {
   PASSWORD: process.env.DB_PASSWORD || 'areacode',
   DB: process.env.DB_NAME || 'customer-service',
   dialect: 'mysql',
+  timezone: '+03:00', // East Africa Time (GMT+3)
+  dialectOptions: {
+    timezone: '+03:00'
+  },
   pool: {
     max: 5,
     min: 0,

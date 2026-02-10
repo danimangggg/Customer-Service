@@ -25,7 +25,7 @@ const CreateUserForm = () => {
   });
 
   const accountTypes = ['Admin', 'Credit Manager', 'Pod Manager', 'Self Assesment'];
-  const job_title = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Camera man', 'Wearhouse manager', 'Oditor', 'ICT Officer', 'Database Adminstrator', 'Data Clerk', 'Branch Manager', 'Customer Service', 'Coordinator', 'Manager', 'TV Operator', 'Other'];
+  const job_title = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Camera man', 'Wearhouse manager', 'Oditor', 'ICT Officer', 'Database Adminstrator', 'Data Clerk', 'Branch Manager', 'Customer Service', 'Coordinator', 'Manager', 'TV Operator', 'Dispatch-Documentation', 'Gate Keeper', 'Other'];
 
   useEffect(() => {
     fetchStores();

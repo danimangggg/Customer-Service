@@ -12,6 +12,8 @@ import TableChartIcon from '@mui/icons-material/TableChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import DownloadIcon from '@mui/icons-material/Download';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import HistoryIcon from '@mui/icons-material/History';
 import axios from 'axios';
 
 // Import sub-pages
@@ -19,8 +21,10 @@ import ODNPODDetailReport from './HPReport/ODNPODDetailReport';
 import ReportOverview from './HPReport/ReportOverview';
 import ServiceUnitsDetail from './HPReport/FacilitiesDetail';
 import RouteAnalysis from './HPReport/RouteAnalysis';
+import ServiceTimeTracking from './HPReport/ServiceTimeTracking';
 import AllPicklists from '../Customer-Service/AllPicklists';
 import OrganizationProfileView from './OrganizationProfileView';
+import UserActivityLog from './UserActivityLog';
 
 const HPComprehensiveReport = () => {
   const navigate = useNavigate();
@@ -106,6 +110,8 @@ const HPComprehensiveReport = () => {
     { label: 'ODN/RRF', icon: <AssessmentIcon /> },
     { label: 'Service Units Detail', icon: <TableChartIcon /> },
     { label: 'Route Analysis', icon: <RouteIcon /> },
+    { label: 'Service Time Tracking', icon: <AccessTimeIcon /> },
+    { label: 'User Activity Log', icon: <HistoryIcon /> },
     { label: 'All Picklists', icon: <TrendingUpIcon /> },
     { label: 'Organization Profile', icon: <TimelineIcon /> }
   ];
@@ -216,8 +222,10 @@ const HPComprehensiveReport = () => {
             {activeTab === 1 && <ReportOverview data={reportData} />}
             {activeTab === 2 && <ServiceUnitsDetail data={reportData} />}
             {activeTab === 3 && <RouteAnalysis data={reportData} />}
-            {activeTab === 4 && <AllPicklists />}
-            {activeTab === 5 && <OrganizationProfileView />}
+            {activeTab === 4 && <ServiceTimeTracking />}
+            {activeTab === 5 && <UserActivityLog />}
+            {activeTab === 6 && <AllPicklists />}
+            {activeTab === 7 && <OrganizationProfileView />}
           </CardContent>
         </Card>
       )}

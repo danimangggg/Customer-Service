@@ -88,6 +88,104 @@ module.exports = (sequelize, DataTypes) => {
 availability_aa2: {
   type: DataTypes.STRING
 },
+// Exit Permit fields (added for Dispatch-Documentation)
+receipt_count: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+},
+vehicle_plate: {
+  type: DataTypes.STRING(50),
+  allowNull: true,
+},
+receipt_number: {
+  type: DataTypes.STRING(100),
+  allowNull: true,
+},
+total_amount: {
+  type: DataTypes.DECIMAL(10, 2),
+  allowNull: true,
+},
+measurement_unit: {
+  type: DataTypes.STRING(50),
+  allowNull: true,
+},
+// Gate Keeper fields
+gate_status: {
+  type: DataTypes.ENUM('allowed', 'denied'),
+  allowNull: true,
+},
+gate_processed_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+gate_processed_by: {
+  type: DataTypes.STRING(255),
+  allowNull: true,
+},
+// Registration tracking
+registered_by_id: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+},
+registered_by_name: {
+  type: DataTypes.STRING(255),
+  allowNull: true,
+},
+registration_completed_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+// O2C Officer tracking
+o2c_started_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+o2c_completed_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+o2c_officer_id: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+},
+o2c_officer_name: {
+  type: DataTypes.STRING(255),
+  allowNull: true,
+},
+// EWM Officer tracking
+ewm_started_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+ewm_completed_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+ewm_officer_id: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+},
+ewm_officer_name: {
+  type: DataTypes.STRING(255),
+  allowNull: true,
+},
+// WIM Operator tracking
+wim_started_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+wim_completed_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
+wim_operator_id: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+},
+wim_operator_name: {
+  type: DataTypes.STRING(255),
+  allowNull: true,
+},
   }, {
     tableName: 'customer_queue',
     timestamps: false,

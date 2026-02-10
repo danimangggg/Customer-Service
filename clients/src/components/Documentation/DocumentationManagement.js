@@ -19,6 +19,7 @@ import {
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
@@ -359,6 +360,52 @@ const DocumentationManagement = () => {
             updates: [update],
             confirmed_by: loggedInUserId
           });
+
+          // Record service time for Documentation Officer
+          try {
+            const docEndTime = formatTimestamp();
+            
+            // Get process_id from ODN
+            if (currentODN && currentODN.process_id) {
+              // Calculate waiting time: current time - Dispatcher end time
+              let waitingMinutes = 0;
+              try {
+                const dispatchResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+                  params: {
+                    process_id: currentODN.process_id,
+                    service_unit: 'Dispatcher - HP'
+                  }
+                });
+                
+                if (dispatchResponse.data.end_time) {
+                  const prevTime = new Date(dispatchResponse.data.end_time);
+                  const currTime = new Date(docEndTime);
+                  const diffMs = currTime - prevTime;
+                  waitingMinutes = Math.floor(diffMs / 60000);
+                  waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+                }
+              } catch (err) {
+                console.error('Failed to get Dispatcher end time:', err);
+              }
+              
+              await axios.post(`${api_url}/api/service-time-hp`, {
+                process_id: currentODN.process_id,
+                service_unit: 'Documentation Officer',
+                start_time: docEndTime,
+                end_time: docEndTime,
+                waiting_minutes: waitingMinutes,
+                officer_id: loggedInUserId,
+                officer_name: localStorage.getItem('FullName'),
+                status: 'completed',
+                notes: `POD confirmed - POD #: ${formValues.podNumber}`
+              });
+              
+              console.log(`✅ Documentation Officer service time recorded for process ${currentODN.process_id}: ${waitingMinutes} minutes`);
+            }
+          } catch (err) {
+            console.error('❌ Failed to record Documentation service time:', err);
+            // Don't fail the confirmation if service time recording fails
+          }
 
           // Remove from pending updates since it's saved
           setPendingUpdates(prev => {

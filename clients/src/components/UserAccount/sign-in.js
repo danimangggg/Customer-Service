@@ -414,8 +414,8 @@ export default function SignIn() {
             <Box sx={{ position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: 550, px: 3 }}>
               <Box sx={{ mb: 2 }}>
                 <img 
-                  src="/Epss-logo.png" 
-                  alt="EPSS Logo" 
+                  src="/pharmalog-logo.png" 
+                  alt="PharmaLog Logo" 
                   style={{ 
                     width: 180, 
                     height: 180, 
@@ -432,10 +432,10 @@ export default function SignIn() {
               </Box>
               
               <Typography variant="h2" sx={{ fontWeight: 900, mb: 1.5, textShadow: '0 4px 8px rgba(0,0,0,0.2)', letterSpacing: '-1px', fontSize: '3rem' }}>
-                EPSS
+                PharmaLog
               </Typography>
               <Typography variant="h6" sx={{ mb: 3, opacity: 0.95, fontWeight: 500 }}>
-                Ethiopian Pharmaceutical Supply Service
+                Pharmaceutical Operations Follow-Up System
               </Typography>
 
               <Box sx={{ mt: 3 }}>
@@ -560,7 +560,7 @@ export default function SignIn() {
                 </StyledButton>
 
                 <Typography variant="body2" sx={{ mt: 3, color: 'text.secondary', textAlign: 'center' }}>
-                  © 2025 EPSS. All rights reserved.
+                  © 2025 PharmaLog. All rights reserved.
                 </Typography>
               </Box>
             </Box>

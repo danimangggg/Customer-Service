@@ -225,7 +225,63 @@ const OutstandingCustomers = () => {
         }
 
         try {
+            const ewmEndTime = new Date().toISOString();
+            
+            // Add EWM tracking to completion data
+            if (!customer.ewm_started_at) {
+                completionData.ewm_started_at = ewmEndTime;
+                completionData.ewm_officer_id = localStorage.getItem('EmployeeID');
+                completionData.ewm_officer_name = localStorage.getItem('FullName');
+            }
+            completionData.ewm_completed_at = ewmEndTime;
+            
             await axios.put(`${api_url}/api/update-service-point`, completionData);
+
+            // Record EWM service time
+            try {
+                const o2cEndTime = customer.o2c_completed_at || customer.started_at;
+                const ewmStartTime = customer.ewm_started_at || ewmEndTime;
+                
+                // Calculate waiting time
+                let waitingMinutes = 0;
+                if (o2cEndTime && ewmStartTime) {
+                    const o2cEnd = new Date(o2cEndTime);
+                    const ewmStart = new Date(ewmStartTime);
+                    const diffMs = ewmStart - o2cEnd;
+                    waitingMinutes = Math.floor(diffMs / 60000);
+                    if (waitingMinutes < 0) waitingMinutes = 0;
+                }
+                
+                // Format datetime for MySQL
+                const formatForMySQL = (dateValue) => {
+                    if (!dateValue) return null;
+                    const d = new Date(dateValue);
+                    return d.getFullYear() + '-' +
+                           String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                           String(d.getDate()).padStart(2, '0') + ' ' +
+                           String(d.getHours()).padStart(2, '0') + ':' +
+                           String(d.getMinutes()).padStart(2, '0') + ':' +
+                           String(d.getSeconds()).padStart(2, '0');
+                };
+                
+                const serviceTimeData = {
+                    process_id: customer.id,
+                    service_unit: 'EWM Officer',
+                    start_time: formatForMySQL(ewmStartTime),
+                    end_time: formatForMySQL(ewmEndTime),
+                    waiting_minutes: waitingMinutes,
+                    officer_id: localStorage.getItem('EmployeeID'),
+                    officer_name: localStorage.getItem('FullName'),
+                    status: 'completed',
+                    notes: `Completed EWM process for store ${normalizedUserStore}`
+                };
+                
+                const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+                console.log('✅ EWM service time recorded:', serviceTimeResponse.data);
+            } catch (err) {
+                console.error('❌ Failed to record EWM service time:', err);
+                console.error('Error details:', err.response?.data);
+            }
 
             const serviceListRes = await axios.get(`${api_url}/api/serviceList`);
             const customerAfterUpdate = serviceListRes.data.find(c => c.id === customer.id);
@@ -305,6 +361,7 @@ const OutstandingCustomers = () => {
     const handleO2CStatusFlow = async (customer, action) => {
         let newStatus = customer.status;
         let startedAt = customer.started_at;
+        let additionalData = {};
 
         if (action === 'notify') {
             newStatus = 'notifying';
@@ -313,11 +370,17 @@ const OutstandingCustomers = () => {
             if (!customer.started_at || customer.status !== 'o2c_started') {
                 startedAt = new Date().toISOString();
             }
+            // Track when O2C officer starts working
+            if (!customer.o2c_started_at) {
+                additionalData.o2c_started_at = new Date().toISOString();
+                additionalData.o2c_officer_id = localStorage.getItem('EmployeeID');
+                additionalData.o2c_officer_name = localStorage.getItem('FullName');
+            }
         } else if (action === 'stop') {
             newStatus = 'started';
             startedAt = null;
         }
-        await updateServiceStatus(customer, newStatus, startedAt);
+        await updateServiceStatus(customer, newStatus, startedAt, undefined, undefined, undefined, additionalData);
     };
 
     const canCancel = (customer) => {
@@ -577,6 +640,15 @@ const OutstandingCustomers = () => {
             }
 
             try {
+                const o2cEndTime = new Date().toISOString();
+                
+                // Add O2C completion tracking to updateData
+                updateData.o2c_completed_at = o2cEndTime;
+                if (!customer.o2c_officer_id) {
+                    updateData.o2c_officer_id = localStorage.getItem('EmployeeID');
+                    updateData.o2c_officer_name = localStorage.getItem('FullName');
+                }
+                
                 await updateServiceStatus(
                     customer,
                     newStatus,
@@ -586,6 +658,55 @@ const OutstandingCustomers = () => {
                     undefined,
                     updateData
                 );
+                
+                // Record service time for O2C Officer
+                try {
+                    // Get the previous step end time (registration completion)
+                    const registrationEndTime = customer.registration_completed_at || customer.started_at;
+                    const o2cStartTime = customer.o2c_started_at || customer.started_at;
+                    
+                    // Calculate waiting time (time between registration end and O2C start)
+                    let waitingMinutes = 0;
+                    if (registrationEndTime && o2cStartTime) {
+                        const regEnd = new Date(registrationEndTime);
+                        const o2cStart = new Date(o2cStartTime);
+                        const diffMs = o2cStart - regEnd;
+                        waitingMinutes = Math.floor(diffMs / 60000);
+                        if (waitingMinutes < 0) waitingMinutes = 0;
+                    }
+                    
+                    // Format datetime for MySQL (YYYY-MM-DD HH:MM:SS)
+                    const formatForMySQL = (dateValue) => {
+                        if (!dateValue) return null;
+                        const d = new Date(dateValue);
+                        return d.getFullYear() + '-' +
+                               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                               String(d.getDate()).padStart(2, '0') + ' ' +
+                               String(d.getHours()).padStart(2, '0') + ':' +
+                               String(d.getMinutes()).padStart(2, '0') + ':' +
+                               String(d.getSeconds()).padStart(2, '0');
+                    };
+                    
+                    const serviceTimeData = {
+                        process_id: customer.id,
+                        service_unit: 'O2C Officer',
+                        start_time: formatForMySQL(o2cStartTime),
+                        end_time: formatForMySQL(o2cEndTime),
+                        waiting_minutes: waitingMinutes,
+                        officer_id: localStorage.getItem('EmployeeID'),
+                        officer_name: localStorage.getItem('FullName'),
+                        status: 'completed',
+                        notes: `Completed O2C process, forwarded to ${nextServicePoint}`
+                    };
+                    
+                    const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+                    console.log('✅ O2C service time recorded:', serviceTimeResponse.data);
+                } catch (err) {
+                    console.error('❌ Failed to record O2C service time:', err);
+                    console.error('Error details:', err.response?.data);
+                    // Don't fail the completion if service time recording fails
+                }
+                
                 Swal.fire('Success', 'Service point updated', 'success');
                 fetchData();
             } catch (error) {

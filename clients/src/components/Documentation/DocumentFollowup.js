@@ -20,6 +20,7 @@ import {
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
@@ -213,6 +214,55 @@ const DocumentFollowup = () => {
         updates: [update],
         completed_by: loggedInUserId
       });
+
+      // Record service time for Documentation Follower when both documents are completed
+      if (update.documents_signed && update.documents_handover) {
+        try {
+          const followupEndTime = formatTimestamp();
+          
+          // Get process_id from ODN
+          const currentData = odnData.find(odn => odn.odn_id === odnId);
+          if (currentData && currentData.process_id) {
+            // Calculate waiting time: current time - Documentation Officer end time
+            let waitingMinutes = 0;
+            try {
+              const docResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+                params: {
+                  process_id: currentData.process_id,
+                  service_unit: 'Documentation Officer'
+                }
+              });
+              
+              if (docResponse.data.end_time) {
+                const prevTime = new Date(docResponse.data.end_time);
+                const currTime = new Date(followupEndTime);
+                const diffMs = currTime - prevTime;
+                waitingMinutes = Math.floor(diffMs / 60000);
+                waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+              }
+            } catch (err) {
+              console.error('Failed to get Documentation Officer end time:', err);
+            }
+            
+            await axios.post(`${api_url}/api/service-time-hp`, {
+              process_id: currentData.process_id,
+              service_unit: 'Documentation Follower',
+              start_time: followupEndTime,
+              end_time: followupEndTime,
+              waiting_minutes: waitingMinutes,
+              officer_id: loggedInUserId,
+              officer_name: localStorage.getItem('FullName'),
+              status: 'completed',
+              notes: `Document follow-up completed - signed and handover done`
+            });
+            
+            console.log(`✅ Documentation Follower service time recorded for process ${currentData.process_id}: ${waitingMinutes} minutes`);
+          }
+        } catch (err) {
+          console.error('❌ Failed to record Documentation Follower service time:', err);
+          // Don't fail the update if service time recording fails
+        }
+      }
 
       // Remove from pending updates since it's saved
       setPendingUpdates(prev => {

@@ -390,9 +390,168 @@ const getAllODNPODDetails = async (req, res) => {
   }
 };
 
+// Get service time tracking data
+const getServiceTimeTracking = async (req, res) => {
+  try {
+    const { month, year, facility_id } = req.query;
+    
+    let whereClause = 'WHERE 1=1';
+    const replacements = [];
+
+    // Build where clause based on filters
+    if (facility_id) {
+      whereClause += ' AND cq.facility_id = ?';
+      replacements.push(facility_id);
+    }
+
+    const serviceTimeQuery = `
+      SELECT 
+        cq.id,
+        cq.facility_id,
+        f.facility_name,
+        f.route,
+        cq.customer_type,
+        cq.status,
+        cq.started_at as registration_time,
+        cq.registered_by_name,
+        cq.registration_completed_at,
+        
+        -- O2C Officer
+        cq.o2c_started_at,
+        cq.o2c_completed_at,
+        cq.o2c_officer_name,
+        TIMESTAMPDIFF(MINUTE, cq.o2c_started_at, cq.o2c_completed_at) as o2c_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, COALESCE(cq.registration_completed_at, cq.started_at), cq.o2c_started_at) as o2c_waiting_minutes,
+        
+        -- EWM Officer
+        cq.ewm_started_at,
+        cq.ewm_completed_at,
+        cq.ewm_officer_name,
+        TIMESTAMPDIFF(MINUTE, cq.ewm_started_at, cq.ewm_completed_at) as ewm_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.o2c_completed_at, cq.ewm_started_at) as ewm_waiting_minutes,
+        
+        -- PI Officer
+        cq.pi_started_at,
+        cq.pi_completed_at,
+        cq.pi_officer_name,
+        TIMESTAMPDIFF(MINUTE, cq.pi_started_at, cq.pi_completed_at) as pi_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.ewm_completed_at, cq.pi_started_at) as pi_waiting_minutes,
+        
+        -- Documentation Officer
+        cq.doc_started_at,
+        cq.doc_completed_at,
+        cq.doc_officer_name,
+        TIMESTAMPDIFF(MINUTE, cq.doc_started_at, cq.doc_completed_at) as doc_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.pi_completed_at, cq.doc_started_at) as doc_waiting_minutes,
+        
+        -- Documentation Follower
+        cq.doc_follow_started_at,
+        cq.doc_follow_completed_at,
+        cq.doc_follow_officer_name,
+        TIMESTAMPDIFF(MINUTE, cq.doc_follow_started_at, cq.doc_follow_completed_at) as doc_follow_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.doc_completed_at, cq.doc_follow_started_at) as doc_follow_waiting_minutes,
+        
+        -- Quality Evaluator
+        cq.quality_started_at,
+        cq.quality_completed_at,
+        cq.quality_officer_name,
+        TIMESTAMPDIFF(MINUTE, cq.quality_started_at, cq.quality_completed_at) as quality_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.doc_follow_completed_at, cq.quality_started_at) as quality_waiting_minutes,
+        
+        -- Dispatcher
+        cq.dispatch_started_at,
+        cq.dispatch_completed_at,
+        cq.dispatcher_name,
+        TIMESTAMPDIFF(MINUTE, cq.dispatch_started_at, cq.dispatch_completed_at) as dispatch_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.quality_completed_at, cq.dispatch_started_at) as dispatch_waiting_minutes,
+        
+        -- Dispatch-Documentation
+        cq.dispatch_doc_started_at,
+        cq.dispatch_doc_completed_at,
+        cq.dispatch_doc_officer_name,
+        TIMESTAMPDIFF(MINUTE, cq.dispatch_doc_started_at, cq.dispatch_doc_completed_at) as dispatch_doc_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.dispatch_completed_at, cq.dispatch_doc_started_at) as dispatch_doc_waiting_minutes,
+        
+        -- Gate Keeper
+        cq.gate_processed_at,
+        cq.gate_processed_by,
+        cq.gate_status,
+        TIMESTAMPDIFF(MINUTE, cq.dispatch_doc_completed_at, cq.gate_processed_at) as gate_waiting_minutes,
+        
+        -- WIM Operator (for RDF)
+        cq.wim_started_at,
+        cq.wim_completed_at,
+        cq.wim_operator_name,
+        TIMESTAMPDIFF(MINUTE, cq.wim_started_at, cq.wim_completed_at) as wim_duration_minutes,
+        TIMESTAMPDIFF(MINUTE, cq.ewm_completed_at, cq.wim_started_at) as wim_waiting_minutes,
+        
+        -- Total time from registration to completion
+        TIMESTAMPDIFF(MINUTE, cq.started_at, cq.completed_at) as total_duration_minutes
+        
+      FROM customer_queue cq
+      LEFT JOIN facilities f ON cq.facility_id = f.id
+      ${whereClause}
+      ORDER BY cq.started_at DESC
+    `;
+
+    const serviceTimeData = await db.sequelize.query(serviceTimeQuery, {
+      replacements,
+      type: db.sequelize.QueryTypes.SELECT
+    });
+
+    // Calculate summary statistics
+    const summaryQuery = `
+      SELECT 
+        COUNT(*) as total_records,
+        AVG(TIMESTAMPDIFF(MINUTE, o2c_started_at, o2c_completed_at)) as avg_o2c_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, ewm_started_at, ewm_completed_at)) as avg_ewm_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, pi_started_at, pi_completed_at)) as avg_pi_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, doc_started_at, doc_completed_at)) as avg_doc_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, doc_follow_started_at, doc_follow_completed_at)) as avg_doc_follow_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, quality_started_at, quality_completed_at)) as avg_quality_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, dispatch_started_at, dispatch_completed_at)) as avg_dispatch_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, dispatch_doc_started_at, dispatch_doc_completed_at)) as avg_dispatch_doc_duration,
+        AVG(TIMESTAMPDIFF(MINUTE, started_at, completed_at)) as avg_total_duration
+      FROM customer_queue cq
+      ${whereClause}
+    `;
+
+    const [summary] = await db.sequelize.query(summaryQuery, {
+      replacements,
+      type: db.sequelize.QueryTypes.SELECT
+    });
+
+    res.json({
+      serviceTimeData,
+      summary: {
+        totalRecords: summary.total_records || 0,
+        averageDurations: {
+          o2c: Math.round(summary.avg_o2c_duration || 0),
+          ewm: Math.round(summary.avg_ewm_duration || 0),
+          pi: Math.round(summary.avg_pi_duration || 0),
+          documentation: Math.round(summary.avg_doc_duration || 0),
+          docFollowup: Math.round(summary.avg_doc_follow_duration || 0),
+          quality: Math.round(summary.avg_quality_duration || 0),
+          dispatch: Math.round(summary.avg_dispatch_duration || 0),
+          dispatchDoc: Math.round(summary.avg_dispatch_doc_duration || 0),
+          total: Math.round(summary.avg_total_duration || 0)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching service time tracking:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch service time tracking',
+      message: error.message 
+    });
+  }
+};
+
 module.exports = {
   getComprehensiveHPReport,
   getTimeTrendData,
   getODNPODDetails,
-  getAllODNPODDetails
+  getAllODNPODDetails,
+  getServiceTimeTracking
 };

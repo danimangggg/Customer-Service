@@ -329,7 +329,7 @@ const TvMainMenu = () => {
             opacity: 0.8
           }}>
             <Typography variant="body2">
-              © 2025 EPSS AA1 - Ethiopian Pharmaceutical Supply Service
+              © 2025 PharmaLog - Pharmaceutical Logistics Management System
             </Typography>
           </Box>
         </Box>

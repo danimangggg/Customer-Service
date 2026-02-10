@@ -61,6 +61,7 @@ let routes =  (app) => {
   router.post("/api/customer-queue", addCustomerQueue.AddCustomerQueue)
   router.get("/api/serviceList", viewCustomerQueue.retriveQueue)
   router.put('/api/update-service-point', updateQueue.updateQueue);
+  router.put('/api/update-service-status/:id', updateQueue.updateServiceStatus);
   router.post("/api/uploadPicklist", uploadPicklist.single('attachment'), picklist.uploadPicklist);
   router.get("/api/getPicklists", viewPicklist.retrievePicklists);
   router.delete("/api/deletePicklist/:id", deletePicklist.deletePicklist);
@@ -187,6 +188,15 @@ let routes =  (app) => {
   router.post('/api/service-times', serviceTimeController.createServiceTime);
   router.put('/api/service-times/:id', serviceTimeController.updateServiceTime);
   router.delete('/api/service-times/:id', serviceTimeController.deleteServiceTime);
+  
+  // New Service Time Tracking routes (using same controller)
+  router.post('/api/service-time', serviceTimeController.insertServiceTime);
+  router.post('/api/service-time-hp', serviceTimeController.insertServiceTimeHP);
+  router.get('/api/service-time/last-end-time', serviceTimeController.getLastEndTime);
+  router.get('/api/service-time-hp/last-end-time', serviceTimeController.getLastEndTime); // HP version uses same function with table param
+  router.get('/api/service-time/by-process', serviceTimeController.getServiceTimesByProcess);
+  router.get('/api/service-time-report', serviceTimeController.getRDFServiceTimeReport);
+  router.get('/api/service-time-hp-report', serviceTimeController.getHPServiceTimeReport);
 
   // HP Comprehensive Report routes
   const hpComprehensiveReportController = require('../controllers/Reports/hpComprehensiveReportController');
@@ -194,6 +204,11 @@ let routes =  (app) => {
   router.get('/api/hp-report/time-trend', hpComprehensiveReportController.getTimeTrendData);
   router.get('/api/hp-odn-pod-details', hpComprehensiveReportController.getODNPODDetails);
   router.get('/api/hp-odn-pod-details-all', hpComprehensiveReportController.getAllODNPODDetails);
+  router.get('/api/service-time-tracking', hpComprehensiveReportController.getServiceTimeTracking);
+
+  // User Activity Log routes
+  const userActivityController = require('../controllers/Reports/userActivityController');
+  router.get('/api/user-activity-log', userActivityController.getUserActivityLog);
 
   return app.use("/", router);
 };

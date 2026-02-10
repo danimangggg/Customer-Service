@@ -20,6 +20,7 @@ import {
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
@@ -231,6 +232,54 @@ const QualityEvaluation = () => {
           console.error('Update failed on server:', result.error);
           MySwal.fire('Error', `Failed to save: ${result.error}`, 'error');
           return;
+        }
+      }
+
+      // Record service time for Quality Evaluator when quality is confirmed
+      if (editQualityConfirmed) {
+        try {
+          const qualityEndTime = formatTimestamp();
+          
+          // Get process_id from ODN
+          if (editingODN && editingODN.process_id) {
+            // Calculate waiting time: current time - Documentation Follower end time
+            let waitingMinutes = 0;
+            try {
+              const followupResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+                params: {
+                  process_id: editingODN.process_id,
+                  service_unit: 'Documentation Follower'
+                }
+              });
+              
+              if (followupResponse.data.end_time) {
+                const prevTime = new Date(followupResponse.data.end_time);
+                const currTime = new Date(qualityEndTime);
+                const diffMs = currTime - prevTime;
+                waitingMinutes = Math.floor(diffMs / 60000);
+                waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+              }
+            } catch (err) {
+              console.error('Failed to get Documentation Follower end time:', err);
+            }
+            
+            await axios.post(`${api_url}/api/service-time-hp`, {
+              process_id: editingODN.process_id,
+              service_unit: 'Quality Evaluator',
+              start_time: qualityEndTime,
+              end_time: qualityEndTime,
+              waiting_minutes: waitingMinutes,
+              officer_id: parseInt(loggedInUserId),
+              officer_name: localStorage.getItem('FullName'),
+              status: 'completed',
+              notes: `Quality evaluation completed${editFeedback ? ` - Feedback: ${editFeedback.substring(0, 50)}...` : ''}`
+            });
+            
+            console.log(`✅ Quality Evaluator service time recorded for process ${editingODN.process_id}: ${waitingMinutes} minutes`);
+          }
+        } catch (err) {
+          console.error('❌ Failed to record Quality Evaluator service time:', err);
+          // Don't fail the evaluation if service time recording fails
         }
       }
 

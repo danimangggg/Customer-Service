@@ -200,10 +200,10 @@ const TvCustomer = () => {
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff' }}>EPSS MONITOR</Typography>
+          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff' }}>PHARMALOG MONITOR</Typography>
           <Typography variant="caption" sx={{ color: '#00d2ff', letterSpacing: 5 }}>REAL-TIME DISPATCH FLOW</Typography>
         </Box>
-        <img src="/Epss-logo.png" alt="Logo" style={{ height: '65px' }} />
+        <img src="/pharmalog-logo.png" alt="PharmaLog Logo" style={{ height: '65px' }} />
       </Box>
 
       {/* FIXED READY ITEMS */}

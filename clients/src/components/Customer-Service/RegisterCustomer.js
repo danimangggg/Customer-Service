@@ -258,8 +258,21 @@ const RegisterCustomer = () => {
       assignedOfficerId = selectedOfficer;
     }
 
-    // Get current date and time and format for the backend
-    const formattedStartedAt = dayjs().tz(dayjs.tz.guess()).format('YYYY-MM-DD HH:mm:ssZ');
+    // Get current date and time in LOCAL timezone and format for MySQL
+    const now = new Date();
+    const formattedStartedAt = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0') + ' ' +
+      String(now.getHours()).padStart(2, '0') + ':' +
+      String(now.getMinutes()).padStart(2, '0') + ':' +
+      String(now.getSeconds()).padStart(2, '0');
+    
+    console.log('🕐 Registration timestamp being sent:', formattedStartedAt);
+    console.log('🕐 Current browser time:', now.toString());
+    
+    // Get the current user info from localStorage
+    const registeredById = localStorage.getItem('EmployeeID');
+    const registeredByName = localStorage.getItem('FullName');
     
     const payload = {
       facility_id: selectedFacility,
@@ -269,12 +282,41 @@ const RegisterCustomer = () => {
       assigned_officer_id: assignedOfficerId,
       status: 'started',
       started_at: formattedStartedAt,
+      registration_completed_at: formattedStartedAt,
+      registered_by_id: registeredById,
+      registered_by_name: registeredByName,
       delegate: delegate,
       delegate_phone: delegatePhone,
       letter_number: letterNumber,
     };
 
-    axios.post(`${api_url}/api/customer-queue`, payload).then(() => {
+    axios.post(`${api_url}/api/customer-queue`, payload).then(async (response) => {
+      const customerQueueId = response.data.task?.id;
+      
+      // Insert service time record for Customer Service Officer
+      if (customerQueueId) {
+        const serviceTimeData = {
+          process_id: customerQueueId,
+          service_unit: 'Customer Service Officer',
+          start_time: formattedStartedAt,
+          end_time: formattedStartedAt,
+          waiting_minutes: 0,
+          officer_id: registeredById,
+          officer_name: registeredByName,
+          status: 'completed',
+          notes: 'Customer registration completed'
+        };
+        
+        try {
+          const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+          console.log('✅ Service time recorded:', serviceTimeResponse.data);
+        } catch (err) {
+          console.error('❌ Failed to record service time:', err);
+          console.error('Error details:', err.response?.data);
+          // Don't fail the registration if service time recording fails
+        }
+      }
+      
       setSnackbarMessage('Customer registered and sent to service point.');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);

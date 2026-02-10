@@ -14,6 +14,9 @@ const AddCustomerQueue = async (req, res) => {
       letter_number: req.body.letter_number,
       started_at: req.body.started_at,
       completed_at: req.body.completed_at,
+      registration_completed_at: req.body.registration_completed_at,
+      registered_by_id: req.body.registered_by_id,
+      registered_by_name: req.body.registered_by_name,
       service_points_status: req.body.service_points_status,
     });
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { recordServiceTimeAuto, formatTimestamp } from '../../utils/serviceTimeHelper';
 import {
   Box,
   Paper,
@@ -161,6 +162,24 @@ const PickListDetail = () => {
       const res = await axios.post(`${api_url}/api/uploadPicklist`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+
+      // Record service time for EWM Officer
+      try {
+        await recordServiceTimeAuto({
+          processId: parseInt(process_id),
+          serviceUnit: 'EWM Officer',
+          startTime: pickList?.o2c_completed_at || pickList?.started_at,
+          endTime: formatTimestamp(),
+          previousServiceUnit: 'O2C Officer',
+          previousEndTime: pickList?.o2c_completed_at,
+          isHP: false,
+          notes: `Uploaded picklist for ODN ${odnInput}, assigned to WIM operator`
+        });
+        console.log('✅ EWM service time recorded');
+      } catch (err) {
+        console.error('❌ Failed to record EWM service time:', err);
+        // Don't fail the upload if service time recording fails
+      }
 
       Swal.fire({
         icon: 'success',

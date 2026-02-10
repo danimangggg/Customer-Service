@@ -19,6 +19,7 @@ import {
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
@@ -135,6 +136,58 @@ const DispatchManagement = () => {
       await axios.put(`${api_url}/api/route-assignments/${routeId}/complete-dispatch`, {
         completed_by: loggedInUserId
       });
+      
+      // Record service time for Dispatcher - HP
+      // Get all process IDs for facilities on this route
+      try {
+        const dispatchEndTime = formatTimestamp();
+        
+        // Find the route info to get facilities
+        const routeInfo = routeData.find(r => r.assignment_id === routeId);
+        if (routeInfo && routeInfo.facilities) {
+          for (const facility of routeInfo.facilities) {
+            if (facility.process_id) {
+              // Calculate waiting time: current time - PI end time
+              let waitingMinutes = 0;
+              try {
+                const piResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+                  params: {
+                    process_id: facility.process_id,
+                    service_unit: 'PI Officer-HP'
+                  }
+                });
+                
+                if (piResponse.data.end_time) {
+                  const prevTime = new Date(piResponse.data.end_time);
+                  const currTime = new Date(dispatchEndTime);
+                  const diffMs = currTime - prevTime;
+                  waitingMinutes = Math.floor(diffMs / 60000);
+                  waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+                }
+              } catch (err) {
+                console.error('Failed to get PI end time:', err);
+              }
+              
+              await axios.post(`${api_url}/api/service-time-hp`, {
+                process_id: facility.process_id,
+                service_unit: 'Dispatcher - HP',
+                start_time: dispatchEndTime,
+                end_time: dispatchEndTime,
+                waiting_minutes: waitingMinutes,
+                officer_id: loggedInUserId,
+                officer_name: localStorage.getItem('FullName'),
+                status: 'completed',
+                notes: `Dispatch completed for route: ${routeName}`
+              });
+              
+              console.log(`✅ Dispatcher - HP service time recorded for process ${facility.process_id}: ${waitingMinutes} minutes`);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to record Dispatcher service time:', err);
+        // Don't fail the completion if service time recording fails
+      }
       
       MySwal.fire('Success!', 'Route completed successfully.', 'success');
       fetchAssignedRoutes();

@@ -168,7 +168,7 @@ const TvCustomer = () => {
     <Box sx={{ height: '100vh', background: '#010a14', color: '#fff', p: 4, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5 }}>Dispatch Monitor</Typography>
-        <img src="/Epss-logo.png" alt="Logo" style={{ height: '50px' }} />
+        <img src="/pharmalog-logo.png" alt="PharmaLog Logo" style={{ height: '50px' }} />
       </Box>
 
       <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>

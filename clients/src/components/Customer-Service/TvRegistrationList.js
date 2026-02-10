@@ -432,7 +432,7 @@ const TvRegistrationList = () => {
           Customer Queue
         </Typography>
         <Box sx={{ textAlign: 'center' }}>
-          <img src="/Epss-logo.png" alt="EPSS Logo" style={{ height: '60px', width: 'auto' }} />
+          <img src="/pharmalog-logo.png" alt="PharmaLog Logo" style={{ height: '60px', width: 'auto' }} />
         </Box>
         <Typography
           sx={{

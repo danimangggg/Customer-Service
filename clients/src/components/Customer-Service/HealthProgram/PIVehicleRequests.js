@@ -21,6 +21,7 @@ import {
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { formatTimestamp } from '../../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
@@ -190,6 +191,58 @@ const PIVehicleRequests = () => {
           year: currentEthiopianYear,
           requested_by: loggedInUserId
         });
+        
+        // Record service time for PI Officer-HP
+        // Get all process IDs for facilities on this route
+        try {
+          const piEndTime = formatTimestamp();
+          
+          // For each facility on this route, record service time
+          const routeInfo = routeData.find(r => r.route_id === routeId);
+          if (routeInfo && routeInfo.facilities) {
+            for (const facility of routeInfo.facilities) {
+              if (facility.process_id) {
+                // Calculate waiting time: current time - EWM end time
+                let waitingMinutes = 0;
+                try {
+                  const ewmResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+                    params: {
+                      process_id: facility.process_id,
+                      service_unit: 'EWM Officer - HP'
+                    }
+                  });
+                  
+                  if (ewmResponse.data.end_time) {
+                    const prevTime = new Date(ewmResponse.data.end_time);
+                    const currTime = new Date(piEndTime);
+                    const diffMs = currTime - prevTime;
+                    waitingMinutes = Math.floor(diffMs / 60000);
+                    waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+                  }
+                } catch (err) {
+                  console.error('Failed to get EWM end time:', err);
+                }
+                
+                await axios.post(`${api_url}/api/service-time-hp`, {
+                  process_id: facility.process_id,
+                  service_unit: 'PI Officer-HP',
+                  start_time: piEndTime,
+                  end_time: piEndTime,
+                  waiting_minutes: waitingMinutes,
+                  officer_id: loggedInUserId,
+                  officer_name: localStorage.getItem('FullName'),
+                  status: 'completed',
+                  notes: `Vehicle requested for route: ${routeName}`
+                });
+                
+                console.log(`✅ PI Officer-HP service time recorded for process ${facility.process_id}: ${waitingMinutes} minutes`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('❌ Failed to record PI service time:', err);
+          // Don't fail the request if service time recording fails
+        }
         
         MySwal.fire('Success!', 'Vehicle request submitted successfully.', 'success');
         fetchRouteData();

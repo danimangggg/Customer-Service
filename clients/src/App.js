@@ -18,6 +18,8 @@ import Dispatch from './pages/Customer-Service/Dispatch/DispatchPage';
 import TvCustomer from './pages/Customer-Service/Dispatch/TvCustomerPage';
 import TvMainMenu from './pages/Customer-Service/TvMainMenuPage';
 import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
+import GateKeeperPage from './pages/Customer-Service/Dispatch/GateKeeperPage';
+import ServiceDebug from './components/Debug/ServiceDebug';
 import facilityManager from './pages/Customer-Service/HealthProgram/FacilityManagerPage';
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
 import HPFacilitiesCS from './components/Customer-Service/HealthProgram/HP-Facilities';
@@ -43,6 +45,7 @@ import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDP
 import VehicleManagement from './components/Transportation/VehicleManagement';
 import StoreManagementPage from './pages/Settings/StoreManagementPage';
 import HPComprehensiveReport from './components/Reports/HPComprehensiveReport';
+import RDFReport from './components/Reports/RDFReport';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -76,6 +79,8 @@ const AppContent = () => {
             <Route path = '/tvcustomer' Component={TvCustomer} />
             <Route path = '/tv-main-menu' Component={TvMainMenu} />
             <Route path = '/exit-permit' Component={ExitPermit} />
+            <Route path = '/gate-keeper' Component={GateKeeperPage} />
+            <Route path = '/debug-services' Component={ServiceDebug} />
             <Route path = '/update-facility' Component={facilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
             <Route path = '/hp-facilities' Component={HPFacilitiesCS} />
@@ -92,6 +97,7 @@ const AppContent = () => {
             <Route path = '/reports/transportation' Component={TransportationReports} />
             <Route path = '/reports/organization-profile' Component={OrganizationProfileView} />
             <Route path = '/reports/hp-comprehensive' Component={HPComprehensiveReport} />
+            <Route path = '/reports/rdf' Component={RDFReport} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />
             <Route path = '/settings/account-types' Component={AccountTypesManagement} />
@@ -127,7 +133,7 @@ const App = () => {
           "fontWeight": "lighter",
           "zIndex": "1000"
         }}>
-      <h6>© 2025 EPSS AA1.</h6>
+      <h6>© 2025 PharmaLog.</h6>
     </footer>
 
    </>

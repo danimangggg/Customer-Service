@@ -24,6 +24,7 @@ import ReplyIcon from '@mui/icons-material/Reply';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { formatTimestamp } from '../../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
@@ -507,6 +508,31 @@ const HpFacilities = () => {
             process_id: processId
           });
           
+          // Record service time for O2C Officer - HP
+          try {
+            const o2cEndTime = formatTimestamp();
+            
+            // No previous service for O2C (it's the first step in HP flow)
+            const waitingMinutes = 0;
+            
+            await axios.post(`${api_url}/api/service-time-hp`, {
+              process_id: processId,
+              service_unit: 'O2C Officer - HP',
+              start_time: o2cEndTime,
+              end_time: o2cEndTime,
+              waiting_minutes: waitingMinutes,
+              officer_id: localStorage.getItem('EmployeeID'),
+              officer_name: localStorage.getItem('FullName'),
+              status: 'completed',
+              notes: `O2C process completed with ${odnCount} ODN(s)`
+            });
+            
+            console.log(`✅ O2C Officer - HP service time recorded`);
+          } catch (err) {
+            console.error('❌ Failed to record O2C service time:', err);
+            // Don't fail the completion if service time recording fails
+          }
+          
           // Update the process status in local state
           setActiveProcesses(prev => 
             prev.map(p => 
@@ -579,6 +605,49 @@ const HpFacilities = () => {
         await axios.post(`${api_url}/api/complete-odn`, { 
           odn_id: odnId
         });
+        
+        // Record service time for EWM Officer - HP
+        try {
+          const ewmEndTime = formatTimestamp();
+          
+          // Calculate waiting time: current time - O2C end time
+          let waitingMinutes = 0;
+          try {
+            const o2cResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+              params: {
+                process_id: processId,
+                service_unit: 'O2C Officer - HP'
+              }
+            });
+            
+            if (o2cResponse.data.end_time) {
+              const prevTime = new Date(o2cResponse.data.end_time);
+              const currTime = new Date(ewmEndTime);
+              const diffMs = currTime - prevTime;
+              waitingMinutes = Math.floor(diffMs / 60000);
+              waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+            }
+          } catch (err) {
+            console.error('Failed to get O2C end time:', err);
+          }
+          
+          await axios.post(`${api_url}/api/service-time-hp`, {
+            process_id: processId,
+            service_unit: 'EWM Officer - HP',
+            start_time: ewmEndTime,
+            end_time: ewmEndTime,
+            waiting_minutes: waitingMinutes,
+            officer_id: localStorage.getItem('EmployeeID'),
+            officer_name: localStorage.getItem('FullName'),
+            status: 'completed',
+            notes: `EWM ODN completed: ${odnId}`
+          });
+          
+          console.log(`✅ EWM Officer - HP service time recorded: ${waitingMinutes} minutes`);
+        } catch (err) {
+          console.error('❌ Failed to record EWM service time:', err);
+          // Don't fail the completion if service time recording fails
+        }
         
         // Update the ODN status in local state
         setProcessODNData(prev => {

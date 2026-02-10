@@ -105,7 +105,7 @@ const UserManagement = () => {
 
   const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
-  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator'];
+  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator', 'Dispatch-Documentation', 'Gate Keeper'];
 
   useEffect(() => {
     fetchStores();
@@ -163,8 +163,9 @@ const UserManagement = () => {
 
   const handleSubmit = async () => {
     try {
-      // Validation for EWM officers - store is mandatory
-      if ((formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') && !formData.store) {
+      // Validation for roles that require store assignment
+      const rolesRequiringStore = ['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'];
+      if (rolesRequiringStore.includes(formData.jobTitle) && !formData.store) {
         await MySwal.fire({
           title: 'Store Required!',
           html: `
@@ -173,7 +174,7 @@ const UserManagement = () => {
                 🏪
               </div>
               <p style="font-size: 18px; color: #333;">
-                Store selection is mandatory for EWM Officers.
+                Store selection is mandatory for ${formData.jobTitle}.
               </p>
               <p style="font-size: 14px; color: #666;">
                 Please select a store before saving the user.
@@ -910,22 +911,22 @@ const UserManagement = () => {
               <Grid item xs={12} md={6}>
                 <FormControl 
                   fullWidth 
-                  required={formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP'}
+                  required={['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle)}
                 >
                   <InputLabel>
-                    Store {(formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') && '*'}
+                    Store {['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle) && '*'}
                   </InputLabel>
                   <Select
                     value={formData.store}
-                    label={`Store ${(formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') ? '*' : ''}`}
+                    label={`Store ${['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle) ? '*' : ''}`}
                     onChange={(e) => setFormData({ ...formData, store: e.target.value })}
                     sx={{
-                      backgroundColor: (formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') ? '#fff3e0' : 'inherit'
+                      backgroundColor: ['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle) ? '#fff3e0' : 'inherit'
                     }}
                   >
                     <MenuItem value="">
-                      {(formData.jobTitle === 'EWM Officer' || formData.jobTitle === 'EWM Officer - HP') 
-                        ? 'Select Store (Required for EWM Officers)' 
+                      {['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle)
+                        ? 'Select Store (Required)' 
                         : 'Select Store'
                       }
                     </MenuItem>

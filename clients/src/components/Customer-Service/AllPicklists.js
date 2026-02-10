@@ -237,6 +237,68 @@ const AllPicklists = () => {
         fileUrl: picklist.url,
         status: 'Completed',
       });
+      
+      // Record WIM Operator service time
+      try {
+        // Get the customer queue record to find previous service times
+        const customerRes = await axios.get(`${api_url}/api/serviceList`);
+        const customer = customerRes.data.find(c => c.id === picklist.customer_queue_id);
+        
+        if (customer) {
+          const wimEndTime = new Date().toISOString();
+          const ewmEndTime = customer.ewm_completed_at || customer.started_at;
+          const wimStartTime = customer.wim_started_at || wimEndTime;
+          
+          // Calculate waiting time
+          let waitingMinutes = 0;
+          if (ewmEndTime && wimStartTime) {
+            const ewmEnd = new Date(ewmEndTime);
+            const wimStart = new Date(wimStartTime);
+            const diffMs = wimStart - ewmEnd;
+            waitingMinutes = Math.floor(diffMs / 60000);
+            if (waitingMinutes < 0) waitingMinutes = 0;
+          }
+          
+          // Format datetime for MySQL
+          const formatForMySQL = (dateValue) => {
+            if (!dateValue) return null;
+            const d = new Date(dateValue);
+            return d.getFullYear() + '-' +
+                   String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                   String(d.getDate()).padStart(2, '0') + ' ' +
+                   String(d.getHours()).padStart(2, '0') + ':' +
+                   String(d.getMinutes()).padStart(2, '0') + ':' +
+                   String(d.getSeconds()).padStart(2, '0');
+          };
+          
+          const serviceTimeData = {
+            process_id: customer.id,
+            service_unit: 'WIM Operator',
+            start_time: formatForMySQL(wimStartTime),
+            end_time: formatForMySQL(wimEndTime),
+            waiting_minutes: waitingMinutes,
+            officer_id: localStorage.getItem('EmployeeID'),
+            officer_name: localStorage.getItem('FullName'),
+            status: 'completed',
+            notes: `Completed picklist for ODN ${picklist.odn}`
+          };
+          
+          // Update customer_queue with WIM tracking
+          await axios.put(`${api_url}/api/update-service-point`, {
+            id: customer.id,
+            wim_completed_at: wimEndTime,
+            wim_operator_id: localStorage.getItem('EmployeeID'),
+            wim_operator_name: localStorage.getItem('FullName'),
+            wim_started_at: wimStartTime
+          });
+          
+          const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+          console.log('✅ WIM Operator service time recorded:', serviceTimeResponse.data);
+        }
+      } catch (err) {
+        console.error('❌ Failed to record WIM service time:', err);
+        console.error('Error details:', err.response?.data);
+      }
 
       Swal.fire({ icon: 'success', title: 'Picklist marked as completed' });
       fetchData();
