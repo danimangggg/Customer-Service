@@ -116,9 +116,10 @@ const ExitPermit = () => {
         }
         
         // Record service time directly
+        const { storeId } = getStoreKeys();
         await axios.post(`${API_URL}/api/service-time`, {
           process_id: record.id,
-          service_unit: 'Dispatch-Documentation',
+          service_unit: `Dispatch-Documentation - ${storeId}`,
           start_time: dispatchDocTime,
           end_time: dispatchDocTime,
           waiting_minutes: waitingMinutes,

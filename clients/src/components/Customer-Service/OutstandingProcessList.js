@@ -266,7 +266,7 @@ const OutstandingCustomers = () => {
                 
                 const serviceTimeData = {
                     process_id: customer.id,
-                    service_unit: 'EWM Officer',
+                    service_unit: `EWM Officer - ${normalizedUserStore}`,
                     start_time: formatForMySQL(ewmStartTime),
                     end_time: formatForMySQL(ewmEndTime),
                     waiting_minutes: waitingMinutes,
@@ -689,7 +689,7 @@ const OutstandingCustomers = () => {
                     
                     const serviceTimeData = {
                         process_id: customer.id,
-                        service_unit: 'O2C Officer',
+                        service_unit: 'O2C',
                         start_time: formatForMySQL(o2cStartTime),
                         end_time: formatForMySQL(o2cEndTime),
                         waiting_minutes: waitingMinutes,

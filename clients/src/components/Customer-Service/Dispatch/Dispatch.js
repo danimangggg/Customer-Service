@@ -208,7 +208,7 @@ const DispatcherAccount = () => {
                     
                     const serviceTimeData = {
                         process_id: item.id,
-                        service_unit: 'Dispatcher',
+                        service_unit: `Dispatcher - ${store}`,
                         start_time: formatForMySQL(dispatchStartTime),
                         end_time: formatForMySQL(dispatchEndTime),
                         waiting_minutes: waitingMinutes,

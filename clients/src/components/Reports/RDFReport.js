@@ -31,8 +31,11 @@ const RDFReport = () => {
       // Transform the data to match the expected format
       const records = response.data.records || [];
       
-      // Get all unique stores from service units
-      const stores = new Set();
+      // Always show all configured stores (AA1, AA2, AA3)
+      // This ensures the table structure is consistent even if some stores have no data yet
+      const stores = new Set(['AA1', 'AA2', 'AA3']);
+      
+      // Also add any additional stores found in the data
       records.forEach(record => {
         record.service_units.forEach(unit => {
           // Extract store from service unit name (e.g., "EWM Officer - AA1" -> "AA1")
@@ -42,13 +45,6 @@ const RDFReport = () => {
           }
         });
       });
-      
-      // If no stores found in data, use default stores
-      if (stores.size === 0) {
-        stores.add('AA1');
-        stores.add('AA2');
-        stores.add('AA3');
-      }
       
       const storeList = Array.from(stores).sort();
       
@@ -190,7 +186,7 @@ const RDFReport = () => {
             transformed.registration_duration_minutes = 0;
             transformed.registered_by_name = unit.officer_name;
             transformed.registration_completed_at = unit.end_time;
-          } else if (unitName === 'O2C Officer') {
+          } else if (unitName === 'O2C Officer' || unitName === 'O2C') {
             transformed.o2c_duration_minutes = duration;
             transformed.o2c_officer_name = unit.officer_name;
             transformed.o2c_started_at = unit.start_time;
