@@ -105,7 +105,7 @@ const UserManagement = () => {
 
   const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
-  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator', 'Dispatch-Documentation', 'Gate Keeper'];
+  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'];
 
   useEffect(() => {
     fetchStores();
@@ -164,7 +164,7 @@ const UserManagement = () => {
   const handleSubmit = async () => {
     try {
       // Validation for roles that require store assignment
-      const rolesRequiringStore = ['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'];
+      const rolesRequiringStore = ['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'];
       if (rolesRequiringStore.includes(formData.jobTitle) && !formData.store) {
         await MySwal.fire({
           title: 'Store Required!',
@@ -911,21 +911,21 @@ const UserManagement = () => {
               <Grid item xs={12} md={6}>
                 <FormControl 
                   fullWidth 
-                  required={['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle)}
+                  required={['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'].includes(formData.jobTitle)}
                 >
                   <InputLabel>
-                    Store {['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle) && '*'}
+                    Store {['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'].includes(formData.jobTitle) && '*'}
                   </InputLabel>
                   <Select
                     value={formData.store}
-                    label={`Store ${['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle) ? '*' : ''}`}
+                    label={`Store ${['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'].includes(formData.jobTitle) ? '*' : ''}`}
                     onChange={(e) => setFormData({ ...formData, store: e.target.value })}
                     sx={{
-                      backgroundColor: ['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle) ? '#fff3e0' : 'inherit'
+                      backgroundColor: ['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'].includes(formData.jobTitle) ? '#fff3e0' : 'inherit'
                     }}
                   >
                     <MenuItem value="">
-                      {['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.jobTitle)
+                      {['EWM Officer', 'EWM Officer - HP', 'Dispatcher', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'].includes(formData.jobTitle)
                         ? 'Select Store (Required)' 
                         : 'Select Store'
                       }

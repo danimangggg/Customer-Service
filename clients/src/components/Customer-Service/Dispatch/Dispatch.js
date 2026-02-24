@@ -20,39 +20,27 @@ const DispatcherAccount = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const [customerOdns, setCustomerOdns] = useState({}); // Store ODNs by customer ID
     
     // --- STATE for Store Info ---
-    const [store, setStore] = useState(null); 
-    const [storeCompletionField, setStoreCompletionField] = useState(null); 
-    const [odnKey, setOdnKey] = useState(null); // Dynamic key for aaX_odn
+    const [store, setStore] = useState(null);
 
-    const TARGET_PRIMARY_STATUSES = useMemo(() => ['ewm_completed'], []); 
+    const TARGET_PRIMARY_STATUSES = useMemo(() => ['ewm_completed'], []);
 
-    // 1. Initialize Store Info and dynamic column keys
+    // 1. Initialize Store Info
     useEffect(() => {
         const storedStore = localStorage.getItem('store'); 
         console.log('Stored store from localStorage:', storedStore);
         
         if (storedStore) {
             const storeId = storedStore.toUpperCase().trim();
-            setStore(storeId); 
-            
-            const match = storeId.match(/AA(\d)/i);
-            if (match) {
-                setStoreCompletionField(`store_completed_${match[1]}`);
-                setOdnKey(`${storeId.toLowerCase()}_odn`); // Sets 'aa1_odn', etc.
-                console.log('Store configuration set:', { storeId, storeCompletionField: `store_completed_${match[1]}`, odnKey: `${storeId.toLowerCase()}_odn` });
-            } else {
-                console.error('Store ID format not recognized:', storeId);
-                setError(`Invalid store format: ${storeId}. Expected format: AA1, AA2, or AA3`);
-            }
+            setStore(storeId);
+            console.log('Store configuration set:', { storeId });
         } else {
             console.error('No store found in localStorage');
             // Set a default store for testing
             const defaultStore = 'AA1';
             setStore(defaultStore);
-            setStoreCompletionField('store_completed_1');
-            setOdnKey('aa1_odn');
             console.log('Using default store configuration:', defaultStore);
         }
     }, []);
@@ -81,49 +69,76 @@ const DispatcherAccount = () => {
     // 3. Fetch and Filter List
     const fetchDispatchList = useCallback(async () => {
         console.log('fetchDispatchList called with:', { 
-            facilitiesMapLength: Object.keys(facilitiesMap).length, 
-            storeCompletionField 
+            facilitiesMapLength: Object.keys(facilitiesMap).length,
+            store
         });
         
-        if (Object.keys(facilitiesMap).length === 0 || !storeCompletionField) {
+        if (Object.keys(facilitiesMap).length === 0 || !store) {
             console.log('Skipping fetch - missing dependencies');
             return; 
         }
         
         try {
-            console.log('Fetching service list from:', `${API_URL}/api/serviceList`);
-            const response = await axios.get(`${API_URL}/api/serviceList`);
+            console.log('Fetching TV display customers from:', `${API_URL}/api/tv-display-customers`);
+            const response = await axios.get(`${API_URL}/api/tv-display-customers`);
             const allItems = response.data;
-            console.log('Service list response:', allItems);
+            console.log('TV display customers response:', allItems);
             
+            // Filter items that have ODNs for this store and are ready for dispatch
             const filteredItems = allItems.filter(item => {
                 const primaryStatus = (item.status || "").toLowerCase().trim();
-                const storeStatus = (item[storeCompletionField] || "").toLowerCase().trim();
-
-                const isReadyToStart = TARGET_PRIMARY_STATUSES.includes(primaryStatus);
-                const isInProgress = ['dispatch_started', 'notifying'].includes(storeStatus);
-                const isNotDone = storeStatus !== 'dispatch_completed';
-
+                const storeDetails = item.store_details || {};
+                const storeInfo = storeDetails[store];
+                
+                // Must have ODNs for this store
+                if (!storeInfo) return false;
+                
+                const ewmStatus = (storeInfo.ewm_status || '').toLowerCase();
+                const dispatchStatus = (storeInfo.dispatch_status || '').toLowerCase();
+                
+                // Show if:
+                // 1. EWM is completed and dispatch not completed yet
+                // 2. Dispatch is in progress (started or notifying)
+                const isReadyToStart = ewmStatus === 'completed' && dispatchStatus === 'pending';
+                const isInProgress = ['started', 'notifying'].includes(dispatchStatus);
+                const isNotDone = dispatchStatus !== 'completed';
+                
                 return isNotDone && (isReadyToStart || isInProgress);
             }).sort((a, b) => new Date(a.started_at) - new Date(b.started_at));
 
             console.log('Filtered dispatch items:', filteredItems);
             setDispatchList(filteredItems);
+            
+            // Extract ODN data from store_details
+            const odnMap = {};
+            filteredItems.forEach(item => {
+                const storeInfo = item.store_details[store];
+                if (storeInfo) {
+                    odnMap[item.id] = storeInfo.odns.map(odnNumber => ({
+                        odn_number: odnNumber,
+                        store: store,
+                        ewm_status: storeInfo.ewm_status,
+                        dispatch_status: storeInfo.dispatch_status
+                    }));
+                }
+            });
+            setCustomerOdns(odnMap);
+            
         } catch (err) {
             console.error('Error fetching dispatch list:', err);
             setError(`Failed to load dispatch list: ${err.message}`);
         } finally {
             setLoading(false);
         }
-    }, [facilitiesMap, storeCompletionField, TARGET_PRIMARY_STATUSES]);
+    }, [facilitiesMap, store, TARGET_PRIMARY_STATUSES]);
 
     useEffect(() => {
         console.log('Main effect triggered with:', { 
-            facilitiesMapLength: Object.keys(facilitiesMap).length, 
-            storeCompletionField 
+            facilitiesMapLength: Object.keys(facilitiesMap).length,
+            store
         });
         
-        if (Object.keys(facilitiesMap).length > 0 && storeCompletionField) {
+        if (Object.keys(facilitiesMap).length > 0 && store) {
             fetchDispatchList();
             const interval = setInterval(fetchDispatchList, 10000);
             return () => clearInterval(interval);
@@ -136,7 +151,7 @@ const DispatcherAccount = () => {
                     if (Object.keys(facilitiesMap).length === 0) {
                         setError('Failed to load facilities data');
                     }
-                    if (!storeCompletionField) {
+                    if (!store) {
                         setError('Store configuration not available');
                     }
                 }
@@ -144,55 +159,76 @@ const DispatcherAccount = () => {
             
             return () => clearTimeout(timeout);
         }
-    }, [fetchDispatchList, facilitiesMap, storeCompletionField, loading]);
+    }, [fetchDispatchList, facilitiesMap, store, loading]);
 
-    // 4. Update Status Logic
+    // Helper function to get ODNs for a customer
+    const getCustomerOdns = (customerId) => {
+        const odns = customerOdns[customerId] || [];
+        const storeOdns = odns.filter(odn => odn.store === store);
+        
+        if (storeOdns.length === 0) {
+            return 'Pending';
+        }
+        
+        return storeOdns.map(odn => odn.odn_number).join(', ');
+    };
+
+    // 5. Update Status Logic
     const handleStatusUpdate = async (item, newStatus) => {
         try {
             setLoading(true);
             
             const isFinalStep = newStatus === 'completed';
-            const statusValue = isFinalStep ? 'dispatch_completed' : newStatus;
-            const nextPoint = isFinalStep ? 'Exit-Permit' : 'dispatch';
-
-            const payload = {
-                ...item,
-                status: statusValue, 
-                next_service_point: nextPoint,
-                [storeCompletionField]: statusValue 
-            };
             
-            // Add dispatcher tracking if completing
-            if (isFinalStep) {
-                const dispatchEndTime = new Date().toISOString();
-                payload.dispatch_completed_at = dispatchEndTime;
-                if (!item.dispatcher_id) {
-                    payload.dispatcher_id = localStorage.getItem('EmployeeID');
-                    payload.dispatcher_name = localStorage.getItem('FullName');
+            // Update ODN dispatch status
+            const dispatchStatusValue = isFinalStep ? 'completed' : 
+                                       newStatus === 'notifying' ? 'notifying' : 'started';
+            
+            try {
+                // Update ODN dispatch status
+                const response = await axios.put(`${API_URL}/api/odns-rdf/update-dispatch-status`, {
+                    process_id: item.id,
+                    store: store,
+                    dispatch_status: dispatchStatusValue,
+                    dispatcher_id: localStorage.getItem('EmployeeID'),
+                    dispatcher_name: localStorage.getItem('FullName')
+                });
+                
+                if (!response.data.success) {
+                    throw new Error('Failed to update dispatch status');
                 }
-                if (!item.dispatch_started_at) {
-                    payload.dispatch_started_at = dispatchEndTime;
-                }
+            } catch (error) {
+                console.error('Error updating ODN dispatch status:', error);
+                setSnackbar({ open: true, message: "Update failed", severity: 'error' });
+                setLoading(false);
+                return;
             }
-
-            await axios.put(`${API_URL}/api/update-service-point`, payload); 
             
-            // Record dispatcher service time if completing
+            // If completing, update customer_queue to move to Exit Permit
             if (isFinalStep) {
                 try {
-                    const ewmEndTime = item.ewm_completed_at || item.started_at;
-                    const dispatchStartTime = item.dispatch_started_at || new Date().toISOString();
-                    const dispatchEndTime = new Date().toISOString();
+                    // Check if all stores have completed dispatch
+                    const odnResponse = await axios.get(`${API_URL}/api/rdf-odns/${item.id}`);
+                    const allOdns = odnResponse.data.odns || [];
+                    const allDispatchCompleted = allOdns.every(odn => odn.dispatch_status === 'completed');
                     
-                    // Calculate waiting time
-                    let waitingMinutes = 0;
-                    if (ewmEndTime && dispatchStartTime) {
-                        const ewmEnd = new Date(ewmEndTime);
-                        const dispatchStart = new Date(dispatchStartTime);
-                        const diffMs = dispatchStart - ewmEnd;
-                        waitingMinutes = Math.floor(diffMs / 60000);
-                        if (waitingMinutes < 0) waitingMinutes = 0;
+                    if (allDispatchCompleted) {
+                        // All stores completed, move to Exit Permit
+                        await axios.put(`${API_URL}/api/update-service-point`, {
+                            id: item.id,
+                            status: 'dispatch_completed',
+                            next_service_point: 'Exit-Permit'
+                            // Don't set completed_at here - only when Gate Keeper allows exit
+                        });
                     }
+                } catch (error) {
+                    console.error('Error updating customer queue:', error);
+                }
+                
+                // Record dispatcher service time
+                try {
+                    // SIMPLIFIED: Only record end_time
+                    const dispatchEndTime = new Date().toISOString();
                     
                     // Format datetime for MySQL
                     const formatForMySQL = (dateValue) => {
@@ -209,20 +245,17 @@ const DispatcherAccount = () => {
                     const serviceTimeData = {
                         process_id: item.id,
                         service_unit: `Dispatcher - ${store}`,
-                        start_time: formatForMySQL(dispatchStartTime),
                         end_time: formatForMySQL(dispatchEndTime),
-                        waiting_minutes: waitingMinutes,
                         officer_id: localStorage.getItem('EmployeeID'),
                         officer_name: localStorage.getItem('FullName'),
                         status: 'completed',
                         notes: `Dispatch completed for store ${store}`
                     };
                     
-                    const serviceTimeResponse = await axios.post(`${API_URL}/api/service-time`, serviceTimeData);
-                    console.log('✅ Dispatcher service time recorded:', serviceTimeResponse.data);
+                    await axios.post(`${API_URL}/api/service-time`, serviceTimeData);
+                    console.log('✅ Dispatcher service time recorded');
                 } catch (err) {
                     console.error('❌ Failed to record Dispatcher service time:', err);
-                    console.error('Error details:', err.response?.data);
                 }
             }
             
@@ -234,6 +267,7 @@ const DispatcherAccount = () => {
 
             fetchDispatchList(); 
         } catch (err) {
+            console.error('Error in handleStatusUpdate:', err);
             setSnackbar({ open: true, message: "Update failed", severity: 'error' });
         } finally {
             setLoading(false);
@@ -364,7 +398,7 @@ const DispatcherAccount = () => {
                                     fontWeight: 300,
                                     textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                                 }}>
-                                    Store ID: <strong>{store}</strong> • Manage dispatch operations
+                                    Store: <strong>{store}</strong>
                                 </Typography>
                             </Box>
                         </Stack>
@@ -419,7 +453,10 @@ const DispatcherAccount = () => {
                                         </TableRow>
                                     ) : (
                                         dispatchList.map((item, index) => {
-                                            const storeStatus = (item[storeCompletionField] || "").toLowerCase().trim();
+                                            // Get dispatch status from store_details
+                                            const storeInfo = item.store_details?.[store] || {};
+                                            const dispatchStatus = (storeInfo.dispatch_status || 'pending').toLowerCase().trim();
+                                            
                                             return (
                                                 <TableRow key={item.id} className="table-row">
                                                     <TableCell sx={{ fontWeight: 'bold', color: 'primary.main' }}>
@@ -431,8 +468,8 @@ const DispatcherAccount = () => {
                                                     
                                                     <TableCell>
                                                         <Chip
-                                                            label={item[odnKey] || "Pending..."}
-                                                            color={item[odnKey] ? "primary" : "default"}
+                                                            label={getCustomerOdns(item.id)}
+                                                            color={getCustomerOdns(item.id) !== 'Pending' ? "primary" : "default"}
                                                             variant="outlined"
                                                             sx={{ fontWeight: 'bold', borderRadius: 2 }}
                                                         />
@@ -449,7 +486,7 @@ const DispatcherAccount = () => {
                                                     
                                                     <TableCell align="center">
                                                         <Stack direction="row" spacing={1} justifyContent="center">
-                                                            {storeStatus === 'notifying' ? (
+                                                            {dispatchStatus === 'notifying' ? (
                                                                 <>
                                                                     <Button 
                                                                         size="small" 
@@ -472,7 +509,7 @@ const DispatcherAccount = () => {
                                                                         Complete
                                                                     </Button>
                                                                 </>
-                                                            ) : storeStatus === 'dispatch_started' ? (
+                                                            ) : dispatchStatus === 'started' ? (
                                                                 <Button 
                                                                     size="small" 
                                                                     variant="contained" 

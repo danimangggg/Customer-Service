@@ -82,15 +82,15 @@ const OrganizationProfile = () => {
   const api_url = process.env.REACT_APP_API_URL;
   
   const [orgData, setOrgData] = useState({
-    name: 'PharmaLog Pharmaceutical Logistics',
-    shortName: 'PharmaLog',
+    name: 'EPSS-MT Ethiopian Pharmaceutical Supply Service - Monitoring Tool',
+    shortName: 'EPSS-MT',
     description: 'Leading pharmaceutical logistics and supply chain management system, ensuring efficient tracking and delivery of medicines and health commodities.',
     address: 'Addis Ababa, Ethiopia',
     zone: 'Addis Ababa Zone',
     woreda: 'Kirkos',
     phone: '+251-11-XXX-XXXX',
-    email: 'info@pharmalog.com',
-    website: 'www.pharmalog.com',
+    email: 'info@epss-mt.gov.et',
+    website: 'www.epss-mt.gov.et',
     establishedYear: '2007',
     employeeCount: '2,500+',
     branches: '15',

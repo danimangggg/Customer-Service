@@ -13,10 +13,15 @@ import DashboardCustomer from './pages/Customer-Service/DashboardCS';
 import Picklist from './pages/Customer-Service/Picklist';
 import AllPicklist from './pages/Customer-Service/AllPicklists';
 import CompletedPicklists from './pages/Customer-Service/CompletedPicklists';
+import RDFPicklists from './pages/Customer-Service/RDFPicklists';
+import RDFPicklistsCompleted from './pages/Customer-Service/RDFPicklistsCompleted';
+import EwmDocumentation from './components/Customer-Service/EwmDocumentation';
+import QueueManager from './components/Customer-Service/QueueManager';
 import TvDispatch from './pages/Customer-Service/Dispatch/TvDispatchPage';
 import Dispatch from './pages/Customer-Service/Dispatch/DispatchPage';
 import TvCustomer from './pages/Customer-Service/Dispatch/TvCustomerPage';
 import TvMainMenu from './pages/Customer-Service/TvMainMenuPage';
+import TvRealEntertainmentPage from './pages/Customer-Service/TvRealEntertainmentPage';
 import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
 import GateKeeperPage from './pages/Customer-Service/Dispatch/GateKeeperPage';
 import ServiceDebug from './components/Debug/ServiceDebug';
@@ -53,10 +58,22 @@ const AppContent = () => {
   const location = useLocation();
   const isPublicPage = location.pathname === '/' || location.pathname === '/login';
   
+  // TV Display routes should be fullscreen (no navbar, no footer)
+  const isTvDisplayPage = [
+    '/customer-slide',
+    '/tv-dispatch', 
+    '/tvcustomer',
+    '/tv-main-menu',
+    '/tv-real-entertainment'
+  ].includes(location.pathname);
+  
+  const showNavbar = !isPublicPage && !isTvDisplayPage;
+  const showFooter = !isTvDisplayPage;
+  
   return (
     <>
-      {!isPublicPage && <Navbar2 />}
-      <div className={isPublicPage ? 'public-content' : 'main-content'}>
+      {showNavbar && <Navbar2 />}
+      <div className={isPublicPage || isTvDisplayPage ? 'public-content' : 'main-content'}>
         <Routes>
         <Route path = '/' element={<DefaultRedirect />} />
         <Route path = '/login' Component={SignIn} />
@@ -74,10 +91,15 @@ const AppContent = () => {
             <Route path = '/hp-picklist/:processId' Component={HPPicklist} />
             <Route path = '/all-picklists' Component={AllPicklist} />
             <Route path = '/completed-picklists' Component={CompletedPicklists} />
+            <Route path = '/rdf-picklists' Component={RDFPicklists} />
+            <Route path = '/rdf-completed-picklists' Component={RDFPicklistsCompleted} />
+            <Route path = '/ewm-documentation' Component={EwmDocumentation} />
+            <Route path = '/queue-manager' Component={QueueManager} />
             <Route path = '/tv-dispatch' Component={TvDispatch} />
             <Route path = '/dispatch' Component={Dispatch} />
             <Route path = '/tvcustomer' Component={TvCustomer} />
             <Route path = '/tv-main-menu' Component={TvMainMenu} />
+            <Route path = '/tv-real-entertainment' Component={TvRealEntertainmentPage} />
             <Route path = '/exit-permit' Component={ExitPermit} />
             <Route path = '/gate-keeper' Component={GateKeeperPage} />
             <Route path = '/debug-services' Component={ServiceDebug} />
@@ -109,20 +131,10 @@ const AppContent = () => {
         
       </Routes>
       </div>
-    </>
-  );
-};
-
-const App = () => {
-  return (
-   <>
-     <Router>
-      <AppContent />
-     </Router>
-
-     <br/> 
-
-     <footer className="footer" style={{
+      
+      {/* Footer - only show when not on TV display pages */}
+      {showFooter && (
+        <footer className="footer" style={{
           "backgroundColor": "black",
           "textAlign": "center",
           "position": "fixed",
@@ -133,10 +145,18 @@ const App = () => {
           "fontWeight": "lighter",
           "zIndex": "1000"
         }}>
-      <h6>© 2025 PharmaLog.</h6>
-    </footer>
+          <h6>© 2025 EPSS-MT.</h6>
+        </footer>
+      )}
+    </>
+  );
+};
 
-   </>
+const App = () => {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   );
 };
 

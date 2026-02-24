@@ -38,13 +38,12 @@ export const getLastEndTime = async (processId, serviceUnit, isHP = false) => {
 
 /**
  * Record service time for RDF process
+ * SIMPLIFIED: Only records end_time
  */
 export const recordRDFServiceTime = async ({
   processId,
   serviceUnit,
-  startTime,
   endTime,
-  waitingMinutes = 0,
   officerId,
   officerName,
   notes = ''
@@ -53,9 +52,7 @@ export const recordRDFServiceTime = async ({
     const serviceTimeData = {
       process_id: processId,
       service_unit: serviceUnit,
-      start_time: startTime,
       end_time: endTime,
-      waiting_minutes: waitingMinutes,
       officer_id: officerId,
       officer_name: officerName,
       status: 'completed',
@@ -74,13 +71,12 @@ export const recordRDFServiceTime = async ({
 
 /**
  * Record service time for HP process
+ * SIMPLIFIED: Only records end_time
  */
 export const recordHPServiceTime = async ({
   processId,
   serviceUnit,
-  startTime,
   endTime,
-  waitingMinutes = 0,
   officerId,
   officerName,
   notes = ''
@@ -89,9 +85,7 @@ export const recordHPServiceTime = async ({
     const serviceTimeData = {
       process_id: processId,
       service_unit: serviceUnit,
-      start_time: startTime,
       end_time: endTime,
-      waiting_minutes: waitingMinutes,
       officer_id: officerId,
       officer_name: officerName,
       status: 'completed',
@@ -133,40 +127,23 @@ export const formatTimestamp = (date = new Date()) => {
 };
 
 /**
- * Record service time with automatic waiting time calculation
+ * Record service time with automatic calculation
+ * SIMPLIFIED: Only records end_time, no start_time or waiting_minutes
  * This is the main function to use in components
  */
 export const recordServiceTimeAuto = async ({
   processId,
   serviceUnit,
-  startTime,
   endTime = formatTimestamp(),
-  previousServiceUnit = null,
-  previousEndTime = null,
   isHP = false,
   notes = ''
 }) => {
   const user = getCurrentUser();
   
-  // Format timestamps for MySQL
-  const formattedStartTime = typeof startTime === 'string' && startTime.includes('T') 
-    ? formatTimestamp(new Date(startTime)) 
-    : startTime;
+  // Format timestamp for MySQL
   const formattedEndTime = typeof endTime === 'string' && endTime.includes('T')
     ? formatTimestamp(new Date(endTime))
     : endTime;
-  
-  // Calculate waiting time
-  let waitingMinutes = 0;
-  if (previousEndTime) {
-    waitingMinutes = calculateWaitingTime(previousEndTime, startTime);
-  } else if (previousServiceUnit) {
-    // Try to get from database
-    const lastEndTime = await getLastEndTime(processId, previousServiceUnit, isHP);
-    if (lastEndTime) {
-      waitingMinutes = calculateWaitingTime(lastEndTime, startTime);
-    }
-  }
   
   // Record service time
   const recordFunction = isHP ? recordHPServiceTime : recordRDFServiceTime;
@@ -174,9 +151,7 @@ export const recordServiceTimeAuto = async ({
   return await recordFunction({
     processId,
     serviceUnit,
-    startTime: formattedStartTime,
     endTime: formattedEndTime,
-    waitingMinutes,
     officerId: user.id,
     officerName: user.name,
     notes

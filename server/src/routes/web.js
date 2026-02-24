@@ -27,6 +27,7 @@ const deletePicklist= require("../controllers/CustomerService/picklistController
 const processController = require('../controllers/CustomerService/processController');
 const processQueryController = require('../controllers/CustomerService/processQueryController');
 const odnController = require('../controllers/CustomerService/odnController');
+const odnRdfController = require('../controllers/CustomerService/odnRdfController');
 const facilityController = require('../controllers/CustomerService/facilityController');
 const locationController = require('../controllers/CustomerService/locationController');
 
@@ -78,6 +79,37 @@ let routes =  (app) => {
   router.post('/api/ewm-complete-process', odnController.ewmCompleteProcess);
   router.post('/api/ewm-revert-process', odnController.ewmRevertProcess);
   router.post('/api/complete-odn', odnController.completeODN);
+
+  // RDF ODN Management routes
+  router.get('/api/rdf-odns/:processId', odnRdfController.getOdnsByProcess);
+  router.post('/api/rdf-odns', odnRdfController.addOdn);
+  router.put('/api/rdf-odns/:odnId', odnRdfController.updateOdn);
+  router.delete('/api/rdf-odns/:odnId', odnRdfController.deleteOdn);
+  router.put('/api/odns-rdf/start-ewm', odnRdfController.startEwm);
+  router.put('/api/odns-rdf/complete-ewm', odnRdfController.completeEwm);
+  router.put('/api/odns-rdf/revert-ewm', odnRdfController.revertEwm);
+  router.put('/api/odns-rdf/update-dispatch-status', odnRdfController.updateDispatchStatus);
+  router.put('/api/odns-rdf/update-exit-permit-status', odnRdfController.updateExitPermitStatus);
+  router.put('/api/odns-rdf/update-gate-status', odnRdfController.updateGateStatus);
+
+  // Invoice routes (EWM-Documentation)
+  const invoiceController = require('../controllers/CustomerService/invoiceController');
+  router.get('/api/ewm-completed-customers', invoiceController.getEwmCompletedCustomers);
+  router.post('/api/invoices', invoiceController.saveInvoice);
+  router.get('/api/invoices', invoiceController.getInvoices);
+
+  // Customer Availability routes
+  const customerAvailabilityController = require('../controllers/CustomerService/customerAvailabilityController');
+  router.post('/api/customer-availability/mark-available', customerAvailabilityController.markCustomerAvailable);
+  router.get('/api/customer-availability/available', customerAvailabilityController.getAvailableCustomers);
+  router.get('/api/customer-availability/o2c-completed', customerAvailabilityController.getO2CCompletedByStore);
+  router.post('/api/customer-availability/start-service', customerAvailabilityController.startService);
+  router.post('/api/customer-availability/complete-service', customerAvailabilityController.completeService);
+  router.get('/api/customer-availability/:process_id', customerAvailabilityController.getCustomerAvailabilityStatus);
+
+  // TV Display routes
+  const tvDisplayController = require('../controllers/CustomerService/tvDisplayController');
+  router.get('/api/tv-display-customers', tvDisplayController.getTvDisplayCustomers);
 
   // Facility and Location routes
   router.get('/api/facilities', facilityController.getFacilities);
@@ -209,6 +241,20 @@ let routes =  (app) => {
   // User Activity Log routes
   const userActivityController = require('../controllers/Reports/userActivityController');
   router.get('/api/user-activity-log', userActivityController.getUserActivityLog);
+
+  // Customer Detail Report routes
+  const customerDetailReportController = require('../controllers/Reports/customerDetailReportController');
+  router.get('/api/customers-detail-report', customerDetailReportController.getCustomersDetailReport);
+  router.get('/api/customers/:customerId/service-details', customerDetailReportController.getCustomerServiceDetails);
+
+  // Picklist History routes
+  const picklistHistoryController = require('../controllers/Reports/picklistHistoryController');
+  router.get('/api/picklist-history', picklistHistoryController.getPicklistHistory);
+
+  // HP Customer Detail Report routes
+  const hpCustomerDetailReportController = require('../controllers/Reports/hpCustomerDetailReportController');
+  router.get('/api/hp-customers-detail-report', hpCustomerDetailReportController.getHPCustomersDetailReport);
+  router.get('/api/hp-customers/:customerId/service-details', hpCustomerDetailReportController.getHPCustomerServiceDetails);
 
   return app.use("/", router);
 };

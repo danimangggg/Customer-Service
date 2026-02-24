@@ -1,301 +1,70 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import Swal from 'sweetalert2';
 import {
   Box,
   Paper,
   Typography,
   CircularProgress,
-  List,
-  ListItem,
-  ListItemText,
-  Stack,
-  Button,
-  useMediaQuery,
   Container,
   Card,
-  CardHeader,
   Avatar,
-  Divider,
+  Stack,
   Fade,
   Chip,
   Grid,
+  Button,
 } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PersonIcon from '@mui/icons-material/Person';
 import StoreIcon from '@mui/icons-material/Store';
-import { useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 
 const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-const AllPicklists = () => {
+const RDFPicklists = () => {
   const [picklists, setPicklists] = useState([]);
-  const [employees, setEmployees] = useState([]);
   const [combinedPicklists, setCombinedPicklists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const jobTitle = (localStorage.getItem('JobTitle') || '').toLowerCase();
-  const userId = Number(localStorage.getItem('UserId')) || null;
-  const userStore = (localStorage.getItem('store') || '').toUpperCase();
-
-  const audioRef = useRef(null);
-  const notificationIntervalRef = useRef(null);
-  const lastPicklistsCountRef = useRef(0);
-
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [pickRes, empRes] = await Promise.all([
-        axios.get(`${api_url}/api/getPicklists`),
-        axios.get(`${api_url}/api/get-employee`),
-      ]);
+      const pickRes = await axios.get(`${api_url}/api/getPicklists`);
 
       let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
 
-      // ✅ Remove completed picklists
+      // ✅ Remove completed picklists - show only uncompleted
       allPicklists = allPicklists.filter(
         (p) => String(p.status || '').toLowerCase() !== 'completed'
       );
 
-      // ✅ If user is a WIM Operator, show only their assigned picklists
-      if (jobTitle.includes('wim operator')) {
-        allPicklists = allPicklists.filter(
-          (p) => Number(p.operator_id) === userId
-        );
-      }
-
-      // ✅ If user is an EWM Officer, show only their store picklists
-      if (jobTitle.includes('ewm officer')) {
-        allPicklists = allPicklists.filter(
-          (p) => String(p.store || '').toUpperCase() === userStore
-        );
-      }
-
       setPicklists(allPicklists);
-      setEmployees(empRes.data || []);
-      lastPicklistsCountRef.current = allPicklists.length;
     } catch (err) {
       console.error(err);
       setError('Failed to fetch data');
     } finally {
       setLoading(false);
     }
-  }, [jobTitle, userId, userStore]);
-
-  // 🔹 Combine picklist + operator info (facility info now comes from backend)
-  useEffect(() => {
-    const combined = picklists.map((p) => {
-      // Operator info (keep existing logic)
-      const operator = employees.find(
-        (e) => Number(e.id) === Number(p.operator_id)
-      );
-      
-      return {
-        ...p,
-        // facility is now provided directly from backend
-        operator,
-      };
-    });
-    setCombinedPicklists(combined);
-  }, [picklists, employees]); // Removed services and facilities dependencies
-
-  // 🔹 Audio setup
-  useEffect(() => {
-    audioRef.current = new Audio('/audio/notification/notification.mp3');
-    audioRef.current.load();
-
-    const unlockAudio = () => {
-      audioRef.current
-        .play()
-        .then(() => {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-          window.removeEventListener('click', unlockAudio);
-        })
-        .catch(() => {});
-    };
-
-    window.addEventListener('click', unlockAudio);
-    return () => window.removeEventListener('click', unlockAudio);
   }, []);
 
-  // 🔹 Poll for updates
+  // Combine picklist info (facility info comes from backend)
+  useEffect(() => {
+    const combined = picklists.map((p) => ({
+      ...p,
+    }));
+    setCombinedPicklists(combined);
+  }, [picklists]);
+
   useEffect(() => {
     fetchData();
-    const interval = setInterval(async () => {
-      try {
-        const pickRes = await axios.get(`${api_url}/api/getPicklists`);
-        let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
-
-        // Remove completed
-        allPicklists = allPicklists.filter(
-          (p) => String(p.status || '').toLowerCase() !== 'completed'
-        );
-
-        // ✅ WIM Operator: only their assigned
-        if (jobTitle.includes('wim operator')) {
-          allPicklists = allPicklists.filter(
-            (p) => Number(p.operator_id) === userId
-          );
-        }
-
-        // ✅ EWM Officer: only their store
-        if (jobTitle.includes('ewm officer')) {
-          allPicklists = allPicklists.filter(
-            (p) => String(p.store || '').toUpperCase() === userStore
-          );
-        }
-
-        if (
-          allPicklists.length > lastPicklistsCountRef.current &&
-          jobTitle.includes('wim operator')
-        ) {
-          const newlyAdded =
-            allPicklists.length - lastPicklistsCountRef.current;
-          triggerNotifications(newlyAdded);
-        }
-
-        lastPicklistsCountRef.current = allPicklists.length;
-        setPicklists(allPicklists);
-      } catch (err) {
-        console.error('Polling error', err);
-      }
-    }, 10000);
-
+    const interval = setInterval(fetchData, 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
-  }, [fetchData, jobTitle, userId, userStore]);
-
-  const triggerNotifications = (newlyAddedCount) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current
-        .play()
-        .catch(() => console.warn('Audio blocked, user interaction needed.'));
-
-      let played = 1;
-      const interval = setInterval(() => {
-        if (played >= 2) {
-          clearInterval(interval);
-          return;
-        }
-        played++;
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {});
-      }, 60000);
-    }
-
-    if (
-      typeof Notification !== 'undefined' &&
-      Notification.permission === 'granted'
-    ) {
-      new Notification('New Picklist Submitted', {
-        body: `${newlyAddedCount} new picklist(s) submitted.`,
-      });
-    }
-
-    Swal.fire({
-      toast: true,
-      position: 'top-end',
-      icon: 'info',
-      title: 'New Picklist Submitted',
-      text: `Check the new picklists list.`,
-      showConfirmButton: false,
-      timer: 4000,
-    });
-  };
-
-  const handleComplete = async (picklistId) => {
-    const picklist = combinedPicklists.find((p) => p.id === picklistId);
-    if (!picklist) return;
-
-    const result = await Swal.fire({
-      title: 'Complete Picklist?',
-      text: 'This will delete the PDF file and mark it as completed.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, complete',
-      cancelButtonText: 'Cancel',
-    });
-
-    if (!result.isConfirmed) return;
-
-    try {
-      clearInterval(notificationIntervalRef.current);
-      if (audioRef.current) audioRef.current.pause();
-
-      await axios.put(`${api_url}/api/completePicklist/${picklistId}`, {
-        fileUrl: picklist.url,
-        status: 'Completed',
-      });
-      
-      // Record WIM Operator service time
-      try {
-        // Get the customer queue record
-        const customerRes = await axios.get(`${api_url}/api/serviceList`);
-        const customer = customerRes.data.find(c => c.id === picklist.customer_queue_id);
-        
-        if (customer) {
-          const wimEndTime = new Date().toISOString();
-          
-          // Format datetime for MySQL
-          const formatForMySQL = (dateValue) => {
-            if (!dateValue) return null;
-            const d = new Date(dateValue);
-            return d.getFullYear() + '-' +
-                   String(d.getMonth() + 1).padStart(2, '0') + '-' +
-                   String(d.getDate()).padStart(2, '0') + ' ' +
-                   String(d.getHours()).padStart(2, '0') + ':' +
-                   String(d.getMinutes()).padStart(2, '0') + ':' +
-                   String(d.getSeconds()).padStart(2, '0');
-          };
-          
-          const serviceTimeData = {
-            process_id: customer.id,
-            service_unit: 'WIM Operator',
-            end_time: formatForMySQL(wimEndTime),
-            officer_id: localStorage.getItem('EmployeeID'),
-            officer_name: localStorage.getItem('FullName'),
-            status: 'completed',
-            notes: `Completed picklist for ODN ${picklist.odn}`
-          };
-          
-          // Update customer_queue with WIM completion tracking only
-          await axios.put(`${api_url}/api/update-service-point`, {
-            id: customer.id,
-            wim_completed_at: wimEndTime,
-            wim_operator_id: localStorage.getItem('EmployeeID'),
-            wim_operator_name: localStorage.getItem('FullName')
-          });
-          
-          const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
-          console.log('✅ WIM Operator service time recorded:', serviceTimeResponse.data);
-        }
-      } catch (err) {
-        console.error('❌ Failed to record WIM service time:', err);
-        console.error('Error details:', err.response?.data);
-      }
-
-      Swal.fire({ icon: 'success', title: 'Picklist marked as completed' });
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      Swal.fire({
-        icon: 'error',
-        title: 'Failed',
-        text: 'Could not complete picklist',
-      });
-    }
-  };
+  }, [fetchData]);
 
   const handleView = (url) => window.open(url, '_blank');
 
@@ -418,19 +187,19 @@ const AllPicklists = () => {
                   textShadow: '0 2px 4px rgba(0,0,0,0.1)',
                   mb: 1
                 }}>
-                  All Picklists
+                  RDF Picklists
                 </Typography>
                 <Typography variant="h6" sx={{ 
                   opacity: 0.9, 
                   fontWeight: 300,
                   textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                 }}>
-                  Manage and track picklist submissions
+                  Manage and track RDF picklist submissions
                 </Typography>
               </Box>
               <Button
                 variant="contained"
-                onClick={() => navigate('/completed-picklists')}
+                onClick={() => navigate('/rdf-completed-picklists')}
                 className="action-button"
                 sx={{
                   bgcolor: 'rgba(255,255,255,0.2)',
@@ -515,21 +284,19 @@ const AllPicklists = () => {
                                 </Stack>
                               )}
 
-                              {p.operator && (
-                                <Stack direction="row" alignItems="center" spacing={1}>
-                                  <PersonIcon fontSize="small" color="success" />
-                                  <Typography variant="body2" fontWeight="bold" color="success.main">
-                                    Assigned: {p.operator.full_name}
-                                  </Typography>
-                                </Stack>
-                              )}
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <PersonIcon fontSize="small" color="info" />
+                                <Typography variant="body2" color="text.secondary">
+                                  Process ID: {p.process_id}
+                                </Typography>
+                              </Stack>
                             </Stack>
                           </Grid>
 
                           {/* Actions */}
                           <Grid item xs={12} md={6}>
                             <Stack 
-                              direction={isMobile ? "column" : "row"} 
+                              direction="row" 
                               spacing={2} 
                               justifyContent="flex-end"
                               alignItems="center"
@@ -543,20 +310,6 @@ const AllPicklists = () => {
                               >
                                 View PDF
                               </Button>
-
-                              {jobTitle.includes('wim operator') &&
-                                Number(p.operator_id) === userId && (
-                                  <Button
-                                    variant="contained"
-                                    color="success"
-                                    onClick={() => handleComplete(p.id)}
-                                    startIcon={<CheckCircleIcon />}
-                                    className="action-button"
-                                    sx={{ minWidth: 120 }}
-                                  >
-                                    Complete
-                                  </Button>
-                                )}
                             </Stack>
                           </Grid>
                         </Grid>
@@ -568,35 +321,9 @@ const AllPicklists = () => {
             )}
           </Box>
         </Card>
-
-        {/* Floating Alert Button */}
-        {jobTitle.includes('wim operator') && (
-          <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
-            <Button 
-              variant="contained" 
-              startIcon={<NotificationsActiveIcon />}
-              className="action-button"
-              sx={{
-                background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%)',
-                borderRadius: 3,
-                px: 3,
-                py: 1.5,
-                fontSize: '0.9rem',
-                fontWeight: 'bold',
-                boxShadow: '0 8px 24px rgba(255, 107, 107, 0.4)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #ee5a24 0%, #ff6b6b 100%)',
-                  boxShadow: '0 12px 32px rgba(255, 107, 107, 0.6)',
-                }
-              }}
-            >
-              WIM Operator Alerts Active
-            </Button>
-          </Box>
-        )}
       </Container>
     </>
   );
 };
 
-export default AllPicklists;
+export default RDFPicklists;

@@ -343,9 +343,12 @@ export default function SignIn() {
       console.log("========================");
       
       setTimeout(() => {
-        // Handle Admin account type FIRST (highest priority)
-        if(response.data.AccountType === "Admin"){
-          if(response.data.JobTitle === "WIM Operator"){
+        const accountType = response.data.AccountType;
+        const jobTitle = response.data.JobTitle;
+        
+        // Admin, Coordinator, and Manager - keep dashboard/reports access
+        if(accountType === "Admin"){
+          if(jobTitle === "WIM Operator"){
             console.log("→ Routing to Picklists - Admin WIM Operator");
             navigate(`/all-picklists`);
           } else {
@@ -353,24 +356,82 @@ export default function SignIn() {
             navigate('/hp-dashboard');
           }
         }
-        // Check for specific HP-related job titles (with - HP suffix)
-        else if(response.data.JobTitle === "O2C Officer - HP" || response.data.JobTitle === "EWM Officer - HP" || response.data.JobTitle === "PI Officer-HP" || response.data.JobTitle === "Documentation Officer" || response.data.JobTitle === "Documentation Follower" || response.data.JobTitle === "Quality Evaluator" || response.data.JobTitle === "Dispatcher - HP" || response.data.JobTitle === "TM Manager"){
-          console.log("✓ Routing to HP Dashboard - HP job title");
-          navigate('/hp-dashboard');
-        }
-        // Coordinator and Manager users go to HP Reports
-        else if(response.data.JobTitle === "Coordinator" || response.data.JobTitle === "Manager"){
+        else if(jobTitle === "Coordinator" || jobTitle === "Manager"){
           console.log("→ Routing to HP Reports - Coordinator/Manager");
           navigate('/reports/hp-comprehensive');
         }
-        // Customer Service Dispatcher (without HP suffix) goes to Customer Dashboard
-        else if(response.data.JobTitle === "Dispatcher"){
-          console.log("→ Routing to Customer Dashboard - Customer Service Dispatcher");
-          navigate('/customer-dashboard');
+        // Regular users - redirect to their specific work page
+        else if(jobTitle === "Customer Service Officer"){
+          console.log("→ Routing to Register Customer - Customer Service Officer");
+          navigate('/register-customer');
+        }
+        else if(jobTitle === "O2C Officer"){
+          console.log("→ Routing to Outstanding Process - O2C Officer");
+          navigate('/outstandingProcess');
+        }
+        else if(jobTitle === "EWM Officer"){
+          console.log("→ Routing to Outstanding Process - EWM Officer");
+          navigate('/outstandingProcess');
+        }
+        else if(jobTitle === "O2C Officer - HP"){
+          console.log("→ Routing to HP Facilities - O2C Officer HP");
+          navigate('/hp-facilities');
+        }
+        else if(jobTitle === "EWM Officer - HP"){
+          console.log("→ Routing to HP Facilities - EWM Officer HP");
+          navigate('/hp-facilities');
+        }
+        else if(jobTitle === "PI Officer-HP"){
+          console.log("→ Routing to PI Vehicle Requests - PI Officer HP");
+          navigate('/pi-vehicle-requests');
+        }
+        else if(jobTitle === "Dispatcher"){
+          console.log("→ Routing to Dispatch - Dispatcher");
+          navigate('/dispatch');
+        }
+        else if(jobTitle === "Dispatcher - HP"){
+          console.log("→ Routing to Dispatch Management - Dispatcher HP");
+          navigate('/dispatch-management');
+        }
+        else if(jobTitle === "Dispatch-Documentation"){
+          console.log("→ Routing to Exit Permit - Dispatch-Documentation");
+          navigate('/exit-permit');
+        }
+        else if(jobTitle === "EWM-Documentation"){
+          console.log("→ Routing to Invoice Management - EWM-Documentation");
+          navigate('/ewm-documentation');
+        }
+        else if(jobTitle === "Gate Keeper"){
+          console.log("→ Routing to Security - Gate Keeper");
+          navigate('/gate-keeper');
+        }
+        else if(jobTitle === "WIM Operator"){
+          console.log("→ Routing to Picklists - WIM Operator");
+          navigate('/all-picklists');
+        }
+        else if(jobTitle === "Queue Manager"){
+          console.log("→ Routing to Customer Availability - Queue Manager");
+          navigate('/queue-manager');
+        }
+        else if(jobTitle === "Documentation Officer"){
+          console.log("→ Routing to Documentation Management - Documentation Officer");
+          navigate('/documentation-management');
+        }
+        else if(jobTitle === "Documentation Follower"){
+          console.log("→ Routing to Document Follow-up - Documentation Follower");
+          navigate('/document-followup');
+        }
+        else if(jobTitle === "Quality Evaluator"){
+          console.log("→ Routing to Quality Evaluation - Quality Evaluator");
+          navigate('/quality-evaluation');
+        }
+        else if(jobTitle === "TM Manager"){
+          console.log("→ Routing to HP Dashboard - TM Manager");
+          navigate('/hp-dashboard');
         }
         // Handle Self Assessment account type
-        else if(response.data.AccountType === "Self Assesment"){
-          if(response.data.JobTitle === "WIM Operator"){
+        else if(accountType === "Self Assesment"){
+          if(jobTitle === "WIM Operator"){
             console.log("→ Routing to Picklists - WIM Operator");
             navigate(`/all-picklists`);
           } else {
@@ -379,7 +440,7 @@ export default function SignIn() {
           }
         } 
         // Handle Credit Manager
-        else if (response.data.AccountType === "Credit Manager"){
+        else if(accountType === "Credit Manager"){
           console.log("→ Routing to Customer Dashboard - Credit Manager");
           navigate('/customer-dashboard');
         }
@@ -415,7 +476,7 @@ export default function SignIn() {
               <Box sx={{ mb: 2 }}>
                 <img 
                   src="/pharmalog-logo.png" 
-                  alt="PharmaLog Logo" 
+                  alt="EPSS-MT Logo" 
                   style={{ 
                     width: 180, 
                     height: 180, 
@@ -432,7 +493,7 @@ export default function SignIn() {
               </Box>
               
               <Typography variant="h2" sx={{ fontWeight: 900, mb: 1.5, textShadow: '0 4px 8px rgba(0,0,0,0.2)', letterSpacing: '-1px', fontSize: '3rem' }}>
-                PharmaLog
+                EPSS-MT
               </Typography>
               <Typography variant="h6" sx={{ mb: 3, opacity: 0.95, fontWeight: 500 }}>
                 Pharmaceutical Operations Follow-Up System
@@ -560,7 +621,7 @@ export default function SignIn() {
                 </StyledButton>
 
                 <Typography variant="body2" sx={{ mt: 3, color: 'text.secondary', textAlign: 'center' }}>
-                  © 2025 PharmaLog. All rights reserved.
+                  © 2025 EPSS-MT. All rights reserved.
                 </Typography>
               </Box>
             </Box>

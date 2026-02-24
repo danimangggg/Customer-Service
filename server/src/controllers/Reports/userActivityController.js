@@ -12,9 +12,7 @@ const getUserActivityLog = async (req, res) => {
         st.id as activity_id,
         st.process_id,
         st.service_unit,
-        st.start_time,
         st.end_time,
-        st.duration_minutes,
         st.status,
         st.notes,
         st.created_by as user_id,
@@ -53,7 +51,7 @@ const getUserActivityLog = async (req, res) => {
       LEFT JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN customer_queue cq ON cq.facility_id = f.id
       WHERE 1=1
-      ORDER BY st.start_time DESC
+      ORDER BY st.end_time DESC
       LIMIT 1000
     `;
 
@@ -68,9 +66,8 @@ const getUserActivityLog = async (req, res) => {
       
       return {
         activityId: record.activity_id,
-        timestamp: record.start_time,
+        timestamp: record.end_time,
         endTime: record.end_time,
-        duration: record.duration_minutes,
         userId: record.user_id,
         userName: record.user_name,
         role: record.user_role || record.service_unit,
@@ -133,7 +130,6 @@ const getUserActivityLog = async (req, res) => {
         activityId: `reg_${reg.queue_id}`,
         timestamp: reg.timestamp,
         endTime: reg.timestamp,
-        duration: 0,
         userId: reg.user_id,
         userName: reg.user_name,
         role: reg.role,
@@ -161,8 +157,7 @@ const getUserActivityLog = async (req, res) => {
         e.jobTitle as role,
         st.service_unit,
         COUNT(DISTINCT CASE WHEN st.status = 'completed' THEN st.id END) as completed_tasks,
-        COUNT(DISTINCT CASE WHEN st.status = 'in_progress' THEN st.id END) as pending_tasks,
-        AVG(CASE WHEN st.status = 'completed' THEN st.duration_minutes END) as avg_duration
+        COUNT(DISTINCT CASE WHEN st.status = 'in_progress' THEN st.id END) as pending_tasks
       FROM service_time st
       INNER JOIN employees e ON st.created_by = e.id
       GROUP BY e.full_name, e.jobTitle, st.service_unit
@@ -174,8 +169,7 @@ const getUserActivityLog = async (req, res) => {
         'Customer Service Officer' as role,
         'Customer Service Officer' as service_unit,
         COUNT(DISTINCT CASE WHEN cq.registration_completed_at IS NOT NULL THEN cq.id END) as completed_tasks,
-        0 as pending_tasks,
-        0 as avg_duration
+        0 as pending_tasks
       FROM customer_queue cq
       WHERE cq.registered_by_name IS NOT NULL
       GROUP BY cq.registered_by_name
@@ -193,8 +187,7 @@ const getUserActivityLog = async (req, res) => {
         COUNT(DISTINCT st.id) as total_activities,
         COUNT(DISTINCT st.created_by) as total_users,
         COUNT(DISTINCT CASE WHEN st.status = 'completed' THEN st.id END) as completed_activities,
-        COUNT(DISTINCT CASE WHEN st.status = 'in_progress' THEN st.id END) as in_progress_activities,
-        AVG(CASE WHEN st.status = 'completed' THEN st.duration_minutes END) as avg_duration_minutes
+        COUNT(DISTINCT CASE WHEN st.status = 'in_progress' THEN st.id END) as in_progress_activities
       FROM service_time st
     `;
 
@@ -209,8 +202,7 @@ const getUserActivityLog = async (req, res) => {
         totalActivities: (summary.total_activities || 0) + registrations.length,
         totalUsers: summary.total_users || 0,
         completedActivities: (summary.completed_activities || 0) + registrations.length,
-        inProgressActivities: summary.in_progress_activities || 0,
-        avgDurationMinutes: Math.round(summary.avg_duration_minutes || 0)
+        inProgressActivities: summary.in_progress_activities || 0
       }
     });
 

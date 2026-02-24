@@ -35,6 +35,9 @@ db.customerService = require("./CustomerService/customerQueue.js")(sequelize, Se
 db.picklist = require("./CustomerService/picklist.js")(sequelize, Sequelize);
 db.process = require("./CustomerService/process.js")(sequelize, Sequelize);
 db.odn = require("./CustomerService/odn.js")(sequelize, Sequelize);
+db.odnRdf = require("./CustomerService/odnRdf.js")(sequelize, Sequelize);
+db.invoice = require("./CustomerService/invoice.js")(sequelize, Sequelize);
+db.customerAvailability = require("./CustomerService/customerAvailability.js")(sequelize, Sequelize);
 db.facility = require("./CustomerService/facility.js")(sequelize, Sequelize);
 db.region = require("./CustomerService/region.js")(sequelize, Sequelize);
 db.zone = require("./CustomerService/zone.js")(sequelize, Sequelize);
@@ -79,6 +82,17 @@ db.odn.belongsTo(db.process, {
 db.process.hasMany(db.odn, {
   foreignKey: 'process_id',
   as: 'odns'
+});
+
+// ODN RDF and Customer Queue associations
+db.odnRdf.belongsTo(db.customerService, {
+  foreignKey: 'process_id',
+  as: 'customerQueue'
+});
+
+db.customerService.hasMany(db.odnRdf, {
+  foreignKey: 'process_id',
+  as: 'odnRdfs'
 });
 
 // Route Assignment associations

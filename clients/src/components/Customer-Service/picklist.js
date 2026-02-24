@@ -74,16 +74,24 @@ const PickListDetail = () => {
         setPickList(processItem);
       }
 
-      const storeKey = userStore.toLowerCase();
-      const odnField = `${storeKey}_odn`;
-      const odns = services
-        .map(s => s[odnField])
-        .filter(Boolean)
-        .filter((v, i, a) => a.indexOf(v) === i);
-      setOdnOptions(odns);
-
-      if (processItem) {
-        setOdnInput(processItem[odnField] || '');
+      // Fetch ODNs from the new odns_rdf table
+      try {
+        const odnRes = await axios.get(`${api_url}/api/rdf-odns/${process_id}`);
+        if (odnRes.data.success && odnRes.data.odns) {
+          // Filter ODNs for the current user's store
+          const storeOdns = odnRes.data.odns
+            .filter(odn => odn.store === userStore)
+            .map(odn => odn.odn_number);
+          setOdnOptions(storeOdns);
+          
+          // Set first ODN as default if available
+          if (storeOdns.length > 0 && !odnInput) {
+            setOdnInput(storeOdns[0]);
+          }
+        }
+      } catch (odnError) {
+        console.error('Error fetching ODNs:', odnError);
+        setOdnOptions([]);
       }
 
       const facilitiesRes = await axios.get(`${api_url}/api/facilities`);
@@ -145,11 +153,6 @@ const PickListDetail = () => {
       return;
     }
 
-    if (submittedPicklists.some(p => p.odn === odnInput)) {
-      setUploadMessage('This ODN number is already submitted!');
-      return;
-    }
-
     setUploading(true);
     try {
       const formData = new FormData();
@@ -163,19 +166,16 @@ const PickListDetail = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // Record service time for EWM Officer
+      // Record service time for EWM Officer with store
       try {
         await recordServiceTimeAuto({
           processId: parseInt(process_id),
-          serviceUnit: 'EWM Officer',
-          startTime: pickList?.o2c_completed_at || pickList?.started_at,
+          serviceUnit: `EWM ${userStore}`,
           endTime: formatTimestamp(),
-          previousServiceUnit: 'O2C Officer',
-          previousEndTime: pickList?.o2c_completed_at,
           isHP: false,
           notes: `Uploaded picklist for ODN ${odnInput}, assigned to WIM operator`
         });
-        console.log('✅ EWM service time recorded');
+        console.log(`✅ EWM ${userStore} service time recorded`);
       } catch (err) {
         console.error('❌ Failed to record EWM service time:', err);
         // Don't fail the upload if service time recording fails
@@ -432,34 +432,40 @@ const PickListDetail = () => {
                 <form onSubmit={handleSubmit}>
                   <Grid container spacing={3}>
                     <Grid item xs={12} md={6}>
-                      <Autocomplete
-                        freeSolo
-                        fullWidth
-                        options={odnOptions}
+                      <TextField
+                        select
+                        label="Select ODN Number"
                         value={odnInput}
-                        onChange={(e, val) => setOdnInput(val || '')}
-                        onInputChange={(e, val) => setOdnInput(val)}
-                        renderInput={(params) => (
-                          <TextField 
-                            {...params} 
-                            label="ODN Number" 
-                            required 
-                            className="form-field"
-                            sx={{
-                              '& .MuiOutlinedInput-root': {
-                                borderRadius: 3,
-                                transition: 'all 0.3s ease',
-                                '&:hover': {
-                                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)',
-                                },
-                                '&.Mui-focused': {
-                                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)',
-                                }
-                              }
-                            }}
-                          />
+                        onChange={(e) => setOdnInput(e.target.value)}
+                        required
+                        fullWidth
+                        className="form-field"
+                        helperText={odnOptions.length === 0 ? "No ODNs available for your store" : `${odnOptions.length} ODN(s) available`}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 3,
+                            transition: 'all 0.3s ease',
+                            '&:hover': {
+                              boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)',
+                            },
+                            '&.Mui-focused': {
+                              boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)',
+                            }
+                          }
+                        }}
+                      >
+                        {odnOptions.length === 0 ? (
+                          <MenuItem value="" disabled>
+                            No ODNs available
+                          </MenuItem>
+                        ) : (
+                          odnOptions.map((odn) => (
+                            <MenuItem key={odn} value={odn}>
+                              {odn}
+                            </MenuItem>
+                          ))
                         )}
-                      />
+                      </TextField>
                     </Grid>
 
                     <Grid item xs={12} md={6}>

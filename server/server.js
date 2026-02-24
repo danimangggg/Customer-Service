@@ -7,7 +7,7 @@ const initRoutes = require("./src/routes/web");
 
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://192.168.1.100:3000', 'http://127.0.0.1:3000'],
+  origin: ['http://localhost:3000', 'http://10.2.32.150:3000', 'http://127.0.0.1:3000'],
   credentials: true
 }));
 app.use(express.json())
@@ -33,5 +33,5 @@ db.sequelize.sync().then(() => {
 let port = "3001";
 app.listen(port, '0.0.0.0', () => {
   console.log(`Running at 0.0.0.0:${port}`);
-  console.log(`Access via: http://localhost:${port} or http://[your-ip]:${port}`);
+  console.log(`Access via: http://localhost:${port} or http://10.2.32.150:${port}`);
 });

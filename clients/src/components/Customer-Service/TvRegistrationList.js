@@ -304,7 +304,20 @@ const TvRegistrationList = () => {
 
   if (loading) {
     return (
-      <Box sx={{ height: '100vh', bgcolor: '#0d131f', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Box sx={{ 
+        height: '100vh', 
+        width: '100vw',
+        bgcolor: '#0d131f', 
+        color: '#fff', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        margin: 0,
+        padding: 0
+      }}>
         <CircularProgress color="inherit" />
       </Box>
     );
@@ -312,7 +325,21 @@ const TvRegistrationList = () => {
 
   if (!audioStarted) {
     return (
-      <Box sx={{ height: '100vh', bgcolor: '#0d131f', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+      <Box sx={{ 
+        height: '100vh', 
+        width: '100vw',
+        bgcolor: '#0d131f', 
+        color: '#fff', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        flexDirection: 'column',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        margin: 0,
+        padding: 0
+      }}>
         <Typography variant="h4" sx={{ mb: 4 }}>
           Click to Start Kiosk
         </Typography>
@@ -406,10 +433,14 @@ const TvRegistrationList = () => {
     <Box
       sx={{
         height: '100vh',
+        width: '100vw',
         bgcolor: '#0d131f',
         color: '#fff',
         p: 2,
-        position: 'relative',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        margin: 0,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -432,7 +463,7 @@ const TvRegistrationList = () => {
           Customer Queue
         </Typography>
         <Box sx={{ textAlign: 'center' }}>
-          <img src="/pharmalog-logo.png" alt="PharmaLog Logo" style={{ height: '60px', width: 'auto' }} />
+          <img src="/pharmalog-logo.png" alt="EPSS-MT Logo" style={{ height: '60px', width: 'auto' }} />
         </Box>
         <Typography
           sx={{

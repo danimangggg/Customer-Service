@@ -6,9 +6,7 @@ const insertServiceTime = async (req, res) => {
     const { 
       process_id, 
       service_unit, 
-      start_time, 
       end_time, 
-      waiting_minutes, 
       officer_id, 
       officer_name, 
       status, 
@@ -17,18 +15,15 @@ const insertServiceTime = async (req, res) => {
 
     const query = `
       INSERT INTO service_time 
-      (process_id, service_unit, start_time, end_time, waiting_minutes, 
-       officer_id, officer_name, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     await db.sequelize.query(query, {
       replacements: [
         process_id, 
         service_unit, 
-        start_time, 
         end_time, 
-        waiting_minutes || 0, 
         officer_id, 
         officer_name, 
         status || 'completed', 
@@ -54,9 +49,7 @@ const insertServiceTimeHP = async (req, res) => {
     const { 
       process_id, 
       service_unit, 
-      start_time, 
       end_time, 
-      waiting_minutes, 
       officer_id, 
       officer_name, 
       status, 
@@ -65,18 +58,15 @@ const insertServiceTimeHP = async (req, res) => {
 
     const query = `
       INSERT INTO service_time_hp 
-      (process_id, service_unit, start_time, end_time, waiting_minutes, 
-       officer_id, officer_name, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     await db.sequelize.query(query, {
       replacements: [
         process_id, 
         service_unit, 
-        start_time, 
         end_time, 
-        waiting_minutes || 0, 
         officer_id, 
         officer_name, 
         status || 'completed', 
@@ -139,7 +129,7 @@ const getServiceTimesByProcess = async (req, res) => {
       SELECT * 
       FROM ${tableName}
       WHERE process_id = ?
-      ORDER BY start_time ASC
+      ORDER BY end_time ASC
     `;
 
     const records = await db.sequelize.query(query, {
@@ -165,7 +155,6 @@ const getRDFServiceTimeReport = async (req, res) => {
     const query = `
       SELECT 
         st.*,
-        TIMESTAMPDIFF(MINUTE, st.start_time, st.end_time) as duration_minutes,
         f.facility_name,
         f.route,
         cq.customer_type,
@@ -173,7 +162,7 @@ const getRDFServiceTimeReport = async (req, res) => {
       FROM service_time st
       INNER JOIN customer_queue cq ON st.process_id = cq.id
       LEFT JOIN facilities f ON cq.facility_id = f.id
-      ORDER BY st.start_time DESC
+      ORDER BY st.end_time DESC
       LIMIT 1000
     `;
 
@@ -196,10 +185,7 @@ const getRDFServiceTimeReport = async (req, res) => {
       }
       groupedRecords[record.process_id].service_units.push({
         service_unit: record.service_unit,
-        start_time: record.start_time,
         end_time: record.end_time,
-        duration_minutes: record.duration_minutes,
-        waiting_minutes: record.waiting_minutes,
         officer_id: record.officer_id,
         officer_name: record.officer_name,
         status: record.status,
@@ -230,7 +216,7 @@ const getHPServiceTimeReport = async (req, res) => {
       LEFT JOIN processes p ON st.process_id = p.id
       LEFT JOIN facilities f ON p.facility_id = f.id
       WHERE f.route IS NOT NULL AND f.route != ''
-      ORDER BY st.start_time DESC
+      ORDER BY st.end_time DESC
       LIMIT 1000
     `;
 
@@ -275,7 +261,7 @@ module.exports = {
 // Legacy functions for backward compatibility
 const getAllServiceTimes = async (req, res) => {
   try {
-    const query = `SELECT * FROM service_time ORDER BY start_time DESC LIMIT 100`;
+    const query = `SELECT * FROM service_time ORDER BY end_time DESC LIMIT 100`;
     const records = await db.sequelize.query(query, {
       type: db.sequelize.QueryTypes.SELECT
     });
@@ -291,8 +277,7 @@ const getServiceTimeStats = async (req, res) => {
     const query = `
       SELECT 
         service_unit,
-        COUNT(*) as count,
-        AVG(duration_minutes) as avg_duration
+        COUNT(*) as count
       FROM service_time
       WHERE status = 'completed'
       GROUP BY service_unit

@@ -22,21 +22,21 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM('started', 'onprogress', "ewm_completed", 'completed', 'Canceled'),
+      type: DataTypes.ENUM('started', 'onprogress', "ewm_completed", 'completed', 'Canceled', 'archived', 'o2c_started', 'o2c_completed', 'notifying'),
       allowNull: false,
       defaultValue: 'started',
     },
     delegate: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     delegate_phone: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     letter_number: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     started_at: {
       type: DataTypes.DATE,
@@ -110,6 +110,14 @@ measurement_unit: {
   allowNull: true,
 },
 // Gate Keeper fields
+assigned_gate_keeper_id: {
+  type: DataTypes.STRING(50),
+  allowNull: true,
+},
+assigned_gate_keeper_name: {
+  type: DataTypes.STRING(255),
+  allowNull: true,
+},
 gate_status: {
   type: DataTypes.ENUM('allowed', 'denied'),
   allowNull: true,

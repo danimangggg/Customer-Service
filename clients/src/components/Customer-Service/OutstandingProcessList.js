@@ -14,6 +14,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import { useNavigate } from 'react-router-dom';
+import OdnRdfManager from './OdnRdfManager';
  
 const OutstandingCustomers = () => {
     const [customers, setCustomers] = useState([]);
@@ -21,6 +22,11 @@ const OutstandingCustomers = () => {
     const [employees, setEmployees] = useState([]);
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [customerOdns, setCustomerOdns] = useState({}); // Store ODNs by customer ID
+    
+    // ODN Manager state
+    const [odnManagerOpen, setOdnManagerOpen] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
 
     const jobTitle = localStorage.getItem("JobTitle");
     const userId = localStorage.getItem("UserId");
@@ -105,7 +111,9 @@ const OutstandingCustomers = () => {
 
     const fetchData = async () => {
         try {
-            const customerRes = await axios.get(`${api_url}/api/serviceList`);
+            const customerRes = await axios.get(`${api_url}/api/serviceList`, {
+                params: { store: normalizedUserStore }
+            });
             const fetchedCustomers = customerRes.data;
             setCustomers(fetchedCustomers);
             console.log("Data fetched from API successfully.");
@@ -121,6 +129,34 @@ const OutstandingCustomers = () => {
             }
         } finally {
             setLoading(false);
+        }
+    };
+    
+    const fetchOdnsForCustomers = async (customerIds) => {
+        if (customerIds.length === 0) return;
+        
+        try {
+            // Fetch ODNs for each customer
+            const odnPromises = customerIds.map(customerId => 
+                axios.get(`${api_url}/api/rdf-odns/${customerId}`)
+                    .then(res => ({ customerId, odns: res.data.odns || [] }))
+                    .catch(err => {
+                        console.error(`Failed to fetch ODNs for customer ${customerId}:`, err);
+                        return { customerId, odns: [] };
+                    })
+            );
+            
+            const results = await Promise.all(odnPromises);
+            
+            // Build ODN map
+            const odnMap = {};
+            results.forEach(({ customerId, odns }) => {
+                odnMap[customerId] = odns;
+            });
+            
+            setCustomerOdns(odnMap);
+        } catch (error) {
+            console.error('Error fetching ODNs:', error);
         }
     };
 
@@ -145,10 +181,66 @@ const OutstandingCustomers = () => {
         fetchData();
         
         // Polling interval for near real-time updates and auto-cancellation check
-        const interval = setInterval(fetchData, 30000); // Poll every 30 seconds
+        const interval = setInterval(fetchData, 60000); // Poll every 60 seconds (reduced from 30)
         
         return () => clearInterval(interval);
     }, []);
+    
+    const filterAndSortCustomers = useMemo(() => {
+        if (!jobTitle || !userId) return [];
+        let filtered = [];
+        if (jobTitle === "Admin") {
+            filtered = customers;
+        } else if (jobTitle === "O2C Officer") {
+            filtered = customers.filter(c =>
+                String(c.assigned_officer_id) === String(userId) &&
+                (c.next_service_point?.toLowerCase() === 'o2c' || c.next_service_point?.toLowerCase() === 'ewm') &&
+                c.status?.toLowerCase() !== 'completed'
+            );
+            filtered.sort((a, b) => {
+                const statusA = a.status?.toLowerCase();
+                const statusB = b.status?.toLowerCase();
+                if (statusA === 'o2c_completed' && statusB !== 'o2c_completed') return 1;
+                if (statusA !== 'o2c_completed' && statusB === 'o2c_completed') return -1;
+                return 0;
+            });
+        } else if (jobTitle === 'Manager') {
+            filtered = customers.filter(c =>
+                c.next_service_point?.toLowerCase() === 'manager' &&
+                c.status?.toLowerCase() !== 'rejected' &&
+                c.status?.toLowerCase() !== 'approved'
+            );
+        } else if (jobTitle === 'Queue Manager') {
+            // Queue Manager sees customers with O2C completed status that have ODNs for their store
+            // This is now handled by the Queue Manager component itself
+            filtered = [];
+        } else {
+            const jobTitleToServicePointMap = {
+                "Customer Service Officer": "customer service", "EWM Officer": "ewm", "Finance": "finance"
+            };
+            const normalizedJobTitle = jobTitleToServicePointMap[jobTitle] || jobTitle.toLowerCase();
+            
+            if (jobTitle === "EWM Officer") {
+                // For EWM Officers, show customers that have ODNs for their store
+                // and where next_service_point is 'ewm'
+                filtered = customers.filter(c =>
+                    c.next_service_point?.toLowerCase() === 'ewm' &&
+                    c.odn_numbers // Has ODNs for this store
+                );
+            } else {
+                filtered = customers.filter(c => c.next_service_point?.toLowerCase() === normalizedJobTitle);
+            }
+        }
+        return filtered;
+    }, [customers, jobTitle, userId, normalizedUserStore]);
+    
+    // Fetch ODNs when filtered customers change (for EWM Officers only)
+    useEffect(() => {
+        if (jobTitle === 'EWM Officer' && filterAndSortCustomers.length > 0) {
+            const customerIds = filterAndSortCustomers.map(c => c.id);
+            fetchOdnsForCustomers(customerIds);
+        }
+    }, [filterAndSortCustomers, jobTitle]);
 
     const getFacilityDetails = (facilityId) => {
         const facility = facilities.find(f => f.id === facilityId);
@@ -178,79 +270,47 @@ const OutstandingCustomers = () => {
     };
 
     const getStoreODN = (customer) => {
-        if (normalizedUserStore === 'AA1') return customer.aa1_odn || 'N/A';
-        if (normalizedUserStore === 'AA2') return customer.aa2_odn || 'N/A';
-        if (normalizedUserStore === 'AA3') return customer.aa3_odn || 'N/A';
-        return 'N/A';
+        // Get ODNs from state for this customer
+        const odns = customerOdns[customer.id] || [];
+        
+        // Filter ODNs for the current user's store
+        const storeOdns = odns.filter(odn => odn.store === normalizedUserStore);
+        
+        if (storeOdns.length === 0) {
+            return 'No ODNs';
+        }
+        
+        // Return comma-separated list of ODN numbers
+        return storeOdns.map(odn => odn.odn_number).join(', ');
     };
 
+    // Availability is now managed by Queue Manager through odns_rdf table
+    // This function is no longer needed
     const handleAvailabilityChange = async (customer, isAvailable) => {
-        const availabilityValue = isAvailable ? 'A' : 'NA';
-        const storeMapping = {
-            'AA1': 'availability_aa1',
-            'AA2': 'availability_aa2',
-            'AA3': 'availability_aa3',
-        };
-        const availabilityField = storeMapping[normalizedUserStore];
-        if (!availabilityField) {
-            Swal.fire('Error', 'Invalid store configuration.', 'error');
-            return;
-        }
-        try {
-            const payload = { id: customer.id, [availabilityField]: availabilityValue };
-            await axios.put(`${api_url}/api/update-service-point`, payload);
-            Swal.fire('Updated!', 'Customer availability status changed.', 'success');
-            fetchData();
-        } catch (error) {
-            console.error("Error updating availability:", error.response ? error.response.data : error.message);
-            Swal.fire('Error', 'Failed to update availability.', 'error');
-        }
+        Swal.fire('Info', 'Availability is now managed by the Queue Manager', 'info');
     };
 
     const completeStoreTask = async (customer) => {
-        const completionData = {
-            id: customer.id,
-            store_completed_1: customer.store_completed_1,
-            store_completed_2: customer.store_completed_2,
-            store_completed_3: customer.store_completed_3,
-        };
-        
-        // Update the specific store's completion status to 'ewm_completed'
-        if (normalizedUserStore === 'AA1') {
-            completionData.store_completed_1 = 'ewm_completed';
-        } else if (normalizedUserStore === 'AA2') {
-            completionData.store_completed_2 = 'ewm_completed';
-        } else if (normalizedUserStore === 'AA3') {
-            completionData.store_completed_3 = 'ewm_completed';
-        }
-
         try {
             const ewmEndTime = new Date().toISOString();
             
-            // Add EWM tracking to completion data
-            if (!customer.ewm_started_at) {
-                completionData.ewm_started_at = ewmEndTime;
-                completionData.ewm_officer_id = localStorage.getItem('EmployeeID');
-                completionData.ewm_officer_name = localStorage.getItem('FullName');
+            // Update ODN status to 'ewm_completed' for this store
+            const response = await axios.put(`${api_url}/api/odns-rdf/complete-ewm`, {
+                process_id: customer.id,
+                store: normalizedUserStore,
+                officer_id: localStorage.getItem('EmployeeID'),
+                officer_name: localStorage.getItem('FullName')
+            });
+
+            if (!response.data.success) {
+                Swal.fire('Error', 'Failed to complete EWM process', 'error');
+                return;
             }
-            completionData.ewm_completed_at = ewmEndTime;
-            
-            await axios.put(`${api_url}/api/update-service-point`, completionData);
 
             // Record EWM service time
             try {
-                const o2cEndTime = customer.o2c_completed_at || customer.started_at;
-                const ewmStartTime = customer.ewm_started_at || ewmEndTime;
-                
-                // Calculate waiting time
-                let waitingMinutes = 0;
-                if (o2cEndTime && ewmStartTime) {
-                    const o2cEnd = new Date(o2cEndTime);
-                    const ewmStart = new Date(ewmStartTime);
-                    const diffMs = ewmStart - o2cEnd;
-                    waitingMinutes = Math.floor(diffMs / 60000);
-                    if (waitingMinutes < 0) waitingMinutes = 0;
-                }
+                // SIMPLIFIED: Only record end_time
+                const ewmEndTime = new Date().toISOString();
                 
                 // Format datetime for MySQL
                 const formatForMySQL = (dateValue) => {
@@ -266,10 +326,8 @@ const OutstandingCustomers = () => {
                 
                 const serviceTimeData = {
                     process_id: customer.id,
-                    service_unit: `EWM Officer - ${normalizedUserStore}`,
-                    start_time: formatForMySQL(ewmStartTime),
+                    service_unit: `EWM ${normalizedUserStore}`,
                     end_time: formatForMySQL(ewmEndTime),
-                    waiting_minutes: waitingMinutes,
                     officer_id: localStorage.getItem('EmployeeID'),
                     officer_name: localStorage.getItem('FullName'),
                     status: 'completed',
@@ -283,31 +341,23 @@ const OutstandingCustomers = () => {
                 console.error('Error details:', err.response?.data);
             }
 
-            const serviceListRes = await axios.get(`${api_url}/api/serviceList`);
-            const customerAfterUpdate = serviceListRes.data.find(c => c.id === customer.id);
+            // Check if all stores have completed their ODNs
+            const allOdnsResponse = await axios.get(`${api_url}/api/rdf-odns/${customer.id}`);
+            const allOdns = allOdnsResponse.data.odns;
+            const allCompleted = allOdns.every(odn => odn.ewm_status === 'completed');
 
-            if (!customerAfterUpdate) {
-                Swal.fire('Error', 'Customer data not found after update.', 'error');
-                return;
-            }
-
-            const isStore1Completed = !customerAfterUpdate.store_id_1 || customerAfterUpdate.store_completed_1 === 'ewm_completed';
-            const isStore2Completed = !customerAfterUpdate.store_id_2 || customerAfterUpdate.store_completed_2 === 'ewm_completed';
-            const isStore3Completed = !customerAfterUpdate.store_id_3 || customerAfterUpdate.store_completed_3 === 'ewm_completed';
-            
-            // The global status only changes if ALL stores are completed
-            const allStoresCompleted = isStore1Completed && isStore2Completed && isStore3Completed;
-
-            if (allStoresCompleted) {
+            if (allCompleted) {
+                // Update customer_queue to move to Dispatch
+                // DON'T set completed_at here - only Gate Keeper sets it when allowing exit
                 await updateServiceStatus(
-                    customerAfterUpdate,
+                    customer,
                     'ewm_completed',
                     null,
                     undefined,
                     'Dispatch',
-                    new Date().toISOString()
+                    undefined  // Don't set completed_at
                 );
-                Swal.fire('Completed!', 'All stores have completed this task. Service is now complete and sent to Customer.', 'success');
+                Swal.fire('Completed!', 'All stores have completed this task. Service is now sent to Dispatch.', 'success');
             } else {
                 Swal.fire('Completed!', 'You have completed your part. Waiting for other stores to complete their tasks.', 'success');
             }
@@ -360,22 +410,15 @@ const OutstandingCustomers = () => {
 
     const handleO2CStatusFlow = async (customer, action) => {
         let newStatus = customer.status;
-        let startedAt = customer.started_at;
+        let startedAt = customer.started_at; // Keep original registration time
         let additionalData = {};
 
         if (action === 'notify') {
             newStatus = 'notifying';
         } else if (action === 'start') {
             newStatus = 'o2c_started';
-            if (!customer.started_at || customer.status !== 'o2c_started') {
-                startedAt = new Date().toISOString();
-            }
-            // Track when O2C officer starts working
-            if (!customer.o2c_started_at) {
-                additionalData.o2c_started_at = new Date().toISOString();
-                additionalData.o2c_officer_id = localStorage.getItem('EmployeeID');
-                additionalData.o2c_officer_name = localStorage.getItem('FullName');
-            }
+            // Don't record o2c_started_at - we only need completion time
+            // The start time is implicitly the registration_completed_at or started_at
         } else if (action === 'stop') {
             newStatus = 'started';
             startedAt = null;
@@ -383,29 +426,33 @@ const OutstandingCustomers = () => {
         await updateServiceStatus(customer, newStatus, startedAt, undefined, undefined, undefined, additionalData);
     };
 
-    const canCancel = (customer) => {
-        const storeIds = [];
-        if (customer.store_id_1) storeIds.push('1');
-        if (customer.store_id_2) storeIds.push('2');
-        if (customer.store_id_3) storeIds.push('3');
-
+    const canCancel = async (customer) => {
         if (customer.next_service_point?.toLowerCase() !== 'ewm') {
             return true; // Allow cancel for non-EWM orders
         }
 
-        // For EWM orders, check if any assigned store has started or completed the process
-        const hasStarted = storeIds.some(index => {
-            const status = customer[`store_completed_${index}`];
-            return status === 'ewm_started' || status === 'ewm_completed';
-        });
-
-        return !hasStarted;
+        // For EWM orders, check if any ODN has started or completed the process
+        try {
+            const odnResponse = await axios.get(`${api_url}/api/rdf-odns/${customer.id}`);
+            const odns = odnResponse.data.odns || [];
+            
+            const hasStarted = odns.some(odn => 
+                odn.ewm_status === 'started' || odn.ewm_status === 'completed'
+            );
+            
+            return !hasStarted;
+        } catch (error) {
+            console.error('Error checking ODN status:', error);
+            return false; // Safer to not allow cancel if we can't check
+        }
     };
 
 
     const handleCancel = async (customer) => {
-        // This check is now also in the button's disabled state, but good to double-check
-        if (!canCancel(customer)) {
+        // Check if cancellation is allowed
+        const canCancelResult = await canCancel(customer);
+        
+        if (!canCancelResult) {
             Swal.fire({
                 title: 'Cancellation Not Allowed',
                 text: 'This service cannot be cancelled because the process has already started at one or more stores.',
@@ -538,105 +585,63 @@ const OutstandingCustomers = () => {
             let nextServicePoint = selectedRole;
 
             if (selectedRole === 'EWM') {
-                // Filter stores to only show the ones that match the existing database structure
-                const availableStores = stores.filter(store => 
-                    ['AA1', 'AA2', 'AA3'].includes(store.store_name)
-                );
-
-                if (availableStores.length === 0) {
-                    Swal.fire('Error', 'No compatible stores found in database. Please ensure AA1, AA2, or AA3 stores exist.', 'error');
+                // Check if at least one ODN exists for this process
+                let existingOdns = [];
+                try {
+                    const odnResponse = await axios.get(`${api_url}/api/rdf-odns/${customer.id}`);
+                    if (!odnResponse.data.success || odnResponse.data.odns.length === 0) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'No ODNs Found',
+                            text: 'You must add at least one Outbound Delivery Number (ODN) before sending to EWM. Please use the "Manage ODNs" button to add ODNs.',
+                            confirmButtonText: 'OK'
+                        });
+                        return;
+                    }
+                    existingOdns = odnResponse.data.odns;
+                } catch (error) {
+                    console.error('Error checking ODNs:', error);
+                    Swal.fire('Error', 'Failed to verify ODNs. Please try again.', 'error');
                     return;
                 }
+                
+                // Get unique stores from existing ODNs
+                const storesWithOdns = [...new Set(existingOdns.map(odn => odn.store))];
+                
+                // Show confirmation with ODN summary
+                const odnSummary = storesWithOdns.map(store => {
+                    const storeOdns = existingOdns.filter(odn => odn.store === store);
+                    return `<strong>${store}:</strong> ${storeOdns.length} ODN(s)`;
+                }).join('<br/>');
 
-                // Generate store checkboxes dynamically from available stores
-                const storeCheckboxes = availableStores.map(store => 
-                    `<label><input type="checkbox" id="store${store.store_name}" value="${store.store_name}"> ${store.store_name} - ${store.description || 'No description'}</label>`
-                ).join('<br/>');
-
-                const { value: selectedStores, isConfirmed: storeConfirmed } = await Swal.fire({
-                    title: 'Select Store(s)',
+                const { isConfirmed: finalConfirm } = await Swal.fire({
+                    title: 'Confirm Completion',
                     html: `
-                        <div style="text-align:left;line-height:1.9">
-                          ${storeCheckboxes}
+                        <div style="text-align:left;">
+                            <p>You are about to send this process to EWM with the following ODNs:</p>
+                            <div style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                                ${odnSummary}
+                            </div>
+                            <p><strong>Total ODNs:</strong> ${existingOdns.length}</p>
                         </div>
                     `,
-                    focusConfirm: false,
+                    icon: 'question',
                     showCancelButton: true,
-                    confirmButtonText: 'Next',
-                    preConfirm: () => {
-                        const picks = [];
-                        availableStores.forEach(store => {
-                            const checkbox = document.getElementById(`store${store.store_name}`);
-                            if (checkbox && checkbox.checked) {
-                                picks.push(store.store_name);
-                            }
-                        });
-                        return picks;
-                    }
+                    confirmButtonText: 'Yes, Complete',
+                    cancelButtonText: 'Cancel'
                 });
 
-                if (!storeConfirmed || selectedStores.length === 0) {
-                    Swal.fire('Cancelled', 'Store assignment cancelled or no stores selected.', 'info');
-                    return;
-                }
-
-                const odnMap = {};
-                let storesToEnter = [...selectedStores];
-                let isCancelled = false;
-
-                while (storesToEnter.length > 0 && !isCancelled) {
-                    const { value: formValues, isConfirmed } = await Swal.fire({
-                        title: 'Enter ODN for each store',
-                        html: `
-                            <select id="swal-store" class="swal2-input">
-                                ${storesToEnter.map(s => `<option value="${s}">${s}</option>`).join('')}
-                            </select>
-                            <input id="swal-odn" class="swal2-input" placeholder="Enter ODN for selected store">
-                        `,
-                        showCancelButton: true,
-                        confirmButtonText: storesToEnter.length > 1 ? 'Save & Continue' : 'Save & Finish',
-                        cancelButtonText: 'Cancel',
-                        preConfirm: () => {
-                            const store = document.getElementById('swal-store').value;
-                            const odn = document.getElementById('swal-odn').value;
-                            if (!store || !odn) {
-                                Swal.showValidationMessage('Both store and ODN are required.');
-                                return false;
-                            }
-                            return { store, odn };
-                        }
-                    });
-
-                    if (isConfirmed) {
-                        odnMap[formValues.store] = formValues.odn;
-                        storesToEnter = storesToEnter.filter(s => s !== formValues.store);
-                    } else {
-                        isCancelled = true;
-                    }
-                }
-
-                if (isCancelled) {
+                if (!finalConfirm) {
                     Swal.fire('Cancelled', 'Service completion cancelled.', 'info');
                     return;
                 }
 
-                updateData = {
-                    aa1_odn: odnMap['AA1'] || null,
-                    aa2_odn: odnMap['AA2'] || null,
-                    aa3_odn: odnMap['AA3'] || null,
-                    store_id_1: selectedStores.includes('AA1') ? 'AA1' : null,
-                    store_id_2: selectedStores.includes('AA2') ? 'AA2' : null,
-                    store_id_3: selectedStores.includes('AA3') ? 'AA3' : null,
-                    store_completed_1: selectedStores.includes('AA1') ? 'o2c_completed' : 'completed',
-                    store_completed_2: selectedStores.includes('AA2') ? 'o2c_completed' : 'completed',
-                    store_completed_3: selectedStores.includes('AA3') ? 'o2c_completed' : 'completed',
-                };
+                // Set store assignments based on ODNs - no longer needed in customer_queue
+                // ODN tracking is now in odns_rdf table
+                updateData = {};
             } else {
-                updateData = {
-                    aa1_odn: null, aa2_odn: null, aa3_odn: null,
-                    store_id_1: null, store_id_2: null, store_id_3: null,
-                    store_completed_1: 'completed', store_completed_2: 'completed', store_completed_3: 'completed',
-                };
+                // For Finance, no store assignments needed
+                updateData = {};
             }
 
             try {
@@ -661,19 +666,8 @@ const OutstandingCustomers = () => {
                 
                 // Record service time for O2C Officer
                 try {
-                    // Get the previous step end time (registration completion)
-                    const registrationEndTime = customer.registration_completed_at || customer.started_at;
-                    const o2cStartTime = customer.o2c_started_at || customer.started_at;
-                    
-                    // Calculate waiting time (time between registration end and O2C start)
-                    let waitingMinutes = 0;
-                    if (registrationEndTime && o2cStartTime) {
-                        const regEnd = new Date(registrationEndTime);
-                        const o2cStart = new Date(o2cStartTime);
-                        const diffMs = o2cStart - regEnd;
-                        waitingMinutes = Math.floor(diffMs / 60000);
-                        if (waitingMinutes < 0) waitingMinutes = 0;
-                    }
+                    // SIMPLIFIED: Only record end_time
+                    const o2cEndTime = new Date().toISOString();
                     
                     // Format datetime for MySQL (YYYY-MM-DD HH:MM:SS)
                     const formatForMySQL = (dateValue) => {
@@ -690,9 +684,7 @@ const OutstandingCustomers = () => {
                     const serviceTimeData = {
                         process_id: customer.id,
                         service_unit: 'O2C',
-                        start_time: formatForMySQL(o2cStartTime),
                         end_time: formatForMySQL(o2cEndTime),
-                        waiting_minutes: waitingMinutes,
                         officer_id: localStorage.getItem('EmployeeID'),
                         officer_name: localStorage.getItem('FullName'),
                         status: 'completed',
@@ -818,239 +810,70 @@ const OutstandingCustomers = () => {
     };
     
 
-    const handleEditOdn = async (customer) => {
-        const stores = [];
-        if (customer.store_id_1) stores.push('AA1');
-        if (customer.store_id_2) stores.push('AA2');
-        if (customer.store_id_3) stores.push('AA3');
+    const handleManageOdns = (customer) => {
+        setSelectedCustomer(customer);
+        setOdnManagerOpen(true);
+    };
 
-        const odnMap = {
-            'AA1': customer.aa1_odn || '',
-            'AA2': customer.aa2_odn || '',
-            'AA3': customer.aa3_odn || '',
-        };
-
-        let htmlContent = '';
-        stores.forEach(store => {
-            const storeStatus = customer[`store_completed_${store.slice(-1)}`];
-            const isStarted = storeStatus === 'ewm_started' || storeStatus === 'ewm_completed';
-            const message = isStarted ? `(Process ${storeStatus})` : '';
-            const readOnly = isStarted ? 'readonly' : '';
-
-            htmlContent += `
-                <div style="margin-top: 10px;">
-                    <label for="odn-${store}" style="display: block; text-align: left;">ODN for ${store}:</label>
-                    <input id="odn-${store}" class="swal2-input" value="${odnMap[store]}" placeholder="Enter ODN for ${store}" ${readOnly}>
-                    ${message ? `<p style="color: red; font-size: 0.8em; margin: 5px 0 0;">${message}</p>` : ''}
-                </div>
-            `;
-        });
-
-        const result = await Swal.fire({
-            title: 'Edit ODN for Stores',
-            html: htmlContent,
-            showCancelButton: true,
-            confirmButtonText: 'Save Changes',
-            preConfirm: () => {
-                const newOdnMap = {};
-                let hasUnfilledField = false;
-                stores.forEach(store => {
-                    const inputElement = document.getElementById(`odn-${store}`);
-                    const storeStatus = customer[`store_completed_${store.slice(-1)}`];
-                    
-                    if (storeStatus === 'o2c_completed') {
-                        const odn = inputElement.value;
-                        if (!odn) {
-                            hasUnfilledField = true;
-                        }
-                        newOdnMap[store] = odn;
-                    } else {
-                        newOdnMap[store] = odnMap[store];
-                    }
-                });
-                if (hasUnfilledField) {
-                    Swal.showValidationMessage('All editable ODN fields must be filled out.');
-                    return false;
-                }
-                return newOdnMap;
-            }
-        });
-
-        if (result.isConfirmed) {
-            const newOdnMap = result.value;
-            const updateData = {
-                aa1_odn: newOdnMap['AA1'],
-                aa2_odn: newOdnMap['AA2'],
-                aa3_odn: newOdnMap['AA3'],
-            };
-            try {
-                await updateServiceStatus(
-                    customer,
-                    customer.status,
-                    customer.started_at,
-                    customer.assigned_officer_id,
-                    customer.next_service_point,
-                    undefined,
-                    updateData
-                );
-                Swal.fire('Success', 'ODNs have been updated.', 'success');
-                fetchData();
-            } catch (error) {
-                console.error("Error updating ODNs:", error.response ? error.response.data : error.message);
-                Swal.fire('Error', 'Failed to update ODNs', 'error');
-            }
-        }
+    const handleCloseOdnManager = () => {
+        setOdnManagerOpen(false);
+        setSelectedCustomer(null);
+        fetchData(); // Refresh data when closing
     };
 
     const handleRevert = async (customer) => {
-        const storeMapping = {
-            'AA1': 'store_completed_1',
-            'AA2': 'store_completed_2',
-            'AA3': 'store_completed_3',
-        };
-        const myStoreCompletedField = storeMapping[normalizedUserStore];
-        
-        if (myStoreCompletedField) {
-            const payload = {
-                id: customer.id,
-                [myStoreCompletedField]: 'o2c_completed',
-            };
-            try {
-                await axios.put(`${api_url}/api/update-service-point`, payload);
-                Swal.fire('Success', 'Your store\'s process has been reverted.', 'success');
+        try {
+            // Revert ODN status to 'pending' for this store
+            const response = await axios.put(`${api_url}/api/odns-rdf/revert-ewm`, {
+                process_id: customer.id,
+                store: normalizedUserStore
+            });
+            
+            if (response.data.success) {
+                Swal.fire('Success', 'Your store\'s EWM process has been reverted.', 'success');
                 fetchData();
-            } catch (error) {
+            } else {
                 Swal.fire('Error', 'Failed to revert your store\'s process.', 'error');
             }
-        } else {
-            Swal.fire('Error', 'Invalid store configuration for reversion.', 'error');
+        } catch (error) {
+            console.error('Error reverting EWM:', error);
+            Swal.fire('Error', 'Failed to revert your store\'s process.', 'error');
         }
     };
     
     const handleEWMStart = async (customer) => {
-        const storeMapping = {
-            'AA1': 'store_completed_1',
-            'AA2': 'store_completed_2',
-            'AA3': 'store_completed_3',
-        };
-        const myStoreCompletedField = storeMapping[normalizedUserStore];
-        
-        if (myStoreCompletedField) {
-            const payload = {
-                id: customer.id,
-                [myStoreCompletedField]: 'ewm_started',
-            };
-            try {
-                await axios.put(`${api_url}/api/update-service-point`, payload);
-                Swal.fire('Success', 'Your store\'s process has started.', 'success');
-                fetchData();
-            } catch (error) {
-                Swal.fire('Error', 'Failed to start your store\'s process.', 'error');
-            }
-        } else {
-            Swal.fire('Error', 'Invalid store configuration.', 'error');
-        }
-    };
-    
-    const canO2CEditODN = (customer) => {
-        const hasStores = customer.store_id_1 || customer.store_id_2 || customer.store_id_3;
-        if (!hasStores || customer.next_service_point?.toLowerCase() !== 'ewm') return false;
-
-        const storesCompleted = [customer.store_completed_1, customer.store_completed_2, customer.store_completed_3]
-            .filter(Boolean)
-            .every(s => s === 'ewm_completed');
-        
-        return !storesCompleted;
-    };
-    
-    const filterAndSortCustomers = useMemo(() => {
-        if (!jobTitle || !userId) return [];
-        let filtered = [];
-        if (jobTitle === "Admin") {
-            filtered = customers;
-        } else if (jobTitle === "O2C Officer") {
-            filtered = customers.filter(c =>
-                String(c.assigned_officer_id) === String(userId) &&
-                (c.next_service_point?.toLowerCase() === 'o2c' || c.next_service_point?.toLowerCase() === 'ewm') &&
-                c.status?.toLowerCase() !== 'completed'
-            );
-            filtered.sort((a, b) => {
-                const statusA = a.status?.toLowerCase();
-                const statusB = b.status?.toLowerCase();
-                if (statusA === 'o2c_completed' && statusB !== 'o2c_completed') return 1;
-                if (statusA !== 'o2c_completed' && statusB === 'o2c_completed') return -1;
-                return 0;
+        // Update ODN status to 'ewm_started' for this store
+        try {
+            const response = await axios.put(`${api_url}/api/odns-rdf/start-ewm`, {
+                process_id: customer.id,
+                store: normalizedUserStore,
+                officer_id: localStorage.getItem('EmployeeID'),
+                officer_name: localStorage.getItem('FullName')
             });
-        } else if (jobTitle === 'Manager') {
-            filtered = customers.filter(c =>
-                c.next_service_point?.toLowerCase() === 'manager' &&
-                c.status?.toLowerCase() !== 'rejected' &&
-                c.status?.toLowerCase() !== 'approved'
-            );
-        } else if (jobTitle === 'Queue Manager') {
-            const storeMapping = {
-                'AA1': { storeIdField: 'store_id_1', completedField: 'store_completed_1', availabilityField: 'availability_aa1' },
-                'AA2': { storeIdField: 'store_id_2', completedField: 'store_completed_2', availabilityField: 'availability_aa2' },
-                'AA3': { storeIdField: 'store_id_3', completedField: 'store_completed_3', availabilityField: 'availability_aa3' },
-            };
-            const myStoreProps = storeMapping[normalizedUserStore];
-            if (!myStoreProps) return [];
             
-            filtered = customers.filter(c =>
-                c.next_service_point?.toLowerCase() === 'ewm' &&
-                c[myStoreProps.storeIdField] === normalizedUserStore &&
-                c[myStoreProps.completedField] !== 'ewm_completed'
-            );
-        } else {
-            const jobTitleToServicePointMap = {
-                "Customer Service Officer": "customer service", "EWM Officer": "ewm", "Finance": "finance"
-            };
-            const normalizedJobTitle = jobTitleToServicePointMap[jobTitle] || jobTitle.toLowerCase();
-            
-            if (jobTitle === "EWM Officer") {
-                const storeToCheck = normalizedUserStore.toLowerCase();
-                const storeMapping = {
-                    'aa1': { storeIdField: 'store_id_1', odn: 'aa1_odn', completed: 'store_completed_1', availability: 'availability_aa1' },
-                    'aa2': { storeIdField: 'store_id_2', odn: 'aa2_odn', completed: 'store_completed_2', availability: 'availability_aa2' },
-                    'aa3': { storeIdField: 'store_id_3', odn: 'aa3_odn', completed: 'store_completed_3', availability: 'availability_aa3' },
-                };
-                const storeProps = storeMapping[storeToCheck];
-                
-                if (storeProps) {
-                    filtered = customers.filter(c =>
-                        c.next_service_point?.toLowerCase() === normalizedJobTitle &&
-                        c[storeProps.storeIdField] === normalizedUserStore &&
-                        c[storeProps.completed] !== 'ewm_completed'
-                    );
-                } else {
-                    filtered = [];
-                }
-            } else {
-                filtered = customers.filter(c => c.next_service_point?.toLowerCase() === normalizedJobTitle);
+            if (response.data.success) {
+                Swal.fire('Success', 'EWM process started for your store', 'success');
+                fetchData();
             }
+        } catch (error) {
+            console.error('Error starting EWM:', error);
+            Swal.fire('Error', 'Failed to start EWM process', 'error');
         }
-        return filtered;
-    }, [customers, jobTitle, userId, normalizedUserStore]);
-
+    };
 
     const getOutboundDeliveryNumber = (customer) => {
-        if (customer.store_id_1 === normalizedUserStore) {
-            return customer.aa1_odn || 'N/A';
+        // Get ODNs from state for this customer
+        const odns = customerOdns[customer.id] || [];
+        
+        // Filter ODNs for the current user's store
+        const storeOdns = odns.filter(odn => odn.store === normalizedUserStore);
+        
+        if (storeOdns.length === 0) {
+            return 'No ODNs';
         }
-        if (customer.store_id_2 === normalizedUserStore) {
-            return customer.aa2_odn || 'N/A';
-        }
-        if (customer.store_id_3 === normalizedUserStore) {
-            return customer.aa3_odn || 'N/A';
-        }
-        return 'N/A';
-    };
-    
-    const getStoreStatus = (customer, storeId) => {
-        if (storeId === 'AA1') return customer.store_completed_1 || 'N/A';
-        if (storeId === 'AA2') return customer.store_completed_2 || 'N/A';
-        if (storeId === 'AA3') return customer.store_completed_3 || 'N/A';
-        return 'N/A';
+        
+        // Return comma-separated list of ODN numbers
+        return storeOdns.map(odn => odn.odn_number).join(', ');
     };
 
     return (
@@ -1190,11 +1013,6 @@ const OutstandingCustomers = () => {
                                                     <span>Facility</span>
                                                 </Stack>
                                             </TableCell>
-                                            {jobTitle === 'Queue Manager' && (
-                                                <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
-                                                    Woreda
-                                                </TableCell>
-                                            )}
                                             <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
                                                 Customer Type
                                             </TableCell>
@@ -1211,11 +1029,6 @@ const OutstandingCustomers = () => {
                                                     <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }} align="center">Availability</TableCell>
                                                 </>
                                             )}
-
-                                            {/* Queue Manager Columns */}
-                                            {jobTitle === 'Queue Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
-                                            {jobTitle === 'Queue Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>My ODN</TableCell>}
-                                            {jobTitle === 'Queue Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Availability</TableCell>}
 
                                             {jobTitle === 'O2C Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
 
@@ -1250,20 +1063,30 @@ const OutstandingCustomers = () => {
                                 const { name, woreda } = getFacilityDetails(customer.facility_id);
                                 const normalizedStatus = customer.status ? String(customer.status).trim().toLowerCase() : null;
                                 const isO2CCompleted = customer.next_service_point?.toLowerCase() === 'ewm';
+                                const isO2CActive = customer.next_service_point?.toLowerCase() === 'o2c';
+                                // Show Manage ODNs only after Start button is clicked (status = 'o2c_started')
+                                const canManageOdns = normalizedStatus === 'o2c_started' || isO2CCompleted;
                                 const rowStyle = (jobTitle === 'O2C Officer' && isO2CCompleted) ? { backgroundColor: '#f0f0f0' } : {};
                                 
                                 const showNotifyButton = customer.next_service_point?.toLowerCase() === 'o2c' && (normalizedStatus === null || normalizedStatus === '' || normalizedStatus === 'started');
                                 const showStartAndStopButtons = normalizedStatus === 'notifying';
                                 const showCompleteButton = normalizedStatus === 'o2c_started';
 
-                                const myStoreStatus = getStoreStatus(customer, normalizedUserStore);
-                                const showEWMStartButton = myStoreStatus === 'o2c_completed';
-                                const showEWMCompleteAndRevertButtons = myStoreStatus === 'ewm_started';
+                                const myStoreStatus = getStoreODN(customer);
+                                
+                                // Get ODN status for this store
+                                const storeOdns = customerOdns[customer.id]?.filter(odn => odn.store === normalizedUserStore) || [];
+                                const hasStartedOdns = storeOdns.some(odn => odn.ewm_status === 'started');
+                                const allCompleted = storeOdns.length > 0 && storeOdns.every(odn => odn.ewm_status === 'completed');
+                                
+                                // Show Start button if no ODNs have been started yet
+                                const showEWMStartButton = !hasStartedOdns && !allCompleted;
+                                // Show Complete/Revert buttons if at least one ODN has been started
+                                const showEWMCompleteAndRevertButtons = hasStartedOdns && !allCompleted;
                                 
                                 return (
                                     <TableRow key={customer.id} sx={rowStyle}>
                                         <TableCell>{name}</TableCell>
-                                        {jobTitle === 'Queue Manager' && <TableCell>{woreda}</TableCell>}
                                         <TableCell>{customer.customer_type}</TableCell>
                                         <TableCell>{getWaitingHours(customer.started_at)}</TableCell>
 
@@ -1313,7 +1136,7 @@ const OutstandingCustomers = () => {
                                                     </Box>
                                                 </TableCell>
                                                 <TableCell sx={{ textAlign: 'center' }}>
-                                                    {customer[`availability_${normalizedUserStore.toLowerCase()}`] === 'A' ? (
+                                                    {customer.is_available === 1 ? (
                                                         <CheckCircleIcon color="success" />
                                                     ) : (
                                                         <CancelIcon color="error" />
@@ -1322,27 +1145,6 @@ const OutstandingCustomers = () => {
                                             </>
                                         )}
                                         
-                                        {jobTitle === 'Queue Manager' && (
-                                            <>
-                                                <TableCell>{customer.next_service_point || 'N/A'}</TableCell>
-                                                {/* START: ODN Wrapping for Queue Manager */}
-                                                <TableCell sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>
-                                                    {getOutboundDeliveryNumber(customer)}
-                                                </TableCell>
-                                                {/* END: ODN Wrapping for Queue Manager */}
-                                                <TableCell>
-                                                    <Checkbox
-                                                        checked={
-                                                            (normalizedUserStore === 'AA1' && customer.availability_aa1 === 'A') ||
-                                                            (normalizedUserStore === 'AA2' && customer.availability_aa2 === 'A') ||
-                                                            (normalizedUserStore === 'AA3' && customer.availability_aa3 === 'A')
-                                                        }
-                                                        onChange={(e) => handleAvailabilityChange(customer, e.target.checked)}
-                                                    />
-                                                </TableCell>
-                                            </>
-                                        )}
-
                                         {jobTitle === 'O2C Officer' && (
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -1351,22 +1153,19 @@ const OutstandingCustomers = () => {
                                                             <Button
                                                                 variant="contained"
                                                                 color="primary"
-                                                                onClick={() => handleEditOdn(customer)}
+                                                                onClick={() => handleManageOdns(customer)}
                                                                 size="small"
-                                                                disabled={!canO2CEditODN(customer)}
                                                             >
-                                                                Edit ODN
+                                                                Manage ODNs
                                                             </Button>
-                                                            {canCancel(customer) && (
-                                                                <Button
-                                                                    variant="contained"
-                                                                    color="error"
-                                                                    onClick={() => handleCancel(customer)}
-                                                                    size="small"
-                                                                >
-                                                                    Cancel
-                                                                </Button>
-                                                            )}
+                                                            <Button
+                                                                variant="contained"
+                                                                color="error"
+                                                                onClick={() => handleCancel(customer)}
+                                                                size="small"
+                                                            >
+                                                                Cancel
+                                                            </Button>
                                                         </>
                                                     )}
                                                     {!isO2CCompleted && (
@@ -1420,16 +1219,25 @@ const OutstandingCustomers = () => {
                                                                     Complete
                                                                 </Button>
                                                             )}
-                                                            {canCancel(customer) && (
+                                                            {/* Show Manage ODNs button only after Start is clicked */}
+                                                            {showCompleteButton && (
                                                                 <Button
                                                                     variant="contained"
-                                                                    color="error"
-                                                                    onClick={() => handleCancel(customer)}
+                                                                    color="info"
+                                                                    onClick={() => handleManageOdns(customer)}
                                                                     size="small"
                                                                 >
-                                                                    Cancel
+                                                                    Manage ODNs
                                                                 </Button>
                                                             )}
+                                                            <Button
+                                                                variant="contained"
+                                                                color="error"
+                                                                onClick={() => handleCancel(customer)}
+                                                                size="small"
+                                                            >
+                                                                Cancel
+                                                            </Button>
                                                         </>
                                                     )}
                                                 </Box>
@@ -1523,6 +1331,16 @@ const OutstandingCustomers = () => {
                     </Box>
                 </Card>
             </Container>
+            
+            {/* ODN Manager Dialog */}
+            {selectedCustomer && (
+                <OdnRdfManager
+                    open={odnManagerOpen}
+                    onClose={handleCloseOdnManager}
+                    processId={selectedCustomer.id}
+                    facilityName={getFacilityDetails(selectedCustomer.facility_id).name}
+                />
+            )}
         </>
     );
 };

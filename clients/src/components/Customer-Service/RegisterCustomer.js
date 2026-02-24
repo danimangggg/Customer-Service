@@ -277,17 +277,17 @@ const RegisterCustomer = () => {
     const payload = {
       facility_id: selectedFacility,
       customer_type: customerType,
-      current_service_point: 'Registration',
       next_service_point: nextServicePoint,
       assigned_officer_id: assignedOfficerId,
       status: 'started',
       started_at: formattedStartedAt,
-      registration_completed_at: formattedStartedAt,
-      registered_by_id: registeredById,
-      registered_by_name: registeredByName,
-      delegate: delegate,
-      delegate_phone: delegatePhone,
-      letter_number: letterNumber,
+      // Remove fields that don't exist in database yet
+      // registration_completed_at: formattedStartedAt,
+      // registered_by_id: registeredById,
+      // registered_by_name: registeredByName,
+      delegate: delegate || null,
+      delegate_phone: delegatePhone || null,
+      letter_number: letterNumber || null,
     };
 
     axios.post(`${api_url}/api/customer-queue`, payload).then(async (response) => {
@@ -298,9 +298,7 @@ const RegisterCustomer = () => {
         const serviceTimeData = {
           process_id: customerQueueId,
           service_unit: 'Customer Service Officer',
-          start_time: formattedStartedAt,
           end_time: formattedStartedAt,
-          waiting_minutes: 0,
           officer_id: registeredById,
           officer_name: registeredByName,
           status: 'completed',

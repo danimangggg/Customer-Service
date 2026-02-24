@@ -1,333 +1,242 @@
 import { useState, useEffect } from 'react';
-import React from 'react';
 import axios from 'axios';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, CircularProgress, Card, CardContent,
-  Grid, Chip, Stack, Divider, Alert, Tooltip, Container, Tabs, Tab
+  Grid, Chip, Stack, Alert, Container,
+  Button, Dialog, DialogTitle, DialogContent, DialogActions,
+  TextField, TablePagination, TableSortLabel, IconButton,
+  InputAdornment, FormControl, InputLabel, Select, MenuItem, Tabs, Tab, Fade, Avatar
 } from '@mui/material';
 import {
-  AccessTime, Person, TrendingUp, Speed, Business, History
+  Business, Search, GetApp, Clear, FilterList, Assignment
 } from '@mui/icons-material';
-import UserActivityLog from './UserActivityLog';
+import MUIDataTable from 'mui-datatables';
+import * as XLSX from 'xlsx';
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const RDFReport = () => {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [customers, setCustomers] = useState([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerDetailOpen, setCustomerDetailOpen] = useState(false);
+  const [customerServiceDetails, setCustomerServiceDetails] = useState([]);
+  
+  // Pagination, search, and sort states for customers
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortOrder, setSortOrder] = useState('DESC');
+  const [statusFilter, setStatusFilter] = useState('');
+  
+  // Picklist states
+  const [picklists, setPicklists] = useState([]);
+  const [picklistsLoading, setPicklistsLoading] = useState(false);
+  const [combinedPicklists, setCombinedPicklists] = useState([]);
+  
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchServiceTimeData();
-  }, []);
+    fetchCustomers();
+  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter]);
+  
+  useEffect(() => {
+    if (activeTab === 1) {
+      fetchPicklists();
+    }
+  }, [activeTab]);
 
-  const fetchServiceTimeData = async () => {
+  const fetchCustomers = async () => {
     try {
-      setLoading(true);
-      const response = await axios.get(`${API_URL}/api/service-time-report`);
+      setCustomersLoading(true);
+      setError(null);
+      console.log('=== CUSTOMER FETCH DEBUG ===');
+      console.log('API_URL:', API_URL);
       
-      // Transform the data to match the expected format
-      const records = response.data.records || [];
-      
-      // Always show all configured stores (AA1, AA2, AA3)
-      // This ensures the table structure is consistent even if some stores have no data yet
-      const stores = new Set(['AA1', 'AA2', 'AA3']);
-      
-      // Also add any additional stores found in the data
-      records.forEach(record => {
-        record.service_units.forEach(unit => {
-          // Extract store from service unit name (e.g., "EWM Officer - AA1" -> "AA1")
-          const match = unit.service_unit.match(/- (AA\d+)$/);
-          if (match) {
-            stores.add(match[1]);
-          }
-        });
-      });
-      
-      const storeList = Array.from(stores).sort();
-      
-      // Calculate summary statistics
-      const summary = {
-        averageDurations: {
-          total: 0,
-          registration: 0,
-          o2c: 0,
-          gate: 0
-        },
-        stores: {}
+      const params = {
+        page: page + 1,
+        limit: rowsPerPage,
+        search: searchTerm,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
+        statusFilter: statusFilter
       };
       
-      // Initialize store-specific averages
-      storeList.forEach(store => {
-        summary.stores[store] = {
-          ewm: 0,
-          dispatch: 0,
-          dispatchDoc: 0
-        };
-      });
+      console.log('Fetching customers with params:', params);
       
-      // Calculate averages from service_units
-      const serviceUnitTotals = {};
-      const serviceUnitCounts = {};
+      const response = await axios.get(`${API_URL}/api/customers-detail-report`, { params });
+      console.log('Response status:', response.status);
+      console.log('Response data:', response.data);
       
-      records.forEach(record => {
-        record.service_units.forEach(unit => {
-          const unitName = unit.service_unit;
-          if (!serviceUnitTotals[unitName]) {
-            serviceUnitTotals[unitName] = 0;
-            serviceUnitCounts[unitName] = 0;
-          }
-          if (unit.duration_minutes) {
-            serviceUnitTotals[unitName] += unit.duration_minutes;
-            serviceUnitCounts[unitName]++;
-          }
-        });
-      });
-      
-      // Calculate averages for common units
-      if (serviceUnitCounts['Customer Service Officer'] > 0) {
-        summary.averageDurations.registration = Math.round(
-          serviceUnitTotals['Customer Service Officer'] / serviceUnitCounts['Customer Service Officer']
-        );
+      if (response.data.success && response.data.customers) {
+        setCustomers(response.data.customers);
+        setTotalCount(response.data.pagination?.total || 0);
+        console.log('✅ Successfully loaded', response.data.customers.length, 'customers');
+      } else {
+        console.log('❌ Invalid response format:', response.data);
+        setError('Invalid response format from server');
+        setCustomers([]);
       }
-      if (serviceUnitCounts['O2C Officer'] > 0) {
-        summary.averageDurations.o2c = Math.round(
-          serviceUnitTotals['O2C Officer'] / serviceUnitCounts['O2C Officer']
-        );
-      }
-      if (serviceUnitCounts['Gate Keeper'] > 0) {
-        summary.averageDurations.gate = Math.round(
-          serviceUnitTotals['Gate Keeper'] / serviceUnitCounts['Gate Keeper']
-        );
-      }
-      
-      // Calculate averages for store-specific units
-      storeList.forEach(store => {
-        const ewmKey = `EWM Officer - ${store}`;
-        const dispatchKey = `Dispatcher - ${store}`;
-        const dispatchDocKey = `Dispatch-Documentation - ${store}`;
-        
-        if (serviceUnitCounts[ewmKey] > 0) {
-          summary.stores[store].ewm = Math.round(
-            serviceUnitTotals[ewmKey] / serviceUnitCounts[ewmKey]
-          );
-        }
-        if (serviceUnitCounts[dispatchKey] > 0) {
-          summary.stores[store].dispatch = Math.round(
-            serviceUnitTotals[dispatchKey] / serviceUnitCounts[dispatchKey]
-          );
-        }
-        if (serviceUnitCounts[dispatchDocKey] > 0) {
-          summary.stores[store].dispatchDoc = Math.round(
-            serviceUnitTotals[dispatchDocKey] / serviceUnitCounts[dispatchDocKey]
-          );
-        }
-      });
-      
-      // Transform records to match expected format
-      const transformedRecords = records.map(record => {
-        const transformed = {
-          id: record.process_id,
-          facility_name: record.facility_name,
-          customer_type: record.customer_type,
-          route: record.route,
-          total_duration_minutes: 0,
-          registration_duration_minutes: 0,
-          o2c_duration_minutes: 0,
-          gate_duration_minutes: 0,
-          stores: {}
-        };
-        
-        // Initialize store-specific data
-        storeList.forEach(store => {
-          transformed.stores[store] = {
-            ewm_duration_minutes: 0,
-            ewm_officer_name: null,
-            ewm_completed_at: null,
-            dispatch_duration_minutes: 0,
-            dispatcher_name: null,
-            dispatch_completed_at: null,
-            dispatch_doc_duration_minutes: 0,
-            dispatch_doc_officer_name: null,
-            dispatch_doc_completed_at: null
-          };
-        });
-        
-        // Sort service units by end_time to get them in order
-        const sortedUnits = record.service_units.sort((a, b) => 
-          new Date(a.end_time) - new Date(b.end_time)
-        );
-        
-        // Map each service unit and calculate duration from previous unit's end time
-        sortedUnits.forEach((unit, index) => {
-          const unitName = unit.service_unit;
-          
-          // Calculate duration: current end time - previous end time
-          let duration = 0;
-          if (index > 0) {
-            const prevTimeStr = sortedUnits[index - 1].end_time;
-            const currTimeStr = unit.end_time;
-            
-            const prevEndTime = new Date(prevTimeStr.replace(' ', 'T'));
-            const currEndTime = new Date(currTimeStr.replace(' ', 'T'));
-            
-            const diffMs = currEndTime - prevEndTime;
-            duration = Math.round(diffMs / 60000);
-            duration = duration > 0 ? duration : 0;
-          }
-          
-          // Add to totals
-          transformed.total_duration_minutes += duration;
-          
-          // Map to appropriate field
-          if (unitName === 'Customer Service Officer') {
-            transformed.registration_duration_minutes = 0;
-            transformed.registered_by_name = unit.officer_name;
-            transformed.registration_completed_at = unit.end_time;
-          } else if (unitName === 'O2C Officer' || unitName === 'O2C') {
-            transformed.o2c_duration_minutes = duration;
-            transformed.o2c_officer_name = unit.officer_name;
-            transformed.o2c_started_at = unit.start_time;
-            transformed.o2c_completed_at = unit.end_time;
-          } else if (unitName === 'Gate Keeper') {
-            transformed.gate_duration_minutes = duration;
-            transformed.gate_processed_by = unit.officer_name;
-            transformed.gate_processed_at = unit.end_time;
-          } else {
-            // Check for store-specific units
-            const storeMatch = unitName.match(/^(EWM Officer|Dispatcher|Dispatch-Documentation) - (AA\d+)$/);
-            if (storeMatch) {
-              const [, serviceType, store] = storeMatch;
-              if (transformed.stores[store]) {
-                if (serviceType === 'EWM Officer') {
-                  transformed.stores[store].ewm_duration_minutes = duration;
-                  transformed.stores[store].ewm_officer_name = unit.officer_name;
-                  transformed.stores[store].ewm_completed_at = unit.end_time;
-                } else if (serviceType === 'Dispatcher') {
-                  transformed.stores[store].dispatch_duration_minutes = duration;
-                  transformed.stores[store].dispatcher_name = unit.officer_name;
-                  transformed.stores[store].dispatch_completed_at = unit.end_time;
-                } else if (serviceType === 'Dispatch-Documentation') {
-                  transformed.stores[store].dispatch_doc_duration_minutes = duration;
-                  transformed.stores[store].dispatch_doc_officer_name = unit.officer_name;
-                  transformed.stores[store].dispatch_doc_completed_at = unit.end_time;
-                }
-              }
-            }
-          }
-        });
-        
-        return transformed;
-      });
-      
-      setData({
-        serviceTimeData: transformedRecords,
-        summary,
-        stores: storeList
-      });
     } catch (err) {
-      console.error('Error fetching service time data:', err);
-      setError('Failed to load service time tracking data');
+      console.error('=== CUSTOMER FETCH ERROR ===');
+      console.error('Error object:', err);
+      
+      const errorMessage = err.response?.data?.error || err.response?.statusText || err.message || 'Unknown error';
+      setError(`Failed to load customers: ${errorMessage}`);
+      setCustomers([]);
     } finally {
-      setLoading(false);
+      setCustomersLoading(false);
     }
   };
-
-  const formatDuration = (minutes) => {
-    if (!minutes || minutes === 0) return '—';
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0) {
-      return `${hours}h ${mins}m`;
-    }
-    return `${mins}m`;
-  };
-
-  const formatDateTime = (dateTime) => {
-    if (!dateTime) return '—';
-    return new Date(dateTime).toLocaleString();
-  };
-
-  if (loading) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-          <CircularProgress />
-        </Box>
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      </Container>
-    );
-  }
-
-  if (!data || !data.serviceTimeData) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        <Alert severity="info">
-          No service time tracking data available.
-        </Alert>
-      </Container>
-    );
-  }
-
-  const { serviceTimeData, summary } = data;
-
-  // Filter only RDF/Customer Service records (records without routes)
-  const rdfRecords = serviceTimeData.filter(record => {
-    return !record.route || record.route.trim() === '';
-  });
-
-  const renderServiceCell = (duration, officerName, startTime, completedTime, waitingTime, isRegistration = false) => {
-    if (!duration && !officerName) {
-      return (
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="caption" color="text.secondary">—</Typography>
-        </Box>
+  
+  const fetchPicklists = async () => {
+    try {
+      setPicklistsLoading(true);
+      const pickRes = await axios.get(`${API_URL}/api/getPicklists`);
+      
+      let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+      
+      console.log('=== RDF PICKLISTS DEBUG ===');
+      console.log('Total picklists fetched:', allPicklists.length);
+      console.log('Sample raw picklist:', JSON.stringify(allPicklists[0], null, 2));
+      
+      // Filter for RDF picklists only (AA1, AA2, AA3 stores)
+      const rdfPicklists = allPicklists.filter(
+        (p) => ['AA1', 'AA2', 'AA3'].includes(p.store)
       );
+      
+      console.log('RDF picklists (AA1/AA2/AA3):', rdfPicklists.length);
+      console.log('Sample RDF picklist full data:', JSON.stringify(rdfPicklists[0], null, 2));
+      
+      // Show only uncompleted RDF picklists
+      const uncompletedRDF = rdfPicklists.filter(
+        (p) => String(p.status || '').toLowerCase() !== 'completed'
+      );
+      
+      console.log('Uncompleted RDF picklists:', uncompletedRDF.length);
+      if (uncompletedRDF.length > 0) {
+        console.log('Sample uncompleted full data:', JSON.stringify(uncompletedRDF[0], null, 2));
+      }
+      
+      // Map to ensure operator_name is available at top level
+      const formatted = uncompletedRDF.map(p => {
+        const operatorName = p.operator?.full_name || p.operator?.fullName || p.operator_name || null;
+        console.log('Mapping picklist:', {
+          id: p.id,
+          odn: p.odn,
+          operator_obj: p.operator,
+          operator_name_extracted: operatorName
+        });
+        return {
+          ...p,
+          operator_name: operatorName
+        };
+      });
+      
+      setPicklists(formatted);
+      setCombinedPicklists(formatted);
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+      setPicklists([]);
+      setCombinedPicklists([]);
+    } finally {
+      setPicklistsLoading(false);
     }
+  };
 
-    return (
-      <Box>
-        {/* Duration chip - this is the time from previous service end to current service end */}
-        {duration > 0 && (
-          <Chip 
-            label={formatDuration(duration)} 
-            size="small" 
-            color="success"
-            sx={{ mb: 0.5, fontWeight: 'bold' }}
-          />
-        )}
-        {/* Officer name at the bottom */}
-        {officerName && (
-          <Tooltip title={`Completed: ${formatDateTime(completedTime)}`}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-              <Person sx={{ fontSize: 14, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                {officerName}
-              </Typography>
-            </Box>
-          </Tooltip>
-        )}
-        {/* For registration, show registered time at the bottom */}
-        {isRegistration && completedTime && (
-          <Box sx={{ mt: 0.5 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-              {formatDateTime(completedTime)}
-            </Typography>
-          </Box>
-        )}
-      </Box>
-    );
+  const handleSort = (column) => {
+    const isAsc = sortBy === column && sortOrder === 'ASC';
+    setSortOrder(isAsc ? 'DESC' : 'ASC');
+    setSortBy(column);
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+    setPage(0); // Reset to first page when searching
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setPage(0);
+  };
+
+  const handleStatusFilterChange = (event) => {
+    setStatusFilter(event.target.value);
+    setPage(0);
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setPage(0);
+  };
+
+  const handleChangePage = (_, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const exportToExcel = () => {
+    try {
+      const exportData = customers.map(customer => ({
+        'Customer ID': customer.id,
+        'Facility Name': customer.actual_facility_name || customer.facility_name || 'N/A',
+        'Woreda': customer.woreda_name || 'N/A',
+        'Total Waiting Time (min)': customer.total_waiting_time || 0,
+        'Status': customer.status === 'completed' ? 'Completed' : customer.next_service_point || 'Registered',
+        'Created At': new Date(customer.created_at).toLocaleString(),
+        'Completed At': customer.completed_at ? new Date(customer.completed_at).toLocaleString() : 'N/A'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'RDF Customer Report');
+      
+      const fileName = `RDF_Customer_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error('Export error:', error);
+      setError('Failed to export data');
+    }
+  };
+
+  const fetchCustomerServiceDetails = async (customerId) => {
+    try {
+      const response = await axios.get(`${API_URL}/api/customers/${customerId}/service-details`);
+      setCustomerServiceDetails(response.data.serviceDetails || []);
+    } catch (err) {
+      console.error('Error fetching customer service details:', err);
+      setCustomerServiceDetails([]);
+    }
+  };
+
+  const [customerOdns, setCustomerOdns] = useState([]);
+
+  const fetchCustomerOdns = async (customerId) => {
+    try {
+      const response = await axios.get(`${API_URL}/api/rdf-odns/${customerId}`);
+      setCustomerOdns(response.data.odns || []);
+    } catch (err) {
+      console.error('Error fetching customer ODNs:', err);
+      setCustomerOdns([]);
+    }
+  };
+
+  const handleCustomerDetailOpen = (customer) => {
+    setSelectedCustomer(customer);
+    setCustomerDetailOpen(true);
+    fetchCustomerServiceDetails(customer.id);
+    fetchCustomerOdns(customer.id);
   };
 
   return (
@@ -342,7 +251,7 @@ const RDFReport = () => {
                 RDF Report
               </Typography>
               <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                Regular Distribution Flow - Customer Service Performance
+                Regular Distribution Flow - Customer Detail Report
               </Typography>
             </Box>
           </Stack>
@@ -351,305 +260,618 @@ const RDFReport = () => {
 
       {/* Tabs */}
       <Card sx={{ mb: 3 }}>
-        <Tabs
-          value={activeTab}
+        <Tabs 
+          value={activeTab} 
           onChange={(e, newValue) => setActiveTab(newValue)}
-          variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab label="Service Time Tracking" icon={<AccessTime />} iconPosition="start" />
-          <Tab label="User Activity Log" icon={<History />} iconPosition="start" />
+          <Tab 
+            label="Customer Records" 
+            icon={<Business />} 
+            iconPosition="start"
+          />
+          <Tab 
+            label="Picklists" 
+            icon={<Assignment />} 
+            iconPosition="start"
+          />
         </Tabs>
       </Card>
 
+      {/* Customer Detail Report */}
       {activeTab === 0 && (
-        <Box>
-        {/* Summary Statistics */}
+      <Box>
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
-          RDF Service Time Performance Summary
+          Customer Detail Report
         </Typography>
 
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} md={3}>
-            <Card sx={{ bgcolor: '#e3f2fd', borderLeft: '4px solid #2196f3' }}>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <Speed sx={{ fontSize: 40, color: '#2196f3' }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold">
-                      {rdfRecords.length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      RDF Records
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
-            <Card sx={{ bgcolor: '#f3e5f5', borderLeft: '4px solid #9c27b0' }}>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <AccessTime sx={{ fontSize: 40, color: '#9c27b0' }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold">
-                      {formatDuration(summary.averageDurations.total)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Avg Total Time
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
-            <Card sx={{ bgcolor: '#e8f5e9', borderLeft: '4px solid #4caf50' }}>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <TrendingUp sx={{ fontSize: 40, color: '#4caf50' }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold">
-                      {formatDuration(summary.averageDurations.o2c)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Avg O2C Time
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={3}>
-            <Card sx={{ bgcolor: '#fff3e0', borderLeft: '4px solid #ff9800' }}>
-              <CardContent>
-                <Stack direction="row" alignItems="center" spacing={2}>
-                  <Person sx={{ fontSize: 40, color: '#ff9800' }} />
-                  <Box>
-                    <Typography variant="h4" fontWeight="bold">
-                      {formatDuration(summary.averageDurations.ewm)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Avg EWM Time
-                    </Typography>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Average Duration by Service Unit - ALL RDF UNITS */}
-        <Card sx={{ mb: 4 }}>
+        {/* Search and Export Controls */}
+        <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
-              Average Duration by Service Unit (RDF Process)
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Grid container spacing={2}>
-              <Grid item xs={6} md={3}>
-                <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
-                  <Typography variant="body2" color="text.secondary">Customer Service Officer</Typography>
-                  <Typography variant="h6" fontWeight="bold" color="primary">
-                    {formatDuration(summary.averageDurations.registration || 0)}
-                  </Typography>
-                </Box>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  variant="outlined"
+                  placeholder="Search customers..."
+                  value={searchTerm}
+                  onChange={handleSearchChange}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search />
+                      </InputAdornment>
+                    ),
+                    endAdornment: searchTerm && (
+                      <InputAdornment position="end">
+                        <IconButton onClick={handleClearSearch} size="small">
+                          <Clear />
+                        </IconButton>
+                      </InputAdornment>
+                    )
+                  }}
+                />
               </Grid>
-              <Grid item xs={6} md={3}>
-                <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
-                  <Typography variant="body2" color="text.secondary">O2C Officer</Typography>
-                  <Typography variant="h6" fontWeight="bold" color="primary">
-                    {formatDuration(summary.averageDurations.o2c)}
-                  </Typography>
-                </Box>
+              <Grid item xs={12} md={3}>
+                <FormControl fullWidth variant="outlined">
+                  <InputLabel>Filter by Status</InputLabel>
+                  <Select
+                    value={statusFilter}
+                    onChange={handleStatusFilterChange}
+                    label="Filter by Status"
+                    startAdornment={
+                      <InputAdornment position="start">
+                        <FilterList />
+                      </InputAdornment>
+                    }
+                  >
+                    <MenuItem value="">All Status</MenuItem>
+                    <MenuItem value="completed">Completed</MenuItem>
+                    <MenuItem value="registration">Registration</MenuItem>
+                    <MenuItem value="o2c">O2C</MenuItem>
+                    <MenuItem value="ewm">EWM</MenuItem>
+                    <MenuItem value="dispatch">Dispatch</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
-              <Grid item xs={6} md={3}>
-                <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderRadius: 2 }}>
-                  <Typography variant="body2" color="text.secondary">Gate Keeper</Typography>
-                  <Typography variant="h6" fontWeight="bold" color="primary">
-                    {formatDuration(summary.averageDurations.gate || 0)}
-                  </Typography>
-                </Box>
+              <Grid item xs={12} md={5}>
+                <Stack direction="row" spacing={2} justifyContent="flex-end">
+                  {(searchTerm || statusFilter) && (
+                    <Button
+                      variant="outlined"
+                      startIcon={<Clear />}
+                      onClick={handleClearFilters}
+                      disabled={customersLoading}
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                  <Button
+                    variant="contained"
+                    startIcon={<GetApp />}
+                    onClick={exportToExcel}
+                    disabled={customers.length === 0}
+                  >
+                    Export Excel
+                  </Button>
+                </Stack>
               </Grid>
-              
-              {/* Store-specific averages */}
-              {data.stores && data.stores.map(store => (
-                <React.Fragment key={store}>
-                  <Grid item xs={12} md={12}>
-                    <Divider sx={{ my: 2 }}>
-                      <Chip label={`Store ${store}`} color="primary" />
-                    </Divider>
-                  </Grid>
-                  <Grid item xs={6} md={3}>
-                    <Box sx={{ p: 2, bgcolor: '#e3f2fd', borderRadius: 2 }}>
-                      <Typography variant="body2" color="text.secondary">EWM Officer - {store}</Typography>
-                      <Typography variant="h6" fontWeight="bold" color="primary">
-                        {formatDuration(summary.stores[store]?.ewm || 0)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} md={3}>
-                    <Box sx={{ p: 2, bgcolor: '#e8f5e9', borderRadius: 2 }}>
-                      <Typography variant="body2" color="text.secondary">Dispatcher - {store}</Typography>
-                      <Typography variant="h6" fontWeight="bold" color="primary">
-                        {formatDuration(summary.stores[store]?.dispatch || 0)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={6} md={3}>
-                    <Box sx={{ p: 2, bgcolor: '#fff3e0', borderRadius: 2 }}>
-                      <Typography variant="body2" color="text.secondary">Dispatch-Doc - {store}</Typography>
-                      <Typography variant="h6" fontWeight="bold" color="primary">
-                        {formatDuration(summary.stores[store]?.dispatchDoc || 0)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </React.Fragment>
-              ))}
             </Grid>
           </CardContent>
         </Card>
 
-        {/* Detailed Service Time Table - ALL RDF SERVICE UNITS */}
-        <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2 }}>
-          Detailed RDF Service Time Records
-        </Typography>
-
-        {rdfRecords.length === 0 ? (
-          <Alert severity="info">
-            No RDF (Customer Service) records found.
-          </Alert>
-        ) : (
-          <>
-            <TableContainer component={Paper} sx={{ maxHeight: 600, overflowX: 'auto' }}>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 150 }}>Facility</TableCell>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 120 }}>CS Officer</TableCell>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 120 }}>O2C Officer</TableCell>
-                    {/* Dynamic store columns */}
-                    {data.stores && data.stores.map(store => (
-                      <React.Fragment key={store}>
-                        <TableCell sx={{ fontWeight: 700, bgcolor: '#e3f2fd', minWidth: 120 }}>
-                          EWM - {store}
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 700, bgcolor: '#e8f5e9', minWidth: 120 }}>
-                          Dispatch - {store}
-                        </TableCell>
-                        <TableCell sx={{ fontWeight: 700, bgcolor: '#fff3e0', minWidth: 120 }}>
-                          Dispatch-Doc - {store}
-                        </TableCell>
-                      </React.Fragment>
-                    ))}
-                    <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 120 }}>Gate Keeper</TableCell>
-                    <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 100 }}>Total Time</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {rdfRecords.slice(0, 50).map((record) => (
-                    <TableRow key={record.id} hover>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight={600}>
-                          {record.facility_name || 'N/A'}
-                        </Typography>
-                        <Typography variant="caption" display="block" color="text.secondary">
-                          {record.customer_type}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {renderServiceCell(
-                          record.registration_duration_minutes,
-                          record.registered_by_name,
-                          record.registration_completed_at,
-                          record.registration_completed_at,
-                          0,
-                          true
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {renderServiceCell(
-                          record.o2c_duration_minutes,
-                          record.o2c_officer_name,
-                          record.o2c_started_at,
-                          record.o2c_completed_at,
-                          0
-                        )}
-                      </TableCell>
-                      {/* Dynamic store columns */}
-                      {data.stores && data.stores.map(store => (
-                        <React.Fragment key={store}>
-                          <TableCell>
-                            {renderServiceCell(
-                              record.stores[store]?.ewm_duration_minutes,
-                              record.stores[store]?.ewm_officer_name,
-                              null,
-                              record.stores[store]?.ewm_completed_at,
-                              0
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {renderServiceCell(
-                              record.stores[store]?.dispatch_duration_minutes,
-                              record.stores[store]?.dispatcher_name,
-                              null,
-                              record.stores[store]?.dispatch_completed_at,
-                              0
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {renderServiceCell(
-                              record.stores[store]?.dispatch_doc_duration_minutes,
-                              record.stores[store]?.dispatch_doc_officer_name,
-                              null,
-                              record.stores[store]?.dispatch_doc_completed_at,
-                              0
-                            )}
-                          </TableCell>
-                        </React.Fragment>
-                      ))}
-                      <TableCell>
-                        {renderServiceCell(
-                          record.gate_duration_minutes,
-                          record.gate_processed_by,
-                          null,
-                          record.gate_processed_at,
-                          0
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {record.total_duration_minutes > 0 ? (
-                          <Chip 
-                            label={formatDuration(record.total_duration_minutes)} 
-                            size="small" 
-                            color="primary"
-                            sx={{ fontWeight: 'bold' }}
-                          />
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">—</Typography>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            {rdfRecords.length > 50 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Showing first 50 records out of {rdfRecords.length} total records.
+        <Card>
+          <CardContent>
+            {customersLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+                <Typography sx={{ ml: 2 }}>Loading customers...</Typography>
+              </Box>
+            ) : error ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
               </Alert>
+            ) : (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Customer Records ({totalCount} total)
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table stickyHeader>
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: '#1976d2' }}>
+                        <TableCell sx={{ 
+                          color: 'white', 
+                          fontWeight: 'bold', 
+                          minWidth: 100,
+                          fontSize: '0.9rem',
+                          bgcolor: '#1976d2 !important'
+                        }}>
+                          <TableSortLabel
+                            active={sortBy === 'id'}
+                            direction={sortBy === 'id' ? sortOrder.toLowerCase() : 'asc'}
+                            onClick={() => handleSort('id')}
+                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
+                          >
+                            Customer ID
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell sx={{ 
+                          color: 'white', 
+                          fontWeight: 'bold', 
+                          minWidth: 250,
+                          fontSize: '0.9rem',
+                          bgcolor: '#1976d2 !important'
+                        }}>
+                          <TableSortLabel
+                            active={sortBy === 'facility_name'}
+                            direction={sortBy === 'facility_name' ? sortOrder.toLowerCase() : 'asc'}
+                            onClick={() => handleSort('facility_name')}
+                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
+                          >
+                            Facility Name
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell sx={{ 
+                          color: 'white', 
+                          fontWeight: 'bold', 
+                          minWidth: 120,
+                          fontSize: '0.9rem',
+                          bgcolor: '#1976d2 !important'
+                        }}>
+                          <TableSortLabel
+                            active={sortBy === 'woreda_name'}
+                            direction={sortBy === 'woreda_name' ? sortOrder.toLowerCase() : 'asc'}
+                            onClick={() => handleSort('woreda_name')}
+                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
+                          >
+                            Woreda
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell sx={{ 
+                          color: 'white', 
+                          fontWeight: 'bold', 
+                          minWidth: 120,
+                          fontSize: '0.9rem',
+                          bgcolor: '#1976d2 !important'
+                        }}>
+                          Total Waiting Time
+                        </TableCell>
+                        <TableCell sx={{ 
+                          color: 'white', 
+                          fontWeight: 'bold', 
+                          minWidth: 120,
+                          fontSize: '0.9rem',
+                          bgcolor: '#1976d2 !important'
+                        }}>
+                          <TableSortLabel
+                            active={sortBy === 'status'}
+                            direction={sortBy === 'status' ? sortOrder.toLowerCase() : 'asc'}
+                            onClick={() => handleSort('status')}
+                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
+                          >
+                            Status
+                          </TableSortLabel>
+                        </TableCell>
+                        <TableCell sx={{ 
+                          color: 'white', 
+                          fontWeight: 'bold', 
+                          minWidth: 120,
+                          fontSize: '0.9rem',
+                          bgcolor: '#1976d2 !important'
+                        }}>
+                          Actions
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {customers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                            <Typography color="text.secondary">
+                              {searchTerm ? 'No customers found matching your search.' : 'No customers found. Make sure customers are registered in the system.'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        customers.map((customer) => (
+                          <TableRow key={customer.id} hover sx={{ '&:nth-of-type(odd)': { bgcolor: '#f9f9f9' } }}>
+                            <TableCell sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{customer.id}</TableCell>
+                            <TableCell sx={{ fontSize: '0.9rem', maxWidth: 200 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {customer.actual_facility_name || customer.facility_name || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell sx={{ fontSize: '0.9rem' }}>{customer.woreda_name || 'N/A'}</TableCell>
+                            <TableCell sx={{ fontSize: '0.9rem' }}>
+                              <Chip 
+                                label={`${customer.total_waiting_time || 0} min`}
+                                color={customer.total_waiting_time > 60 ? 'error' : customer.total_waiting_time > 30 ? 'warning' : 'success'}
+                                size="small"
+                                sx={{ fontWeight: 'bold' }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={customer.status === 'completed' ? 'Completed' : customer.next_service_point || 'Registered'} 
+                                color={customer.status === 'completed' ? 'success' : 'primary'}
+                                size="small"
+                                sx={{ fontSize: '0.75rem' }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => handleCustomerDetailOpen(customer)}
+                                sx={{ fontSize: '0.75rem' }}
+                              >
+                                View Details
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                
+                {/* Pagination */}
+                <TablePagination
+                  component="div"
+                  count={totalCount}
+                  page={page}
+                  onPageChange={handleChangePage}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={handleChangeRowsPerPage}
+                  rowsPerPageOptions={[10, 25, 50, 100]}
+                  showFirstButton
+                  showLastButton
+                />
+              </>
             )}
-          </>
-        )}
+          </CardContent>
+        </Card>
       </Box>
       )}
 
-      {activeTab === 1 && <UserActivityLog />}
+      {/* Picklists Tab */}
+      {activeTab === 1 && (
+        <Container maxWidth="xl">
+          {picklistsLoading ? (
+            <Fade in={picklistsLoading}>
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                py: 8
+              }}>
+                <CircularProgress size={60} thickness={4} />
+                <Typography variant="h6" color="text.secondary">
+                  Loading picklists...
+                </Typography>
+              </Box>
+            </Fade>
+          ) : (
+            <Card sx={{ borderRadius: 3 }}>
+              <Box className="header-gradient" sx={{ 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                p: 3,
+                borderRadius: '20px 20px 0 0'
+              }}>
+                <Stack direction="row" alignItems="center" spacing={3} justifyContent="space-between">
+                  <Stack direction="row" alignItems="center" spacing={2}>
+                    <Avatar sx={{ 
+                      bgcolor: 'rgba(255,255,255,0.2)', 
+                      width: 56, 
+                      height: 56
+                    }}>
+                      <Assignment fontSize="large" />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="h4" fontWeight="bold" color="white">
+                        RDF Picklists
+                      </Typography>
+                      <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                        Uncompleted picklist submissions
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Button
+                    variant="contained"
+                    onClick={() => navigate('/rdf-completed-picklists')}
+                    sx={{
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                      color: 'white',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      '&:hover': {
+                        bgcolor: 'rgba(255,255,255,0.3)',
+                      }
+                    }}
+                  >
+                    Completed Picklists
+                  </Button>
+                </Stack>
+              </Box>
+
+              <Box sx={{ p: 4 }}>
+                {combinedPicklists.length === 0 ? (
+                  <Fade in={true}>
+                    <Box sx={{ 
+                      textAlign: 'center', 
+                      py: 8,
+                      background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                      borderRadius: 3,
+                      border: '2px dashed rgba(99, 102, 241, 0.2)'
+                    }}>
+                      <Assignment sx={{ fontSize: 80, color: 'text.secondary', mb: 2 }} />
+                      <Typography variant="h5" color="text.secondary" gutterBottom>
+                        No picklists submitted yet
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary">
+                        Picklists will appear here once they are submitted
+                      </Typography>
+                    </Box>
+                  </Fade>
+                ) : (
+                  <Grid container spacing={3}>
+                    {combinedPicklists.map((p) => (
+                      <Grid item xs={12} key={p.id}>
+                        <Card sx={{ 
+                          transition: 'all 0.3s ease',
+                          borderRadius: 3,
+                          border: '1px solid rgba(0,0,0,0.08)',
+                          '&:hover': {
+                            transform: 'translateX(8px)',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                            borderColor: 'rgba(99, 102, 241, 0.3)'
+                          }
+                        }}>
+                          <CardContent>
+                            <Grid container spacing={3} alignItems="center">
+                              <Grid item xs={12} md={6}>
+                                <Stack spacing={2}>
+                                  <Chip 
+                                    label={`ODN: ${p.odn}`} 
+                                    color="primary" 
+                                    variant="filled"
+                                    sx={{ 
+                                      fontSize: '1rem', 
+                                      fontWeight: 'bold',
+                                      height: 32,
+                                      borderRadius: 2,
+                                      width: 'fit-content'
+                                    }} 
+                                  />
+                                  
+                                  {p.facility && (
+                                    <Stack spacing={1}>
+                                      <Typography variant="body1" fontWeight="bold">
+                                        {p.facility.facility_name}
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {p.facility.woreda_name}, {p.facility.zone_name}, {p.facility.region_name}
+                                      </Typography>
+                                    </Stack>
+                                  )}
+
+                                  {p.store && (
+                                    <Chip 
+                                      label={`Store: ${p.store}`}
+                                      color="secondary"
+                                      size="small"
+                                      sx={{ width: 'fit-content' }}
+                                    />
+                                  )}
+                                  
+                                  <Typography variant="body2" color="success.main" fontWeight="bold">
+                                    Operator: {p.operator_name || 'N/A'}
+                                  </Typography>
+                                </Stack>
+                              </Grid>
+
+                              <Grid item xs={12} md={6}>
+                                <Stack direction="row" spacing={2} justifyContent="flex-end">
+                                  <Button
+                                    variant="outlined"
+                                    onClick={() => window.open(p.url, '_blank')}
+                                    startIcon={<GetApp />}
+                                    sx={{ minWidth: 120 }}
+                                  >
+                                    View PDF
+                                  </Button>
+                                </Stack>
+                              </Grid>
+                            </Grid>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
+              </Box>
+            </Card>
+          )}
+        </Container>
+      )}
+
+      {/* Customer Detail Dialog */}
+      <Dialog 
+        open={customerDetailOpen} 
+        onClose={() => setCustomerDetailOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Customer Details - {selectedCustomer?.actual_facility_name || selectedCustomer?.facility_name}
+        </DialogTitle>
+        <DialogContent>
+          {selectedCustomer && (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Customer ID</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.id}</Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Facility Name</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedCustomer.actual_facility_name || selectedCustomer.facility_name}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Woreda</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.woreda_name}</Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Total Waiting Time</Typography>
+                <Chip 
+                  label={`${selectedCustomer.total_waiting_time || 0} minutes`}
+                  color={selectedCustomer.total_waiting_time > 60 ? 'error' : selectedCustomer.total_waiting_time > 30 ? 'warning' : 'success'}
+                  sx={{ mb: 2, fontWeight: 'bold', fontSize: '1rem' }}
+                />
+              </Grid>
+
+              {/* Service Time Details */}
+              <Grid item xs={12} sx={{ mt: 2 }}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 700,
+                  color: '#1976d2',
+                  borderBottom: '2px solid #1976d2',
+                  pb: 1,
+                  mb: 2
+                }}>
+                  Service Time Details
+                </Typography>
+                {customerServiceDetails.length > 0 ? (
+                  <TableContainer component={Paper} sx={{ 
+                    mt: 2,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    borderRadius: 2
+                  }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                          <TableCell sx={{ fontWeight: 700 }}>Service Unit</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Officer</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Start Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>End Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Duration</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {customerServiceDetails.map((service, index) => (
+                          <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
+                            <TableCell>{service.service_unit}</TableCell>
+                            <TableCell>{service.officer_name}</TableCell>
+                            <TableCell>{new Date(service.start_time).toLocaleString()}</TableCell>
+                            <TableCell>{new Date(service.end_time).toLocaleString()}</TableCell>
+                            <TableCell>{service.waiting_minutes} min</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={service.status} 
+                                color={service.status === 'completed' ? 'success' : 'default'}
+                                size="small"
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                ) : (
+                  <Typography color="text.secondary">No service time records found.</Typography>
+                )}
+              </Grid>
+
+              {/* ODN Status by Store */}
+              {selectedCustomer && customerOdns.length > 0 && (
+                <Grid item xs={12} sx={{ mt: 2 }}>
+                  <Typography variant="h6" gutterBottom sx={{ 
+                    fontWeight: 700,
+                    color: '#1976d2',
+                    borderBottom: '2px solid #1976d2',
+                    pb: 1,
+                    mb: 2
+                  }}>
+                    Store Process Status
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ 
+                    mt: 2,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    borderRadius: 2
+                  }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                          <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>ODN</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>EWM</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Dispatch</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Exit Permit</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Security</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {customerOdns.map((odn, index) => (
+                          <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
+                            <TableCell sx={{ fontWeight: 600 }}>{odn.store}</TableCell>
+                            <TableCell>{odn.odn_number}</TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={odn.ewm_status === 'completed' ? '✓' : '○'} 
+                                color={odn.ewm_status === 'completed' ? 'success' : 'default'}
+                                size="small"
+                                sx={{ minWidth: 40 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={odn.dispatch_status === 'completed' ? '✓' : '○'} 
+                                color={odn.dispatch_status === 'completed' ? 'success' : 'default'}
+                                size="small"
+                                sx={{ minWidth: 40 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={odn.exit_permit_status === 'completed' ? '✓' : '○'} 
+                                color={odn.exit_permit_status === 'completed' ? 'success' : 'default'}
+                                size="small"
+                                sx={{ minWidth: 40 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={odn.gate_status === 'allowed' ? '✓' : '○'} 
+                                color={odn.gate_status === 'allowed' ? 'success' : 'default'}
+                                size="small"
+                                sx={{ minWidth: 40 }}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  
+                  {/* Show info about process flow */}
+                  <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
+                    <Typography variant="caption">
+                      Each store follows: EWM → Dispatch → Exit Permit (Documentation) → Security
+                    </Typography>
+                  </Alert>
+                </Grid>
+              )}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCustomerDetailOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

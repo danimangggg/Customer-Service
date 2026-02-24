@@ -42,12 +42,22 @@ const TvMainMenu = () => {
     {
       id: 'waiting-room',
       title: 'Waiting Room',
-      subtitle: 'Customer Display',
-      description: 'Customer waiting area information display',
+      subtitle: 'All Stores Display',
+      description: 'All stores customer waiting area information display',
       icon: EventSeatIcon,
       color: '#4caf50',
       gradient: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
       route: '/tvcustomer'
+    },
+    {
+      id: 'real-tv',
+      title: 'Real TV',
+      subtitle: 'All Stores + TV',
+      description: 'All stores customer queue with real TV (DSTV, Netflix, Cable)',
+      icon: TvIcon,
+      color: '#ff5722',
+      gradient: 'linear-gradient(135deg, #ff5722 0%, #d84315 100%)',
+      route: '/tv-real-entertainment'
     }
   ];
 
@@ -112,12 +122,13 @@ const TvMainMenu = () => {
             pointer-events: none;
           }
           .header-gradient {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%);
             color: white;
             padding: 40px;
             border-radius: 24px 24px 0 0;
             position: relative;
             overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
           }
           .header-gradient::before {
             content: '';
@@ -139,9 +150,14 @@ const TvMainMenu = () => {
       </style>
       
       <Box sx={{ 
-        minHeight: '100vh', 
+        height: '100vh',
+        width: '100vw', 
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        position: 'relative',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        margin: 0,
+        padding: 0,
         overflow: 'hidden'
       }}>
         {/* Background Pattern */}
@@ -160,39 +176,66 @@ const TvMainMenu = () => {
           zIndex: 1,
           maxWidth: '1400px',
           mx: 'auto',
-          minHeight: '100vh',
+          height: '100vh',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          p: 2,
+          overflow: 'auto'
         }}>
           {/* Header Section */}
-          <Box className="header-gradient">
-            <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Stack direction="row" alignItems="center" spacing={4}>
+          <Box className="header-gradient" sx={{ 
+            flexShrink: 0,
+            position: 'relative',
+            zIndex: 10,
+            minHeight: '160px',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <Box sx={{ 
+              position: 'relative', 
+              zIndex: 11,
+              width: '100%'
+            }}>
+              <Stack 
+                direction={{ xs: 'column', md: 'row' }} 
+                alignItems="center" 
+                justifyContent="space-between" 
+                sx={{ 
+                  flexWrap: 'wrap', 
+                  gap: 3,
+                  width: '100%'
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={3} sx={{ flex: 1 }}>
                   <Box className="icon-container" sx={{ 
-                    bgcolor: 'rgba(255,255,255,0.2)', 
-                    width: 100, 
-                    height: 100,
+                    bgcolor: 'rgba(255,255,255,0.3)', 
+                    width: 80, 
+                    height: 80,
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     backdropFilter: 'blur(10px)',
-                    border: '3px solid rgba(255,255,255,0.3)'
+                    border: '3px solid rgba(255,255,255,0.4)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
                   }}>
-                    <TvIcon sx={{ fontSize: 50 }} />
+                    <TvIcon sx={{ fontSize: 40, color: 'white' }} />
                   </Box>
                   <Box>
-                    <Typography variant="h2" fontWeight="bold" sx={{ 
-                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                      mb: 1
+                    <Typography variant="h3" fontWeight="bold" sx={{ 
+                      textShadow: '0 3px 6px rgba(0,0,0,0.3)',
+                      mb: 1,
+                      color: 'white',
+                      fontSize: { xs: '2rem', md: '3rem' }
                     }}>
                       TV Display Menu
                     </Typography>
-                    <Typography variant="h5" sx={{ 
-                      opacity: 0.9, 
-                      fontWeight: 300,
-                      textShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                    <Typography variant="h6" sx={{ 
+                      opacity: 0.95, 
+                      fontWeight: 400,
+                      textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      color: 'white',
+                      fontSize: { xs: '1rem', md: '1.25rem' }
                     }}>
                       Select your display mode
                     </Typography>
@@ -201,23 +244,33 @@ const TvMainMenu = () => {
                 
                 <Box className="time-display" sx={{ 
                   textAlign: 'right',
-                  bgcolor: 'rgba(255,255,255,0.1)',
+                  bgcolor: 'rgba(255,255,255,0.2)',
                   p: 3,
-                  borderRadius: 3,
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.2)'
+                  borderRadius: 4,
+                  backdropFilter: 'blur(15px)',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  minWidth: '220px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
                 }}>
                   <Stack direction="row" alignItems="center" spacing={2}>
-                    <AccessTimeIcon sx={{ fontSize: 32 }} />
+                    <AccessTimeIcon sx={{ fontSize: 28, color: 'white' }} />
                     <Box>
-                      <Typography variant="h4" fontWeight="bold">
+                      <Typography variant="h4" fontWeight="bold" sx={{ 
+                        color: 'white',
+                        textShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        fontSize: { xs: '1.5rem', md: '2rem' }
+                      }}>
                         {currentTime.toLocaleTimeString()}
                       </Typography>
-                      <Typography variant="body1" sx={{ opacity: 0.8 }}>
+                      <Typography variant="body1" sx={{ 
+                        opacity: 0.9,
+                        color: 'white',
+                        textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                        fontSize: { xs: '0.875rem', md: '1rem' }
+                      }}>
                         {currentTime.toLocaleDateString('en-US', { 
-                          weekday: 'long', 
-                          year: 'numeric', 
-                          month: 'long', 
+                          weekday: 'short', 
+                          month: 'short', 
                           day: 'numeric' 
                         })}
                       </Typography>
@@ -229,16 +282,16 @@ const TvMainMenu = () => {
           </Box>
 
           {/* Menu Cards Section */}
-          <Box sx={{ flex: 1, p: 6 }}>
-            <Grid container spacing={4} justifyContent="center">
+          <Box sx={{ flex: 1, p: 4, minHeight: 0 }}>
+            <Grid container spacing={3} justifyContent="center">
               {menuItems.map((item, index) => (
-                <Grid item xs={12} md={4} key={item.id}>
+                <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
                   <Fade in={true} timeout={800 + (index * 200)}>
                     <Card 
                       className="menu-card"
                       onClick={() => handleMenuClick(item.route)}
                       sx={{
-                        height: '400px',
+                        height: '350px',
                         background: item.gradient,
                         color: 'white',
                         display: 'flex',
@@ -252,29 +305,29 @@ const TvMainMenu = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         textAlign: 'center',
-                        p: 4,
+                        p: 3,
                         position: 'relative',
                         zIndex: 1
                       }}>
                         <Avatar sx={{ 
                           bgcolor: 'rgba(255,255,255,0.2)', 
-                          width: 100, 
-                          height: 100,
-                          mb: 3,
+                          width: 80, 
+                          height: 80,
+                          mb: 2,
                           backdropFilter: 'blur(10px)',
                           border: '3px solid rgba(255,255,255,0.3)'
                         }}>
-                          <item.icon sx={{ fontSize: 50 }} />
+                          <item.icon sx={{ fontSize: 40 }} />
                         </Avatar>
                         
-                        <Typography variant="h3" fontWeight="bold" sx={{ 
+                        <Typography variant="h4" fontWeight="bold" sx={{ 
                           mb: 1,
                           textShadow: '0 2px 4px rgba(0,0,0,0.2)'
                         }}>
                           {item.title}
                         </Typography>
                         
-                        <Typography variant="h6" sx={{ 
+                        <Typography variant="body1" sx={{ 
                           mb: 2, 
                           opacity: 0.9,
                           fontWeight: 500,
@@ -283,10 +336,11 @@ const TvMainMenu = () => {
                           {item.subtitle}
                         </Typography>
                         
-                        <Typography variant="body1" sx={{ 
+                        <Typography variant="body2" sx={{ 
                           opacity: 0.8,
-                          lineHeight: 1.6,
-                          maxWidth: '280px'
+                          lineHeight: 1.4,
+                          maxWidth: '250px',
+                          mb: 2
                         }}>
                           {item.description}
                         </Typography>
@@ -294,14 +348,12 @@ const TvMainMenu = () => {
                         <Button
                           variant="contained"
                           sx={{
-                            mt: 3,
                             bgcolor: 'rgba(255,255,255,0.2)',
                             color: 'white',
-                            px: 4,
-                            py: 1.5,
+                            px: 3,
+                            py: 1,
                             borderRadius: 3,
                             fontWeight: 'bold',
-                            fontSize: '1.1rem',
                             backdropFilter: 'blur(10px)',
                             border: '1px solid rgba(255,255,255,0.3)',
                             '&:hover': {
@@ -324,12 +376,13 @@ const TvMainMenu = () => {
           {/* Footer */}
           <Box sx={{ 
             textAlign: 'center', 
-            p: 4,
+            p: 2,
             color: 'white',
-            opacity: 0.8
+            opacity: 0.8,
+            flexShrink: 0
           }}>
             <Typography variant="body2">
-              © 2025 PharmaLog - Pharmaceutical Logistics Management System
+              © 2025 EPSS-MT - Ethiopian Pharmaceutical Supply Service - Monitoring Tool
             </Typography>
           </Box>
         </Box>

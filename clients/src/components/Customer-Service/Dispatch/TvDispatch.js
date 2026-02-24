@@ -18,8 +18,7 @@ const TvCustomer = () => {
 
   const dynamicStoreKey = useMemo(() => {
     const storeVal = localStorage.getItem('store') || 'AA1';
-    const num = storeVal.replace(/^\D+/g, ''); 
-    return `store_completed_${num}`;
+    return storeVal.toUpperCase();
   }, []);
 
   const playNotification = async () => {
@@ -51,13 +50,13 @@ const TvCustomer = () => {
   const fetchData = useCallback(async () => {
     try {
       const [custRes, facRes] = await Promise.all([
-        axios.get(`${API_URL}/api/serviceList`),
+        axios.get(`${API_URL}/api/tv-display-customers`),
         axios.get(`${API_URL}/api/facilities`)
       ]);
       setCustomers(custRes.data);
       setFacilities(facRes.data);
     } catch (error) { console.error("API Error"); }
-  }, [API_URL]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -69,16 +68,27 @@ const TvCustomer = () => {
     return customers
       .filter(cust => {
         const globalStatus = (cust.status || '').toLowerCase();
-        const storeStatus = (cust[dynamicStoreKey] || '').toLowerCase();
-        return globalStatus === 'ewm_completed' && ['notifying', 'dispatch_started', 'ewm_completed'].includes(storeStatus);
+        const storeDetails = cust.store_details || {};
+        const storeInfo = storeDetails[dynamicStoreKey];
+        
+        if (!storeInfo) return false;
+        
+        const ewmStatus = (storeInfo.ewm_status || '').toLowerCase();
+        const dispatchStatus = (storeInfo.dispatch_status || '').toLowerCase();
+        
+        return globalStatus === 'ewm_completed' && 
+               (dispatchStatus === 'notifying' || dispatchStatus === 'started' || ewmStatus === 'completed');
       })
       .map((cust, index) => {
-        const statusVal = (cust[dynamicStoreKey] || '').toLowerCase();
+        const storeInfo = cust.store_details[dynamicStoreKey];
+        const dispatchStatus = (storeInfo.dispatch_status || '').toLowerCase();
+        const ewmStatus = (storeInfo.ewm_status || '').toLowerCase();
+        
         return {
           ...cust,
           displayTicket: index + 1,
-          isNotifying: statusVal === 'notifying',
-          isEwmCompleted: statusVal === 'ewm_completed'
+          isNotifying: dispatchStatus === 'notifying',
+          isEwmCompleted: ewmStatus === 'completed' && dispatchStatus === 'pending'
         };
       });
   }, [customers, dynamicStoreKey]);
@@ -157,7 +167,19 @@ const TvCustomer = () => {
   };
 
   if (!audioStarted) return (
-    <Box sx={{ height: '100vh', bgcolor: '#010a14', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <Box sx={{ 
+      height: '100vh', 
+      width: '100vw',
+      bgcolor: '#010a14', 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      margin: 0,
+      padding: 0
+    }}>
       <Button variant="contained" onClick={handleStart} sx={{ bgcolor: '#f1c40f', color: '#000', fontWeight: 900, px: 6, py: 2.5, fontSize: '1.4rem' }}>
         START MONITOR
       </Button>
@@ -165,10 +187,23 @@ const TvCustomer = () => {
   );
 
   return (
-    <Box sx={{ height: '100vh', background: '#010a14', color: '#fff', p: 4, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Box sx={{ 
+      height: '100vh', 
+      width: '100vw',
+      background: '#010a14', 
+      color: '#fff', 
+      p: 4, 
+      display: 'flex', 
+      flexDirection: 'column', 
+      overflow: 'hidden',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      margin: 0
+    }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5 }}>Dispatch Monitor</Typography>
-        <img src="/pharmalog-logo.png" alt="PharmaLog Logo" style={{ height: '50px' }} />
+        <img src="/pharmalog-logo.png" alt="EPSS-MT Logo" style={{ height: '50px' }} />
       </Box>
 
       <Box sx={{ flexGrow: 1, position: 'relative', overflow: 'hidden' }}>

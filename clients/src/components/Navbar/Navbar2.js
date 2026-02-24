@@ -146,30 +146,30 @@ const Sidebar = () => {
         <Box sx={{ 
           bgcolor: 'rgba(107, 66, 38, 0.9)',
           backdropFilter: 'blur(10px)',
-          px: 3,
-          py: 2.5,
+          px: 2,
+          py: 0.5,
           borderBottom: '1px solid rgba(255,255,255,0.1)'
         }}>
-          <Stack direction="row" alignItems="center" spacing={2}>
+          <Stack direction="column" alignItems="center" spacing={-2}>
             <Box
               component="img"
               src="/pharmalog-logo.png"
-              alt="PharmaLog Logo"
+              alt="EPSS-MT Logo"
               sx={{ 
-                width: 70, 
-                height: 70,
+                width: 150, 
+                height: 150,
                 objectFit: 'contain',
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
               }}
             />
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="h6" fontWeight="bold" sx={{ 
-                fontSize: '1.3rem',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="body2" fontWeight="bold" sx={{ 
+                fontSize: '0.85rem',
+                lineHeight: 1.2,
+                whiteSpace: 'normal',
+                wordWrap: 'break-word'
               }}>
-                PharmaLog
+                EPSS Monitoring Tool
               </Typography>
             </Box>
           </Stack>
@@ -261,7 +261,7 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Register Customer - for Customer Service Officers */}
+         {/* Register Customer - for Customer Service Officers only */}
          {jobTitle === "Customer Service Officer" && (
            <MenuTooltip title={"Register Customer"}>
              <ListItem 
@@ -278,6 +278,34 @@ const Sidebar = () => {
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: isActivePath('/register-customer') ? 600 : 500,
+                     fontSize: '0.95rem',
+                     whiteSpace: 'nowrap',
+                     overflow: 'hidden',
+                     textOverflow: 'ellipsis'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Customer Availability - for Queue Manager only */}
+         {jobTitle === "Queue Manager" && (
+           <MenuTooltip title={"Customer Availability"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/queue-manager"
+               sx={getActiveStyles('/queue-manager')}
+             >
+               <ListItemIcon>
+                 <Store sx={{ color: '#4caf50' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Customer Availability"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/queue-manager') ? 600 : 500,
                      fontSize: '0.95rem',
                      whiteSpace: 'nowrap',
                      overflow: 'hidden',
@@ -530,9 +558,9 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Gate Security - for Gate Keeper */}
+         {/* Gate Security - for Security */}
          {jobTitle === "Gate Keeper" && (
-           <MenuTooltip title={"Gate Security"}>
+           <MenuTooltip title={"Security"}>
              <ListItem 
                button 
                component={Link} 
@@ -543,7 +571,7 @@ const Sidebar = () => {
                  <Security sx={{ color: '#2196f3' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Gate Security"} 
+                 primary={"Security"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: isActivePath('/gate-keeper') ? 600 : 500,
@@ -579,6 +607,41 @@ const Sidebar = () => {
                </ListItemIcon>
                <ListItemText 
                  primary={"Picklists"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* EWM Documentation - for EWM-Documentation only */}
+         {jobTitle === "EWM-Documentation" && (
+           <MenuTooltip title={"EWM Documentation"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/ewm-documentation"
+               sx={{
+                 borderRadius: 2,
+                 mx: 1,
+                 mb: 1,
+                 '&:hover': {
+                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   transform: 'translateX(4px)',
+                   transition: 'all 0.2s ease'
+                 },
+                 transition: 'all 0.2s ease'
+               }}
+             >
+               <ListItemIcon>
+                 <Description sx={{ color: '#ff9800' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Invoice Management"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
@@ -1057,30 +1120,7 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* RDF Report - for Customer Service users only */}
-         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer" || jobTitle === "EWM Officer" || jobTitle === "Customer Service Officer" || jobTitle === "Finance") && (
-           <MenuTooltip title={"RDF Report"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/reports/rdf"
-               sx={getActiveStyles('/reports/rdf')}
-             >
-               <ListItemIcon>
-                 <BarChart sx={{ color: '#2196f3' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"RDF Report"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/reports/rdf') ? 600 : 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
+         {/* RDF Report - removed for regular users, only visible to Admin/Coordinator/Manager via Reports menu */}
 
         </List>
 

@@ -48,8 +48,10 @@ const CreateUserForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation for EWM officers - store is mandatory
-    if ((formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP') && !formData.store) {
+    // Validation for EWM officers and Gate Keepers - store is mandatory
+    const requiresStore = ['EWM Officer', 'EWM Officer - HP', 'Gate Keeper', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.job_title);
+    
+    if (requiresStore && !formData.store) {
       await MySwal.fire({
         title: 'Store Required!',
         html: `
@@ -58,7 +60,7 @@ const CreateUserForm = () => {
               🏪
             </div>
             <p style="font-size: 18px; color: #333;">
-              Store selection is mandatory for EWM Officers.
+              Store selection is mandatory for ${formData.job_title}.
             </p>
             <p style="font-size: 14px; color: #666;">
               Please select a store before creating the user.
@@ -305,11 +307,11 @@ const CreateUserForm = () => {
               </FormControl>
             </Grid>
 
-            {/* Store - Show for all users, required for EWM Officers */}
+            {/* Store - Show for all users, required for store-specific roles */}
             <Grid item xs={12}>
               <FormControl 
                 fullWidth 
-                required={formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP'}
+                required={['EWM Officer', 'EWM Officer - HP', 'Gate Keeper', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.job_title)}
               >
                 <Select
                   name="store"
@@ -318,12 +320,12 @@ const CreateUserForm = () => {
                   displayEmpty
                   sx={{ 
                     height: 50,
-                    backgroundColor: (formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP') ? '#fff3e0' : 'inherit'
+                    backgroundColor: ['EWM Officer', 'EWM Officer - HP', 'Gate Keeper', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.job_title) ? '#fff3e0' : 'inherit'
                   }}
                 >
                   <MenuItem value="" disabled>
-                    {(formData.job_title === 'EWM Officer' || formData.job_title === 'EWM Officer - HP') 
-                      ? 'Select Store (Required for EWM Officers)' 
+                    {['EWM Officer', 'EWM Officer - HP', 'Gate Keeper', 'Dispatcher', 'Dispatch-Documentation'].includes(formData.job_title)
+                      ? 'Select Store (Required)' 
                       : 'Select Store (Optional)'
                     }
                   </MenuItem>

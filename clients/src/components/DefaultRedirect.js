@@ -15,6 +15,14 @@ const DefaultRedirect = () => {
       if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") {
         navigate('/hp-dashboard');
       }
+      // EWM-Documentation goes to invoice management
+      else if (jobTitle === "EWM-Documentation") {
+        navigate('/ewm-documentation');
+      }
+      // Queue Manager goes to customer availability
+      else if (jobTitle === "Queue Manager") {
+        navigate('/queue-manager');
+      }
       // Customer Service Dispatcher (without HP suffix) goes to Customer Dashboard
       else if (jobTitle === "Dispatcher") {
         navigate('/customer-dashboard');
