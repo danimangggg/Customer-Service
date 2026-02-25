@@ -328,56 +328,14 @@ const RDFReport = () => {
       }
     }
   ];
-      const pickRes = await axios.get(`${API_URL}/api/getPicklists`);
-      
-      let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
-      
-      console.log('=== RDF PICKLISTS DEBUG ===');
-      console.log('Total picklists fetched:', allPicklists.length);
-      console.log('Sample raw picklist:', JSON.stringify(allPicklists[0], null, 2));
-      
-      // Filter for RDF picklists only (AA1, AA2, AA3 stores)
-      const rdfPicklists = allPicklists.filter(
-        (p) => ['AA1', 'AA2', 'AA3'].includes(p.store)
-      );
-      
-      console.log('RDF picklists (AA1/AA2/AA3):', rdfPicklists.length);
-      console.log('Sample RDF picklist full data:', JSON.stringify(rdfPicklists[0], null, 2));
-      
-      // Show only uncompleted RDF picklists
-      const uncompletedRDF = rdfPicklists.filter(
-        (p) => String(p.status || '').toLowerCase() !== 'completed'
-      );
-      
-      console.log('Uncompleted RDF picklists:', uncompletedRDF.length);
-      if (uncompletedRDF.length > 0) {
-        console.log('Sample uncompleted full data:', JSON.stringify(uncompletedRDF[0], null, 2));
-      }
-      
-      // Map to ensure operator_name is available at top level
-      const formatted = uncompletedRDF.map(p => {
-        const operatorName = p.operator?.full_name || p.operator?.fullName || p.operator_name || null;
-        console.log('Mapping picklist:', {
-          id: p.id,
-          odn: p.odn,
-          operator_obj: p.operator,
-          operator_name_extracted: operatorName
-        });
-        return {
-          ...p,
-          operator_name: operatorName
-        };
-      });
-      
-      setPicklists(formatted);
-      setCombinedPicklists(formatted);
-    } catch (err) {
-      console.error('Error fetching picklists:', err);
-      setPicklists([]);
-      setCombinedPicklists([]);
-    } finally {
-      setPicklistsLoading(false);
-    }
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   const handleSort = (column) => {
@@ -404,15 +362,6 @@ const RDFReport = () => {
   const handleClearFilters = () => {
     setSearchTerm('');
     setStatusFilter('');
-    setPage(0);
-  };
-
-  const handleChangePage = (_, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
 
