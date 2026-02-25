@@ -29,9 +29,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true
     },
-    store: {
-      type: DataTypes.STRING,
-      allowNull: true
+    store_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'stores',
+        key: 'id'
+      }
     },
   });
 

@@ -17,8 +17,29 @@ const login =  async (req, res) => {
         if (!isMatch) {
           return res.status(400).json({ error: 'Invalid username or password' });
         }
+        
+        // Get store name from stores table if store_id exists
+        let storeName = null;
+        if (user.store_id) {
+          const [storeResult] = await db.sequelize.query(
+            'SELECT store_name FROM stores WHERE id = ?',
+            { replacements: [user.store_id] }
+          );
+          if (storeResult && storeResult.length > 0) {
+            storeName = storeResult[0].store_name;
+          }
+        }
+        
         const token = jwt.sign({ id: user.id }, 'your_jwt_secret', { expiresIn: '1h' });
-        res.json({ message: 'Login successful', token , UserId: user.id, FullName: user.full_name, AccountType: user.account_type, JobTitle: user.jobTitle , store: user.store});
+        res.json({ 
+          message: 'Login successful', 
+          token, 
+          UserId: user.id, 
+          FullName: user.full_name, 
+          AccountType: user.account_type, 
+          JobTitle: user.jobTitle, 
+          store: storeName
+        });
      
 }
 

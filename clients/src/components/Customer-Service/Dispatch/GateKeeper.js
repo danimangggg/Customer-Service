@@ -27,98 +27,51 @@ const GateKeeper = () => {
   const [audioEnabled, setAudioEnabled] = useState(false); // Track if audio is enabled
   const [notificationDialog, setNotificationDialog] = useState(false);
   const audioRef = useRef(null);
+  const notificationIntervalRef = useRef(null);
 
   // Access control - only for Gate Keeper users
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const hasAccess = userJobTitle === 'Gate Keeper';
   
-  // Get store assignment (like EWM officers)
-  const userStore = localStorage.getItem('store');
-  const storeId = userStore ? userStore.toUpperCase().trim() : null;
+  // Gate Keepers work across all stores - no store filtering needed
 
   // Initialize audio
+  // Initialize audio - Simple approach like AllPicklists
   useEffect(() => {
     audioRef.current = new Audio('/audio/notification/notification.mp3');
-    audioRef.current.preload = 'auto';
-    audioRef.current.volume = 0.8; // Set volume to 80%
-    audioRef.current.load(); // Explicitly load the audio
-    console.log('🔊 Audio initialized');
-  }, []);
+    audioRef.current.load();
 
-  // Enable audio on first user interaction
-  const enableAudio = useCallback(() => {
-    if (!audioEnabled && audioRef.current) {
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
+    // Unlock audio on first user interaction
+    const unlockAudio = () => {
+      audioRef.current
+        .play()
+        .then(() => {
           audioRef.current.pause();
           audioRef.current.currentTime = 0;
           setAudioEnabled(true);
-          console.log('✅ Audio enabled successfully');
-          setSnackbar({ open: true, message: '🔊 Sound notifications enabled', severity: 'success' });
-        }).catch(err => {
-          console.error('❌ Failed to enable audio:', err);
-          setSnackbar({ open: true, message: 'Click anywhere to enable sound', severity: 'info' });
-        });
-      }
-    }
-  }, [audioEnabled]);
-
-  // Add click listener to enable audio on any user interaction
-  useEffect(() => {
-    const handleUserInteraction = () => {
-      enableAudio();
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-      document.removeEventListener('keydown', handleUserInteraction);
+          console.log('✅ Audio unlocked');
+          window.removeEventListener('click', unlockAudio);
+          window.removeEventListener('touchstart', unlockAudio);
+        })
+        .catch(() => {});
     };
 
-    if (!audioEnabled) {
-      document.addEventListener('click', handleUserInteraction);
-      document.addEventListener('touchstart', handleUserInteraction);
-      document.addEventListener('keydown', handleUserInteraction);
-      console.log('⏳ Waiting for user interaction to enable audio...');
-    }
-
+    window.addEventListener('click', unlockAudio);
+    window.addEventListener('touchstart', unlockAudio);
+    
     return () => {
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-      document.removeEventListener('keydown', handleUserInteraction);
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
     };
-  }, [audioEnabled, enableAudio]);
+  }, []);
 
-  // Play notification sound
+  // Play notification sound - Simple approach
   const playNotificationSound = () => {
-    console.log('🔔 Playing notification:', { soundEnabled, audioEnabled, hasRef: !!audioRef.current });
-    
-    if (!soundEnabled) {
-      console.log('🔇 Sound disabled');
-      return;
-    }
-    
-    if (!audioEnabled) {
-      console.log('⚠️ Audio not enabled - need user interaction');
-      setSnackbar({ open: true, message: 'Click anywhere to enable sound', severity: 'warning' });
-      return;
-    }
-    
-    if (audioRef.current) {
+    if (audioRef.current && soundEnabled) {
       audioRef.current.currentTime = 0;
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => console.log('✅ Sound played'))
-          .catch(err => {
-            console.error('❌ Play failed:', err);
-            try {
-              const fallback = new Audio('/audio/notification/notification.mp3');
-              fallback.volume = 0.8;
-              fallback.play().then(() => console.log('✅ Fallback played'));
-            } catch (e) {
-              console.error('❌ Fallback failed:', e);
-            }
-          });
-      }
+      audioRef.current
+        .play()
+        .catch(() => console.warn('Audio blocked, user interaction needed.'));
     }
   };
 
@@ -126,29 +79,40 @@ const GateKeeper = () => {
   const showNewRecordNotification = (count) => {
     setNewRecordsCount(count);
     setNotificationDialog(true);
+    
+    // Play sound immediately
     playNotificationSound();
     
-    // Auto-close notification after 10 seconds
-    setTimeout(() => {
-      setNotificationDialog(false);
-      setNewRecordsCount(0);
-    }, 10000);
+    // Clear any existing interval
+    if (notificationIntervalRef.current) {
+      clearInterval(notificationIntervalRef.current);
+    }
+    
+    // Play sound repeatedly every 3 seconds until dialog is closed
+    notificationIntervalRef.current = setInterval(() => {
+      playNotificationSound();
+    }, 3000);
   };
 
-  // Fetch Data Logic - only show records for this gate keeper's store
+  // Stop notification sound when dialog is closed
+  const closeNotificationDialog = () => {
+    setNotificationDialog(false);
+    setNewRecordsCount(0);
+    
+    // Stop the repeating sound
+    if (notificationIntervalRef.current) {
+      clearInterval(notificationIntervalRef.current);
+      notificationIntervalRef.current = null;
+    }
+  };
+
+  // Fetch Data Logic - show ALL records ready for gate keeper (any store)
   const fetchData = useCallback(async (isAutoRefresh = false) => {
     if (!isAutoRefresh) setLoading(true);
     try {
       console.log('=== GATE KEEPER DEBUG ===');
-      console.log('Store ID:', storeId);
       console.log('Gate Keeper Name:', localStorage.getItem('FullName'));
-      
-      if (!storeId) {
-        console.error('No store assigned to this Gate Keeper');
-        setSnackbar({ open: true, message: 'No store assigned to your account', severity: 'error' });
-        setLoading(false);
-        return;
-      }
+      console.log('Fetching records for ALL stores');
       
       // Fetch from TV display endpoint which has ODN-based data
       const [serviceRes, facilityRes] = await Promise.all([
@@ -158,32 +122,26 @@ const GateKeeper = () => {
       
       console.log('Service Response:', serviceRes.data);
       
-      // Filter records that are ready for gate keeper (exit permit completed for this store)
+      // Filter records that are ready for gate keeper (exit permit completed for ANY store)
       const processedRecords = serviceRes.data.filter(row => {
         const storeDetails = row.store_details || {};
-        const storeInfo = storeDetails[storeId];
-        
-        if (!storeInfo) return false;
-        
-        const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
-        const gateStatus = (storeInfo.gate_status || '').toLowerCase();
         const globalStatus = (row.status || '').toLowerCase();
         
-        console.log(`Customer ${row.id} check:`, {
-          store: storeId,
-          exitPermitStatus,
-          gateStatus,
-          globalStatus,
-          willShow: exitPermitStatus === 'completed' && (gateStatus === 'pending' || gateStatus === '') && globalStatus !== 'completed'
+        // Check if ANY store has completed exit permit and is waiting for gate keeper
+        const hasStoreReadyForGate = Object.keys(storeDetails).some(storeKey => {
+          const storeInfo = storeDetails[storeKey];
+          const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
+          const gateStatus = (storeInfo.gate_status || '').toLowerCase();
+          
+          return exitPermitStatus === 'completed' && 
+                 (gateStatus === 'pending' || gateStatus === '' || !gateStatus);
         });
         
         // Show records where:
-        // 1. Exit permit is completed for this store
-        // 2. Gate status is pending or empty (not processed yet)
+        // 1. At least one store has completed exit permit
+        // 2. That store's gate status is pending or empty
         // 3. Global status is not completed (final completion)
-        return exitPermitStatus === 'completed' && 
-               (gateStatus === 'pending' || gateStatus === '' || !gateStatus) && 
-               globalStatus !== 'completed';
+        return hasStoreReadyForGate && globalStatus !== 'completed';
       });
 
       // Check for new records and trigger notification
@@ -204,22 +162,35 @@ const GateKeeper = () => {
     } finally {
       setLoading(false);
     }
-  }, [previousCount, soundEnabled, storeId]);
+  }, [previousCount, soundEnabled]);
 
   // Auto-Refresh Effect (every 15 seconds)
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => fetchData(true), 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Clean up notification sound interval on unmount
+      if (notificationIntervalRef.current) {
+        clearInterval(notificationIntervalRef.current);
+      }
+    };
   }, [fetchData]);
 
   const handleVehicleAction = async (record, action) => {
-    // Enable audio on user interaction
-    enableAudio();
-    
     const actionText = action === 'allow' ? 'Allow Exit' : 'Cancel Exit';
     const actionColor = action === 'allow' ? '#4caf50' : '#f44336';
     const actionIcon = action === 'allow' ? '✅' : '❌';
+
+    // Get all stores that have completed exit permit for this customer
+    const storeDetails = record.store_details || {};
+    const storesReadyForGate = Object.keys(storeDetails).filter(storeKey => {
+      const storeInfo = storeDetails[storeKey];
+      const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
+      const gateStatus = (storeInfo.gate_status || '').toLowerCase();
+      return exitPermitStatus === 'completed' && 
+             (gateStatus === 'pending' || gateStatus === '' || !gateStatus);
+    });
 
     const result = await Swal.fire({
       title: `${actionIcon} ${actionText}`,
@@ -230,6 +201,7 @@ const GateKeeper = () => {
           <p><strong>Amount:</strong> ${record.total_amount} ${record.measurement_unit}</p>
           <p><strong>Receipts:</strong> ${record.receipt_count}</p>
           ${record.receipt_number ? `<p><strong>Receipt #:</strong> ${record.receipt_number}</p>` : ''}
+          <p><strong>Stores:</strong> ${storesReadyForGate.join(', ')}</p>
         </div>
       `,
       icon: action === 'allow' ? 'success' : 'warning',
@@ -247,14 +219,16 @@ const GateKeeper = () => {
 
     if (result.isConfirmed) {
       try {
-        // Update ODN gate status for this store
-        await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
-          process_id: record.id,
-          store: storeId,
-          gate_status: action === 'allow' ? 'allowed' : 'denied',
-          officer_id: localStorage.getItem('EmployeeID'),
-          officer_name: localStorage.getItem('FullName')
-        });
+        // Update ODN gate status for ALL stores that are ready for gate
+        for (const storeName of storesReadyForGate) {
+          await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
+            process_id: record.id,
+            store: storeName,
+            gate_status: action === 'allow' ? 'allowed' : 'denied',
+            officer_id: localStorage.getItem('EmployeeID'),
+            officer_name: localStorage.getItem('FullName')
+          });
+        }
 
         // Check if all stores have allowed gate exit
         try {
@@ -274,22 +248,23 @@ const GateKeeper = () => {
           console.error('❌ Failed to check all gate statuses:', err);
         }
 
-        // Record service time for Gate Keeper
+        // Record service time for Gate Keeper (one entry per store)
         try {
           const gateProcessedTime = formatTimestamp();
           
-          // Record service time directly
-          await axios.post(`${API_URL}/api/service-time`, {
-            process_id: record.id,
-            service_unit: `Gate Keeper - ${storeId}`,
-            end_time: gateProcessedTime,
-            officer_id: localStorage.getItem('EmployeeID'),
-            officer_name: localStorage.getItem('FullName'),
-            status: 'completed',
-            notes: `Gate ${action === 'allow' ? 'allowed' : 'denied'} exit for vehicle ${record.vehicle_plate}`
-          });
+          for (const storeName of storesReadyForGate) {
+            await axios.post(`${API_URL}/api/service-time`, {
+              process_id: record.id,
+              service_unit: `Gate Keeper - ${storeName}`,
+              end_time: gateProcessedTime,
+              officer_id: localStorage.getItem('EmployeeID'),
+              officer_name: localStorage.getItem('FullName'),
+              status: 'completed',
+              notes: `Gate ${action === 'allow' ? 'allowed' : 'denied'} exit for vehicle ${record.vehicle_plate}`
+            });
+          }
           
-          console.log(`✅ Gate Keeper service time recorded`);
+          console.log(`✅ Gate Keeper service time recorded for stores: ${storesReadyForGate.join(', ')}`);
         } catch (err) {
           console.error('❌ Failed to record Gate Keeper service time:', err);
           // Don't fail the gate processing if service time recording fails
@@ -297,7 +272,7 @@ const GateKeeper = () => {
 
         setSnackbar({ 
           open: true, 
-          message: `Vehicle ${record.vehicle_plate} ${action === 'allow' ? 'allowed to exit' : 'denied exit'}!`, 
+          message: `Vehicle ${record.vehicle_plate} ${action === 'allow' ? 'allowed to exit' : 'denied exit'} for ${storesReadyForGate.join(', ')}!`, 
           severity: action === 'allow' ? 'success' : 'warning' 
         });
         
@@ -373,7 +348,6 @@ const GateKeeper = () => {
         <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }} alignItems="center">
           <IconButton 
             onClick={() => {
-              enableAudio(); // Enable audio on sound button click
               setSoundEnabled(!soundEnabled);
             }}
             color={soundEnabled ? "primary" : "default"}
@@ -718,7 +692,7 @@ const GateKeeper = () => {
       {/* New Records Notification Dialog */}
       <Dialog
         open={notificationDialog}
-        onClose={() => setNotificationDialog(false)}
+        onClose={closeNotificationDialog}
         PaperProps={{
           sx: {
             borderRadius: { xs: 1.5, sm: 2, md: 3 },
@@ -760,7 +734,7 @@ const GateKeeper = () => {
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', pb: { xs: 1.5, sm: 2 } }}>
           <Button 
-            onClick={() => setNotificationDialog(false)}
+            onClick={closeNotificationDialog}
             variant="contained"
             color="warning"
             sx={{ 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import Swal from 'sweetalert2';
 import { 
     Box, Typography, CircularProgress, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button, Chip, Snackbar, Alert,
@@ -27,7 +28,7 @@ const DispatcherAccount = () => {
 
     const TARGET_PRIMARY_STATUSES = useMemo(() => ['ewm_completed'], []);
 
-    // 1. Initialize Store Info
+    // 1. Initialize Store Info and periodically refresh from server
     useEffect(() => {
         const storedStore = localStorage.getItem('store'); 
         console.log('Stored store from localStorage:', storedStore);
@@ -43,6 +44,39 @@ const DispatcherAccount = () => {
             setStore(defaultStore);
             console.log('Using default store configuration:', defaultStore);
         }
+
+        // Periodically check if store has changed in the database
+        const checkStoreUpdate = async () => {
+            try {
+                const userId = localStorage.getItem('UserId');
+                if (!userId) return;
+                
+                const response = await axios.get(`${API_URL}/api/users-management/${userId}`);
+                const serverStore = response.data.store;
+                
+                if (serverStore && serverStore !== storedStore) {
+                    console.log('🔄 Store updated from server:', serverStore);
+                    localStorage.setItem('store', serverStore);
+                    setStore(serverStore.toUpperCase().trim());
+                    
+                    // Show notification
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Store Updated',
+                        text: `Your store has been updated to ${serverStore}`,
+                        timer: 3000
+                    });
+                }
+            } catch (err) {
+                console.error('Error checking store update:', err);
+            }
+        };
+        
+        // Check immediately and then every 30 seconds
+        checkStoreUpdate();
+        const storeCheckInterval = setInterval(checkStoreUpdate, 30000);
+        
+        return () => clearInterval(storeCheckInterval);
     }, []);
 
     // 2. Fetch Facilities Lookup

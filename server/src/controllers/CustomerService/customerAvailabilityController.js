@@ -252,10 +252,11 @@ const getO2CCompletedByStore = async (req, res) => {
         MAX(odn.is_available) as is_available
       FROM customer_queue cq
       INNER JOIN odns_rdf odn ON cq.id = odn.process_id
+      INNER JOIN stores s ON odn.store_id = s.id
       LEFT JOIN facilities f ON cq.facility_id = f.id
       WHERE cq.status = 'o2c_completed'
         AND (cq.next_service_point = 'ewm' OR cq.next_service_point = 'EWM')
-        AND odn.store = ?
+        AND s.store_name = ?
       GROUP BY cq.id, cq.facility_id, cq.next_service_point, f.facility_name, f.region_name, f.woreda_name, f.zone_name
       ORDER BY cq.id DESC
     `;

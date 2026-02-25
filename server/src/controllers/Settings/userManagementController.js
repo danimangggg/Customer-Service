@@ -15,45 +15,95 @@ const getAllUsers = async (req, res) => {
       store = ''
     } = req.query;
     
-    console.log('Search parameters received:', { search, account_status }); // Debug log
+    console.log('=== GET ALL USERS ===');
+    console.log('Search parameters received:', { search, account_status, store, jobTitle, page, limit });
     
     const offset = (page - 1) * limit;
-    let whereClause = {};
+    
+    // Build WHERE clause
+    let whereConditions = [];
+    let replacements = [];
     
     // Search functionality
-    if (search) {
-      console.log('Applying search filter for:', search); // Debug log
-      whereClause[Op.or] = [
-        { full_name: { [Op.like]: `%${search}%` } },
-        { user_name: { [Op.like]: `%${search}%` } },
-        { jobTitle: { [Op.like]: `%${search}%` } }
-      ];
+    if (search && search.trim()) {
+      whereConditions.push('(e.full_name LIKE ? OR e.user_name LIKE ? OR e.jobTitle LIKE ?)');
+      replacements.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     // Filter by account status
-    if (account_status) {
-      whereClause.account_status = account_status;
+    if (account_status && account_status.trim()) {
+      whereConditions.push('e.account_status = ?');
+      replacements.push(account_status);
     }
 
     // Filter by job title
-    if (jobTitle) {
-      whereClause.jobTitle = jobTitle;
+    if (jobTitle && jobTitle.trim()) {
+      whereConditions.push('e.jobTitle = ?');
+      replacements.push(jobTitle);
     }
 
-    // Filter by store
-    if (store) {
-      whereClause.store = store;
+    // Filter by store name
+    if (store && store.trim()) {
+      whereConditions.push('s.store_name = ?');
+      replacements.push(store);
     }
 
-    console.log('Final where clause:', whereClause); // Debug log
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-    const { count, rows } = await Employee.findAndCountAll({
-      where: whereClause,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      order: [['createdAt', 'DESC']],
-      attributes: { exclude: ['password'] } // Exclude password from response
-    });
+    console.log('WHERE clause:', whereClause);
+    console.log('Replacements:', replacements);
+
+    // Get total count - simplified query
+    const countQuery = `
+      SELECT COUNT(DISTINCT e.id) as count
+      FROM employees e
+      LEFT JOIN stores s ON e.store_id = s.id
+      ${whereClause}
+    `;
+    
+    console.log('Executing count query...');
+    
+    let countResult;
+    try {
+      const results = await db.sequelize.query(countQuery, { 
+        replacements
+      });
+      countResult = results[0][0];
+    } catch (countError) {
+      console.error('Count query failed:', countError.message);
+      throw countError;
+    }
+    
+    const count = countResult.count || 0;
+    console.log('Total count:', count);
+
+    // Get paginated results
+    const dataQuery = `
+      SELECT 
+        e.id, e.full_name, e.user_name, e.jobTitle, e.account_type, 
+        e.account_status, e.store_id, e.createdAt, e.updatedAt,
+        s.store_name as store
+      FROM employees e
+      LEFT JOIN stores s ON e.store_id = s.id
+      ${whereClause}
+      ORDER BY e.createdAt DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    console.log('Executing data query...');
+    
+    let rows;
+    try {
+      const results = await db.sequelize.query(dataQuery, { 
+        replacements: [...replacements, parseInt(limit), parseInt(offset)]
+      });
+      rows = results[0];
+    } catch (dataError) {
+      console.error('Data query failed:', dataError.message);
+      throw dataError;
+    }
+    
+    console.log('Rows fetched:', rows.length);
 
     res.json({
       users: rows,
@@ -62,8 +112,14 @@ const getAllUsers = async (req, res) => {
       currentPage: parseInt(page)
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    console.error('=== ERROR IN GET ALL USERS ===');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to fetch users',
+      message: error.message,
+      details: error.toString()
+    });
   }
 };
 
@@ -71,13 +127,23 @@ const getAllUsers = async (req, res) => {
 const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await Employee.findByPk(id, {
-      attributes: { exclude: ['password'] }
-    });
+    
+    // Use raw query to join with stores table
+    const [users] = await db.sequelize.query(`
+      SELECT 
+        e.*,
+        s.store_name as store
+      FROM employees e
+      LEFT JOIN stores s ON e.store_id = s.id
+      WHERE e.id = ?
+    `, { replacements: [id] });
 
-    if (!user) {
+    if (!users || users.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    const user = users[0];
+    delete user.password; // Remove password from response
 
     res.json(user);
   } catch (error) {
@@ -112,6 +178,18 @@ const createUser = async (req, res) => {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
+    // Convert store name to store_id
+    let store_id = null;
+    if (store) {
+      const [storeResult] = await db.sequelize.query(
+        'SELECT id FROM stores WHERE store_name = ?',
+        { replacements: [store] }
+      );
+      if (storeResult && storeResult.length > 0) {
+        store_id = storeResult[0].id;
+      }
+    }
+
     // Hash password
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -123,7 +201,7 @@ const createUser = async (req, res) => {
       jobTitle: jobTitle || null,
       account_type: account_type || 'Standard',
       account_status: account_status || 'Active',
-      store: store || null,
+      store_id: store_id,
       email: email?.trim() || null,
       phone: phone?.trim() || null
     });
@@ -181,6 +259,22 @@ const updateUser = async (req, res) => {
       }
     }
 
+    // Convert store name to store_id if store is provided
+    let store_id = user.store_id;
+    if (store !== undefined) {
+      if (store === null || store === '') {
+        store_id = null;
+      } else {
+        const [storeResult] = await db.sequelize.query(
+          'SELECT id FROM stores WHERE store_name = ?',
+          { replacements: [store] }
+        );
+        if (storeResult && storeResult.length > 0) {
+          store_id = storeResult[0].id;
+        }
+      }
+    }
+
     // Prepare update data
     const updateData = {
       full_name: full_name?.trim() || user.full_name,
@@ -188,7 +282,7 @@ const updateUser = async (req, res) => {
       jobTitle: jobTitle !== undefined ? jobTitle : user.jobTitle,
       account_type: account_type || user.account_type,
       account_status: account_status || user.account_status,
-      store: store !== undefined ? store : user.store,
+      store_id: store_id,
       email: email !== undefined ? email?.trim() : user.email,
       phone: phone !== undefined ? phone?.trim() : user.phone
     };
@@ -258,14 +352,13 @@ const getUserStats = async (req, res) => {
       raw: true
     });
 
-    const usersByStore = await Employee.findAll({
-      attributes: [
-        'store',
-        [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count']
-      ],
-      group: ['store'],
-      raw: true
-    });
+    // Get users by store using JOIN with stores table
+    const [usersByStore] = await db.sequelize.query(`
+      SELECT s.store_name as store, COUNT(e.id) as count
+      FROM employees e
+      LEFT JOIN stores s ON e.store_id = s.id
+      GROUP BY s.store_name
+    `);
 
     res.json({
       totalUsers,

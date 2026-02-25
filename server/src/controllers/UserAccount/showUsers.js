@@ -4,22 +4,29 @@ const Employee = db.employee;
 
 const retriveUsers = async (req, res) => {
   try {
-    const data = await Employee.findAll({
-      attributes: ['id', 'user_name', 'full_name', 'account_type', 'jobTitle', 'store']
-    });
+    // Use raw query to join with stores table
+    const [data] = await db.sequelize.query(`
+      SELECT 
+        e.id, 
+        e.user_name, 
+        e.full_name, 
+        e.account_type, 
+        e.jobTitle, 
+        e.store_id,
+        s.store_name as store
+      FROM employees e
+      LEFT JOIN stores s ON e.store_id = s.id
+    `);
     
     // Map to match expected frontend format
-    const jsonArray = data.map(element => {
-      const emp = element.toJSON();
-      return {
-        id: emp.id,
-        user_name: emp.user_name,
-        FullName: emp.full_name,
-        AccountType: emp.account_type,
-        JobTitle: emp.jobTitle,
-        store: emp.store
-      };
-    });
+    const jsonArray = data.map(emp => ({
+      id: emp.id,
+      user_name: emp.user_name,
+      FullName: emp.full_name,
+      AccountType: emp.account_type,
+      JobTitle: emp.jobTitle,
+      store: emp.store
+    }));
     
     console.log('Employees fetched:', jsonArray.length);
     

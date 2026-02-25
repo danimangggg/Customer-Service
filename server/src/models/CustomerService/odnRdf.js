@@ -17,9 +17,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(100),
       allowNull: false,
     },
-    store: {
-      type: DataTypes.ENUM('AA1', 'AA2', 'AA3'),
+    store_id: {
+      type: DataTypes.INTEGER,
       allowNull: false,
+      references: {
+        model: 'stores',
+        key: 'id'
+      }
     },
     // Status tracking for each ODN
     status: {

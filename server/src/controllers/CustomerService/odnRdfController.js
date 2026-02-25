@@ -1,5 +1,24 @@
 const db = require('../../models');
 
+// Helper function to convert store name to store_id
+// Handles aliases: AA1 -> AA11, AA2 -> AA12
+const getStoreId = async (storeName) => {
+  if (!storeName) return null;
+  
+  // Normalize store name
+  let normalizedName = storeName.trim();
+  
+  // Handle aliases
+  if (normalizedName === 'AA1') normalizedName = 'AA11';
+  if (normalizedName === 'AA2') normalizedName = 'AA12';
+  
+  const [result] = await db.sequelize.query(
+    'SELECT id FROM stores WHERE store_name = ?',
+    { replacements: [normalizedName], type: db.sequelize.QueryTypes.SELECT }
+  );
+  return result ? result.id : null;
+};
+
 // Get ODNs for a specific RDF process
 const getOdnsByProcess = async (req, res) => {
   try {
@@ -9,9 +28,11 @@ const getOdnsByProcess = async (req, res) => {
 
     // Use raw SQL to avoid Sequelize model validation issues
     const query = `
-      SELECT * FROM odns_rdf
-      WHERE process_id = ?
-      ORDER BY created_at DESC
+      SELECT o.*, s.store_name as store
+      FROM odns_rdf o
+      LEFT JOIN stores s ON o.store_id = s.id
+      WHERE o.process_id = ?
+      ORDER BY o.created_at DESC
     `;
 
     const odns = await db.sequelize.query(query, {
@@ -50,14 +71,23 @@ const addOdn = async (req, res) => {
       });
     }
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     // Check if ODN already exists
     const checkQuery = `
       SELECT * FROM odns_rdf
-      WHERE process_id = ? AND odn_number = ? AND store = ?
+      WHERE process_id = ? AND odn_number = ? AND store_id = ?
     `;
 
     const existing = await db.sequelize.query(checkQuery, {
-      replacements: [processId, odnNumber, store],
+      replacements: [processId, odnNumber, storeId],
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -71,12 +101,12 @@ const addOdn = async (req, res) => {
     // Insert new ODN with default status values
     const insertQuery = `
       INSERT INTO odns_rdf 
-      (process_id, odn_number, store, status, next_service_point, added_by_id, added_by_name, created_at, updated_at)
+      (process_id, odn_number, store_id, status, next_service_point, added_by_id, added_by_name, created_at, updated_at)
       VALUES (?, ?, ?, 'pending', 'ewm', ?, ?, NOW(), NOW())
     `;
 
     await db.sequelize.query(insertQuery, {
-      replacements: [processId, odnNumber, store, addedById, addedByName],
+      replacements: [processId, odnNumber, storeId, addedById, addedByName],
       type: db.sequelize.QueryTypes.INSERT
     });
 
@@ -145,14 +175,23 @@ const updateOdn = async (req, res) => {
       });
     }
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     // Check for duplicates
     const dupQuery = `
       SELECT * FROM odns_rdf
-      WHERE process_id = ? AND odn_number = ? AND store = ? AND id != ?
+      WHERE process_id = ? AND odn_number = ? AND store_id = ? AND id != ?
     `;
 
     const duplicate = await db.sequelize.query(dupQuery, {
-      replacements: [odn[0].process_id, odnNumber, store, odnId],
+      replacements: [odn[0].process_id, odnNumber, storeId, odnId],
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -166,12 +205,12 @@ const updateOdn = async (req, res) => {
     // Update ODN
     const updateQuery = `
       UPDATE odns_rdf
-      SET odn_number = ?, store = ?, updated_at = NOW()
+      SET odn_number = ?, store_id = ?, updated_at = NOW()
       WHERE id = ?
     `;
 
     await db.sequelize.query(updateQuery, {
-      replacements: [odnNumber, store, odnId],
+      replacements: [odnNumber, storeId, odnId],
       type: db.sequelize.QueryTypes.UPDATE
     });
 
@@ -196,6 +235,15 @@ const startEwm = async (req, res) => {
 
     console.log('Starting EWM for ODNs:', { process_id, store });
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     const result = await db.sequelize.query(
       `UPDATE odns_rdf 
        SET ewm_status = 'started',
@@ -203,9 +251,9 @@ const startEwm = async (req, res) => {
            ewm_officer_id = ?,
            ewm_officer_name = ?,
            updated_at = NOW()
-       WHERE process_id = ? AND store = ? AND (ewm_status IS NULL OR ewm_status = 'pending')`,
+       WHERE process_id = ? AND store_id = ? AND (ewm_status IS NULL OR ewm_status = 'pending')`,
       {
-        replacements: [officer_id, officer_name, process_id, store],
+        replacements: [officer_id, officer_name, process_id, storeId],
         type: db.sequelize.QueryTypes.UPDATE
       }
     );
@@ -233,6 +281,15 @@ const completeEwm = async (req, res) => {
 
     console.log('Completing EWM for ODNs:', { process_id, store });
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     const result = await db.sequelize.query(
       `UPDATE odns_rdf 
        SET ewm_status = 'completed',
@@ -240,9 +297,9 @@ const completeEwm = async (req, res) => {
            ewm_officer_id = ?,
            ewm_officer_name = ?,
            updated_at = NOW()
-       WHERE process_id = ? AND store = ? AND ewm_status = 'started'`,
+       WHERE process_id = ? AND store_id = ? AND ewm_status = 'started'`,
       {
-        replacements: [officer_id, officer_name, process_id, store],
+        replacements: [officer_id, officer_name, process_id, storeId],
         type: db.sequelize.QueryTypes.UPDATE
       }
     );
@@ -270,15 +327,24 @@ const revertEwm = async (req, res) => {
 
     console.log('Reverting EWM for ODNs:', { process_id, store });
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     const result = await db.sequelize.query(
       `UPDATE odns_rdf 
        SET ewm_status = 'pending',
            ewm_started_at = NULL,
            ewm_completed_at = NULL,
            updated_at = NOW()
-       WHERE process_id = ? AND store = ?`,
+       WHERE process_id = ? AND store_id = ?`,
       {
-        replacements: [process_id, store],
+        replacements: [process_id, storeId],
         type: db.sequelize.QueryTypes.UPDATE
       }
     );
@@ -311,6 +377,15 @@ const updateDispatchStatus = async (req, res) => {
       });
     }
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     const now = new Date();
     const updateData = {
       dispatch_status: dispatch_status
@@ -337,10 +412,10 @@ const updateDispatchStatus = async (req, res) => {
     const query = `
       UPDATE odns_rdf 
       SET ${Object.keys(updateData).map(key => `${key} = ?`).join(', ')}
-      WHERE process_id = ? AND store = ?
+      WHERE process_id = ? AND store_id = ?
     `;
 
-    const values = [...Object.values(updateData), process_id, store];
+    const values = [...Object.values(updateData), process_id, storeId];
     await db.sequelize.query(query, {
       replacements: values,
       type: db.Sequelize.QueryTypes.UPDATE
@@ -372,6 +447,15 @@ const updateExitPermitStatus = async (req, res) => {
       });
     }
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     const now = new Date();
     const updateData = {
       exit_permit_status: exit_permit_status
@@ -398,10 +482,10 @@ const updateExitPermitStatus = async (req, res) => {
     const query = `
       UPDATE odns_rdf 
       SET ${Object.keys(updateData).map(key => `${key} = ?`).join(', ')}
-      WHERE process_id = ? AND store = ?
+      WHERE process_id = ? AND store_id = ?
     `;
 
-    const values = [...Object.values(updateData), process_id, store];
+    const values = [...Object.values(updateData), process_id, storeId];
     await db.sequelize.query(query, {
       replacements: values,
       type: db.Sequelize.QueryTypes.UPDATE
@@ -433,6 +517,15 @@ const updateGateStatus = async (req, res) => {
       });
     }
 
+    // Convert store name to store_id
+    const storeId = await getStoreId(store);
+    if (!storeId) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid store: ${store}`
+      });
+    }
+
     const now = new Date();
     const updateData = {
       gate_status: gate_status,
@@ -445,10 +538,10 @@ const updateGateStatus = async (req, res) => {
     const query = `
       UPDATE odns_rdf 
       SET ${Object.keys(updateData).map(key => `${key} = ?`).join(', ')}
-      WHERE process_id = ? AND store = ?
+      WHERE process_id = ? AND store_id = ?
     `;
 
-    const values = [...Object.values(updateData), process_id, store];
+    const values = [...Object.values(updateData), process_id, storeId];
     await db.sequelize.query(query, {
       replacements: values,
       type: db.Sequelize.QueryTypes.UPDATE

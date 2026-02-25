@@ -6,13 +6,16 @@ import {
   TableContainer, TableHead, TableRow, Paper, CircularProgress, 
   TextField, Snackbar, Alert, MenuItem, Select, FormControl, 
   InputLabel, InputAdornment, Chip, Autocomplete, Tabs, Tab,
-  Pagination, Stack
+  Pagination, Stack, Dialog, DialogTitle, DialogContent, DialogActions,
+  IconButton, Tooltip
 } from '@mui/material';
+import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import { 
   LocalShipping, Receipt, ConfirmationNumber, 
   Scale, Send, Inventory, Storefront, Person, History,
-  CheckCircle
+  CheckCircle, Edit, Save, Close
 } from '@mui/icons-material';
+import Swal from 'sweetalert2';
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
 
@@ -30,16 +33,47 @@ const ExitPermit = () => {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyTotalPages, setHistoryTotalPages] = useState(1);
   const [historyTotal, setHistoryTotal] = useState(0);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
 
   // Access control - only for Dispatch-Documentation users
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const hasAccess = userJobTitle === 'Dispatch-Documentation';
+  
+  const [userStore, setUserStore] = useState(localStorage.getItem('store') || 'AA11');
 
   const measurementOptions = ["Carton", "Box", "Package", "Bottle", "Others"];
+  
+  // Check for store updates from server
+  useEffect(() => {
+    const checkStoreUpdate = async () => {
+      try {
+        const userId = localStorage.getItem('UserId');
+        if (!userId) return;
+        
+        const response = await axios.get(`${API_URL}/api/users-management/${userId}`);
+        const serverStore = response.data.store;
+        
+        if (serverStore && serverStore !== localStorage.getItem('store')) {
+          console.log('🔄 Store updated from server:', serverStore);
+          localStorage.setItem('store', serverStore);
+          setUserStore(serverStore);
+          
+          // Reload data with new store
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error('Error checking store update:', err);
+      }
+    };
+    
+    checkStoreUpdate();
+  }, []);
 
   // 1. Identify Store Keys dynamically
   const getStoreKeys = useCallback(() => {
-    const rawStore = localStorage.getItem('store') || 'AA1';
+    const rawStore = userStore || 'AA11';
     const storeId = rawStore.toUpperCase().trim(); 
     const storeNum = storeId.replace('AA', '');    
     return {
@@ -47,7 +81,7 @@ const ExitPermit = () => {
       odnKey: `${storeId.toLowerCase()}_odn`,
       statusKey: `store_completed_${storeNum}`
     };
-  }, []);
+  }, [userStore]);
 
   // Get current store keys for display
   const currentStoreKeys = getStoreKeys();
@@ -93,34 +127,25 @@ const ExitPermit = () => {
       console.log('Total records:', serviceRes.data.length);
       console.log('Filtered records for exit permit:', activeRows.length);
       
-      // Get gate keeper users for this store only
+      // Get ALL Gate Keepers (Security Officers) - not store-specific
       const userData = Array.isArray(usersRes.data) ? usersRes.data : [];
       
       console.log('All users fetched:', userData.length);
-      console.log('Looking for Gate Keepers with store:', storeKeys.storeId);
       
-      // Debug: Show all Gate Keepers regardless of store
-      const allGateKeepers = userData.filter(user => user.JobTitle === 'Gate Keeper');
-      console.log('Total Gate Keepers in system:', allGateKeepers.length);
-      allGateKeepers.forEach(gk => {
-        console.log(`  - ${gk.FullName}: store="${gk.store}" (match: ${gk.store === storeKeys.storeId})`);
-      });
-      
+      // Get all Gate Keepers regardless of store
       const gateKeeperUsers = userData.filter(user => {
-        const isGateKeeper = user.JobTitle === 'Gate Keeper';
-        const storeMatch = user.store && user.store.toUpperCase().trim() === storeKeys.storeId.toUpperCase().trim();
-        return isGateKeeper && storeMatch;
+        return user.JobTitle === 'Gate Keeper';
       }).map(user => ({
         id: user.id,
         name: user.FullName,
         label: user.FullName,
-        store: user.store
+        store: user.store || 'All Stores'
       }));
       
-      console.log('Available Gate Keepers for store', storeKeys.storeId, ':', gateKeeperUsers.length);
+      console.log('Available Security Officers (Gate Keepers):', gateKeeperUsers.length);
       if (gateKeeperUsers.length === 0) {
-        console.warn('⚠️ No Gate Keepers found for store', storeKeys.storeId);
-        console.warn('Please assign Gate Keepers to this store in user management');
+        console.warn('⚠️ No Security Officers found in the system');
+        console.warn('Please add Security Officers in user management');
       }
       
       // Handle facilities data
@@ -142,49 +167,46 @@ const ExitPermit = () => {
     }
   }, [getStoreKeys]);
 
-  // Fetch history data with pagination
+  // Fetch history data - get total count first
   const fetchHistoryData = useCallback(async (page = 1) => {
     setHistoryLoading(true);
     try {
       const storeKeys = getStoreKeys();
       
-      // Fetch completed/archived records with pagination
-      const response = await axios.get(`${API_URL}/api/customers-detail-report`, {
-        params: {
-          page,
-          limit: 10,
-          statusFilter: 'completed,archived',
-          sortBy: 'created_at',
-          sortOrder: 'desc'
-        }
+      // Fetch TV display customers to get completed records
+      const response = await axios.get(`${API_URL}/api/tv-display-customers`);
+      
+      // Filter for records that have completed exit permit for this store
+      const completedRecords = response.data.filter(row => {
+        const storeDetails = row.store_details || {};
+        const storeInfo = storeDetails[storeKeys.storeId];
+        const globalStatus = (row.status || '').toLowerCase();
+        
+        if (!storeInfo) return false;
+        
+        const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
+        
+        // Show records where exit permit is completed for this store
+        // OR global status is completed/archived
+        return exitPermitStatus === 'completed' || 
+               globalStatus === 'completed' || 
+               globalStatus === 'archived';
       });
       
-      let historyData = [];
-      if (response.data && response.data.customers && Array.isArray(response.data.customers)) {
-        historyData = response.data.customers;
-      } else if (Array.isArray(response.data)) {
-        historyData = response.data;
-      }
-      
-      // Filter for completed dispatch processes
-      const completedRecords = historyData.filter(row => {
-        const isCustomerDetailFormat = row.ewm_status !== undefined;
-        
-        if (isCustomerDetailFormat) {
-          return row.dispatch_status === 'completed' || row.status === 'completed' || row.status === 'archived';
-        } else {
-          const statusValue = (row[storeKeys.statusKey] || "").toLowerCase().trim();
-          return statusValue === 'dispatch_completed' || row.status === 'archived' || row.dispatch_completed_at;
-        }
+      // Sort by most recent first
+      completedRecords.sort((a, b) => {
+        const dateA = new Date(a.started_at || a.created_at || 0);
+        const dateB = new Date(b.started_at || b.created_at || 0);
+        return dateB - dateA;
       });
       
       setHistoryRecords(completedRecords);
-      setHistoryTotalPages(response.data.totalPages || 1);
-      setHistoryTotal(response.data.total || completedRecords.length);
+      setHistoryTotal(completedRecords.length);
       
     } catch (error) {
       console.error("History fetch error:", error);
       setHistoryRecords([]);
+      setHistoryTotal(0);
     } finally {
       setHistoryLoading(false);
     }
@@ -199,12 +221,17 @@ const ExitPermit = () => {
     }
   }, [fetchData, currentTab]);
 
-  // Fetch history when history tab is selected
+  // Fetch history when history tab is selected OR on mount to get count
   useEffect(() => {
     if (currentTab === 1) {
       fetchHistoryData(historyPage);
     }
   }, [currentTab, historyPage, fetchHistoryData]);
+
+  // Fetch history count on mount for tab label
+  useEffect(() => {
+    fetchHistoryData(1);
+  }, [fetchHistoryData]);
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
@@ -213,6 +240,234 @@ const ExitPermit = () => {
   const handleHistoryPageChange = (event, value) => {
     setHistoryPage(value);
   };
+
+  // Handle edit dialog
+  const handleEditClick = (record) => {
+    setEditingRecord(record);
+    setEditFormData({
+      facility_id: record.facility_id || '',
+      vehicle_plate: record.vehicle_plate || '',
+      receipt_count: record.receipt_count || '',
+      receipt_number: record.receipt_number || '',
+      total_amount: record.total_amount || '',
+      measurement_unit: record.measurement_unit || '',
+      assigned_gate_keeper_id: record.assigned_gate_keeper_id || '',
+      assigned_gate_keeper_name: record.assigned_gate_keeper_name || '',
+      customer_type: record.customer_type || ''
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditClose = () => {
+    setEditDialogOpen(false);
+    setEditingRecord(null);
+    setEditFormData({});
+  };
+
+  const handleEditSave = async () => {
+    if (!editingRecord) return;
+
+    try {
+      // Find selected gate keeper
+      const selectedGateKeeper = gateKeepers.find(gk => gk.id === editFormData.assigned_gate_keeper_id);
+
+      // Update customer_queue with edited data
+      await axios.put(`${API_URL}/api/update-service-status/${editingRecord.id}`, {
+        facility_id: editFormData.facility_id,
+        vehicle_plate: editFormData.vehicle_plate,
+        receipt_count: editFormData.receipt_count,
+        receipt_number: editFormData.receipt_number,
+        total_amount: editFormData.total_amount,
+        measurement_unit: editFormData.measurement_unit,
+        customer_type: editFormData.customer_type,
+        assigned_gate_keeper_id: editFormData.assigned_gate_keeper_id,
+        assigned_gate_keeper_name: selectedGateKeeper ? selectedGateKeeper.name : editFormData.assigned_gate_keeper_name
+      });
+
+      setSnackbar({ 
+        open: true, 
+        message: 'Record updated successfully!', 
+        severity: 'success' 
+      });
+
+      handleEditClose();
+      fetchHistoryData(historyPage);
+    } catch (error) {
+      console.error('Edit error:', error);
+      setSnackbar({ 
+        open: true, 
+        message: 'Failed to update record', 
+        severity: 'error' 
+      });
+    }
+  };
+
+  // DataGrid columns for history
+  const historyColumns = [
+    {
+      field: 'id',
+      headerName: 'ID',
+      width: 80,
+      filterable: true,
+    },
+    {
+      field: 'odn_numbers',
+      headerName: 'ODN Reference',
+      width: 180,
+      filterable: true,
+      valueGetter: (params) => {
+        const row = params.row;
+        const storeDetails = row.store_details || {};
+        const storeInfo = storeDetails[storeId];
+        if (storeInfo && storeInfo.odns && storeInfo.odns.length > 0) {
+          return storeInfo.odns.join(', ');
+        }
+        return '—';
+      }
+    },
+    {
+      field: 'facility_name',
+      headerName: 'Facility',
+      width: 200,
+      filterable: true,
+      valueGetter: (params) => {
+        const row = params.row;
+        return row.actual_facility_name || 
+               row.facility_name || 
+               facilities.find(f => f.id === row.facility_id)?.facility_name || 
+               row.facility_id || '—';
+      }
+    },
+    {
+      field: 'vehicle_plate',
+      headerName: 'Vehicle Plate',
+      width: 150,
+      filterable: true,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <LocalShipping sx={{ fontSize: 16, color: '#2196f3' }} />
+          <Typography variant="body2">{params.value || '—'}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'total_amount',
+      headerName: 'Amount',
+      width: 120,
+      filterable: true,
+      type: 'number',
+      renderCell: (params) => (
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {params.value || '—'} {params.row.measurement_unit || ''}
+        </Typography>
+      )
+    },
+    {
+      field: 'measurement_unit',
+      headerName: 'Unit',
+      width: 100,
+      filterable: true,
+    },
+    {
+      field: 'receipt_count',
+      headerName: 'Receipts',
+      width: 100,
+      filterable: true,
+      type: 'number',
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Receipt sx={{ fontSize: 16, color: '#9c27b0' }} />
+          <Typography variant="body2">{params.value || '—'}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'receipt_number',
+      headerName: 'Receipt #',
+      width: 130,
+      filterable: true,
+      renderCell: (params) => {
+        const isCash = params.row.customer_type?.toLowerCase() === 'cash';
+        return isCash && params.value ? (
+          <Chip 
+            label={params.value} 
+            size="small" 
+            color="warning" 
+            sx={{ fontWeight: 'bold' }}
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">—</Typography>
+        );
+      }
+    },
+    {
+      field: 'assigned_gate_keeper_name',
+      headerName: 'Security Officer',
+      width: 180,
+      filterable: true,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Person sx={{ fontSize: 16, color: '#4caf50' }} />
+          <Typography variant="body2">{params.value || 'Security'}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 130,
+      filterable: true,
+      renderCell: (params) => {
+        const storeDetails = params.row.store_details || {};
+        const storeInfo = storeDetails[storeId];
+        const gateStatus = storeInfo?.gate_status || '';
+        
+        let color = 'success';
+        let label = 'Completed';
+        
+        if (gateStatus === 'allowed') {
+          color = 'success';
+          label = 'Exit Allowed';
+        } else if (gateStatus === 'denied') {
+          color = 'error';
+          label = 'Exit Denied';
+        } else if (params.value === 'archived') {
+          color = 'info';
+          label = 'Awaiting Gate';
+        }
+        
+        return (
+          <Chip 
+            label={label} 
+            color={color} 
+            size="small" 
+            sx={{ fontWeight: 'bold' }}
+          />
+        );
+      }
+    },
+    {
+      field: 'actions',
+      headerName: 'Actions',
+      width: 100,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        // Allow editing for all records in history
+        return (
+          <Tooltip title="Edit Record">
+            <IconButton 
+              size="small" 
+              color="primary"
+              onClick={() => handleEditClick(params.row)}
+            >
+              <Edit fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        );
+      }
+    }
+  ];
 
   const handleInputChange = (id, field, value) => {
     setFormValues(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
@@ -372,7 +627,7 @@ const ExitPermit = () => {
           </Typography>
           {/* Debug Info */}
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            Status Key: {statusKey} | Gate Keepers: {gateKeepers.length} | Records: {records.length}
+            Status Key: {statusKey} | Security Officers: {gateKeepers.length} | Records: {records.length}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             User: {userJobTitle} | Store: {storeId} | Access: {hasAccess ? 'Yes' : 'No'}
@@ -412,41 +667,31 @@ const ExitPermit = () => {
         </Tabs>
       </Box>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
-        {error && (
-          <Alert severity="error" sx={{ m: 2 }}>
-            {error}
-          </Alert>
-        )}
-        <Table>
-          <TableHead sx={{ bgcolor: '#ffffff' }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 700, color: '#5c6bc0' }}>LOGISTICS INFO</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#5c6bc0' }}>QUANTITY & UNIT</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#5c6bc0' }}>DOCUMENTATION</TableCell>
-              <TableCell sx={{ fontWeight: 700, color: '#5c6bc0' }}>SECURITY</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 700, color: '#5c6bc0' }}>ACTION</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {/* Current Tab */}
-            {currentTab === 0 && (
-              <>
-                {records.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 10 }}>
-                      <Inventory sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
-                      <Typography variant="h6" color="text.secondary">No items waiting for exit permit.</Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Records will appear here when dispatch is completed. Check the browser console for debugging info.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  records.map((row) => {
-                    const isCash = row.customer_type?.toLowerCase() === 'cash';
-                    const val = formValues[row.id] || {};
-                    const isFinalized = row.status === 'archived';
+      {/* Current Tab - Table View */}
+      {currentTab === 0 && (
+        <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
+          {error && (
+            <Alert severity="error" sx={{ m: 2 }}>
+              {error}
+            </Alert>
+          )}
+          <Table>
+            <TableBody>
+              {records.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} align="center" sx={{ py: 10 }}>
+                    <Inventory sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
+                    <Typography variant="h6" color="text.secondary">No items waiting for exit permit.</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Records will appear here when dispatch is completed. Check the browser console for debugging info.
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                records.map((row) => {
+                  const isCash = row.customer_type?.toLowerCase() === 'cash';
+                  const val = formValues[row.id] || {};
+                  const isFinalized = row.status === 'archived';
                     
                     return (
                       <TableRow 
@@ -641,166 +886,225 @@ const ExitPermit = () => {
                     );
                   })
                 )}
-              </>
-            )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
-            {/* History Tab */}
-            {currentTab === 1 && (
-              <>
-                {historyLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 10 }}>
-                      <CircularProgress thickness={5} size={40} />
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                        Loading history...
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : historyRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 10 }}>
-                      <History sx={{ fontSize: 48, color: '#e0e0e0', mb: 1 }} />
-                      <Typography variant="h6" color="text.secondary">No completed exit permits found.</Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        Completed exit permits will appear here.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  historyRecords.map((row) => {
-                    const isCash = row.customer_type?.toLowerCase() === 'cash';
-                    
-                    return (
-                      <TableRow 
-                        key={`history-${row.id}`} 
-                        sx={{ 
-                          '&:hover': { bgcolor: '#f8f9fa' },
-                          opacity: 0.8,
-                          bgcolor: '#fafafa'
-                        }}
-                      >
-                        {/* ODN & Store Info */}
-                        <TableCell sx={{ verticalAlign: 'top', py: 3 }}>
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#9e9e9e' }}>ODN REFERENCE</Typography>
-                            <Typography variant="body2" sx={{ wordBreak: 'break-word', mt: 0.5, fontWeight: 'normal' }}>
-                              {(() => {
-                                // History records might come from customer detail report with different structure
-                                const storeDetails = row.store_details || {};
-                                const storeInfo = storeDetails[storeId];
-                                if (storeInfo && storeInfo.odns && storeInfo.odns.length > 0) {
-                                  return storeInfo.odns.join(', ');
-                                }
-                                // Fallback to old column names for history records
-                                return row[odnKey] || row.aa1_odn || row.aa2_odn || row.aa3_odn || row.odn_numbers || '—';
-                              })()}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Storefront sx={{ fontSize: 16, color: '#7986cb' }} />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                              {row.actual_facility_name || 
-                               row.facility_name || 
-                               facilities.find(f => f.id === row.facility_id)?.facility_name || 
-                               row.facility_id}
-                            </Typography>
-                          </Box>
-                          <Chip 
-                            label="Completed" 
-                            color="success" 
-                            size="small" 
-                            sx={{ mt: 1, fontWeight: 'bold' }}
-                          />
-                        </TableCell>
-
-                        {/* Quantity & Units */}
-                        <TableCell sx={{ verticalAlign: 'top', py: 3 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              <Scale sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                              {row.total_amount || '—'} {row.measurement_unit || ''}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Completed
-                            </Typography>
-                          </Box>
-                        </TableCell>
-
-                        {/* Plate & Receipts */}
-                        <TableCell sx={{ verticalAlign: 'top', py: 3 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              <LocalShipping sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                              {row.vehicle_plate || '—'}
-                            </Typography>
-                            <Typography variant="body2">
-                              <Receipt sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                              {row.receipt_count || '—'} Receipts
-                            </Typography>
-                            {isCash && row.receipt_number && (
-                              <Typography variant="body2" sx={{ color: '#f57c00' }}>
-                                <ConfirmationNumber sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                                {row.receipt_number}
-                              </Typography>
-                            )}
-                          </Box>
-                        </TableCell>
-
-                        {/* Security */}
-                        <TableCell sx={{ verticalAlign: 'top', py: 3 }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                              <Person sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                              {row.assigned_gate_keeper_name || 'Gate Keeper'}
-                            </Typography>
-                            <Chip 
-                              label="Processed" 
-                              color="success" 
-                              size="small" 
-                              sx={{ fontWeight: 'bold', alignSelf: 'flex-start' }}
-                            />
-                          </Box>
-                        </TableCell>
-
-                        {/* Status */}
-                        <TableCell align="right" sx={{ verticalAlign: 'middle' }}>
-                          <Chip 
-                            label="Completed" 
-                            color="success" 
-                            variant="filled"
-                            sx={{ fontWeight: 'bold' }}
-                            icon={<CheckCircle />}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Pagination for History Tab */}
-      {currentTab === 1 && historyTotalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Stack spacing={2}>
-            <Pagination 
-              count={historyTotalPages} 
-              page={historyPage} 
-              onChange={handleHistoryPageChange}
-              color="primary"
-              size="large"
-              showFirstButton 
-              showLastButton
-            />
-            <Typography variant="body2" color="text.secondary" align="center">
-              Showing page {historyPage} of {historyTotalPages} ({historyTotal} total records)
-            </Typography>
-          </Stack>
+      {/* Advanced DataGrid for History Tab */}
+      {currentTab === 1 && (
+        <Box sx={{ mt: 3, height: 600, width: '100%' }}>
+          <DataGrid
+            rows={historyRecords}
+            columns={historyColumns}
+            pageSize={10}
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            checkboxSelection={false}
+            disableSelectionOnClick
+            loading={historyLoading}
+            components={{
+              Toolbar: GridToolbar,
+            }}
+            componentsProps={{
+              toolbar: {
+                showQuickFilter: true,
+                quickFilterProps: { debounceMs: 500 },
+              },
+            }}
+            sx={{
+              bgcolor: 'white',
+              borderRadius: 3,
+              boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+              '& .MuiDataGrid-cell': {
+                borderBottom: '1px solid #f0f0f0',
+              },
+              '& .MuiDataGrid-columnHeaders': {
+                bgcolor: '#f8f9fa',
+                color: '#5c6bc0',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                borderBottom: '2px solid #e0e0e0',
+              },
+              '& .MuiDataGrid-row:hover': {
+                bgcolor: '#f5f7ff',
+              },
+              '& .MuiDataGrid-toolbarContainer': {
+                padding: 2,
+                gap: 2,
+              },
+            }}
+          />
         </Box>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog 
+        open={editDialogOpen} 
+        onClose={handleEditClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          bgcolor: '#1a237e', 
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Edit />
+            <Typography variant="h6">Edit Exit Permit</Typography>
+          </Box>
+          <IconButton onClick={handleEditClose} sx={{ color: 'white' }}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3 }}>
+          <Stack spacing={3}>
+            <FormControl fullWidth>
+              <InputLabel>Facility</InputLabel>
+              <Select
+                value={editFormData.facility_id || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, facility_id: e.target.value })}
+                label="Facility"
+                startAdornment={
+                  <InputAdornment position="start">
+                    <Storefront />
+                  </InputAdornment>
+                }
+              >
+                {facilities.map(facility => (
+                  <MenuItem key={facility.id} value={facility.id}>
+                    {facility.facility_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Customer Type</InputLabel>
+              <Select
+                value={editFormData.customer_type || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, customer_type: e.target.value })}
+                label="Customer Type"
+              >
+                <MenuItem value="Cash">Cash</MenuItem>
+                <MenuItem value="Credit">Credit</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              label="Vehicle Plate"
+              fullWidth
+              value={editFormData.vehicle_plate || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, vehicle_plate: e.target.value })}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LocalShipping />
+                  </InputAdornment>
+                )
+              }}
+            />
+            <TextField
+              label="Receipt Count"
+              fullWidth
+              type="number"
+              value={editFormData.receipt_count || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, receipt_count: e.target.value })}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Receipt />
+                  </InputAdornment>
+                )
+              }}
+            />
+            <TextField
+              label="Receipt Number (Cash)"
+              fullWidth
+              value={editFormData.receipt_number || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, receipt_number: e.target.value })}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <ConfirmationNumber />
+                  </InputAdornment>
+                )
+              }}
+            />
+            <TextField
+              label="Total Amount"
+              fullWidth
+              type="number"
+              value={editFormData.total_amount || ''}
+              onChange={(e) => setEditFormData({ ...editFormData, total_amount: e.target.value })}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Scale />
+                  </InputAdornment>
+                )
+              }}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Measurement Unit</InputLabel>
+              <Select
+                value={editFormData.measurement_unit || ''}
+                onChange={(e) => setEditFormData({ ...editFormData, measurement_unit: e.target.value })}
+                label="Measurement Unit"
+              >
+                {measurementOptions.map(opt => (
+                  <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Autocomplete
+              fullWidth
+              options={gateKeepers}
+              getOptionLabel={(option) => option.label || option.name}
+              value={gateKeepers.find(gk => gk.id === editFormData.assigned_gate_keeper_id) || null}
+              onChange={(event, newValue) => {
+                setEditFormData({ 
+                  ...editFormData, 
+                  assigned_gate_keeper_id: newValue?.id || '',
+                  assigned_gate_keeper_name: newValue?.name || ''
+                });
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Security Officer"
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Person />
+                      </InputAdornment>
+                    )
+                  }}
+                />
+              )}
+            />
+            <Alert severity="info">
+              Note: You can edit all fields. Changes will be saved immediately.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={handleEditClose} variant="outlined" startIcon={<Close />}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleEditSave} 
+            variant="contained" 
+            startIcon={<Save />}
+            sx={{ 
+              background: 'linear-gradient(45deg, #2e3b8b 30%, #5c6bc0 90%)'
+            }}
+          >
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
         <Alert variant="filled" severity={snackbar.severity} sx={{ borderRadius: '8px' }}>

@@ -14,7 +14,7 @@ const getEwmCompletedCustomers = async (req, res) => {
         odn.id as odn_id,
         odn.process_id,
         odn.odn_number,
-        odn.store,
+        s.store_name as store,
         odn.ewm_status,
         odn.ewm_completed_at,
         odn.next_service_point,
@@ -28,9 +28,10 @@ const getEwmCompletedCustomers = async (req, res) => {
       FROM odns_rdf odn
       INNER JOIN customer_queue cq ON odn.process_id = cq.id
       INNER JOIN facilities f ON cq.facility_id = f.id
+      LEFT JOIN stores s ON odn.store_id = s.id
       LEFT JOIN invoices inv ON inv.odn_number = odn.odn_number AND inv.process_id = odn.process_id
       WHERE odn.ewm_status = 'completed'
-        ${store ? `AND odn.store = ?` : ''}
+        ${store ? `AND s.store_name = ?` : ''}
       ORDER BY odn.ewm_completed_at DESC, odn.odn_number ASC
     `;
 

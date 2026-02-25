@@ -8,8 +8,10 @@ import {
   TextField, TablePagination, TableSortLabel, IconButton,
   InputAdornment, FormControl, InputLabel, Select, MenuItem, Tabs, Tab, Fade, Avatar
 } from '@mui/material';
+import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
-  Business, Search, GetApp, Clear, FilterList, Assignment
+  Business, Search, GetApp, Clear, FilterList, Assignment, Description,
+  LocalShipping, Receipt, ConfirmationNumber, Scale, Person, Storefront
 } from '@mui/icons-material';
 import MUIDataTable from 'mui-datatables';
 import * as XLSX from 'xlsx';
@@ -40,6 +42,11 @@ const RDFReport = () => {
   const [picklistsLoading, setPicklistsLoading] = useState(false);
   const [combinedPicklists, setCombinedPicklists] = useState([]);
   
+  // Documentation states
+  const [documentationRecords, setDocumentationRecords] = useState([]);
+  const [documentationLoading, setDocumentationLoading] = useState(false);
+  const [facilities, setFacilities] = useState([]);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,6 +56,8 @@ const RDFReport = () => {
   useEffect(() => {
     if (activeTab === 1) {
       fetchPicklists();
+    } else if (activeTab === 2) {
+      fetchDocumentation();
     }
   }, [activeTab]);
 
@@ -98,6 +107,227 @@ const RDFReport = () => {
   const fetchPicklists = async () => {
     try {
       setPicklistsLoading(true);
+      const pickRes = await axios.get(`${API_URL}/api/getPicklists`);
+      let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+      setPicklists(allPicklists);
+      
+      const combined = allPicklists.map((p) => ({ ...p }));
+      setCombinedPicklists(combined);
+    } catch (err) {
+      console.error('Error fetching picklists:', err);
+    } finally {
+      setPicklistsLoading(false);
+    }
+  };
+
+  const fetchDocumentation = async () => {
+    try {
+      setDocumentationLoading(true);
+      
+      // Fetch TV display customers and facilities
+      const [customersRes, facilitiesRes] = await Promise.all([
+        axios.get(`${API_URL}/api/tv-display-customers`),
+        axios.get(`${API_URL}/api/facilities`)
+      ]);
+      
+      // Filter for records that have completed exit permit for any store
+      const completedRecords = customersRes.data.filter(row => {
+        const storeDetails = row.store_details || {};
+        const globalStatus = (row.status || '').toLowerCase();
+        
+        // Check if ANY store has completed exit permit
+        const hasCompletedExitPermit = Object.keys(storeDetails).some(storeKey => {
+          const storeInfo = storeDetails[storeKey];
+          const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
+          return exitPermitStatus === 'completed';
+        });
+        
+        return hasCompletedExitPermit || globalStatus === 'completed' || globalStatus === 'archived';
+      });
+      
+      // Sort by most recent first
+      completedRecords.sort((a, b) => {
+        const dateA = new Date(a.started_at || a.created_at || 0);
+        const dateB = new Date(b.started_at || b.created_at || 0);
+        return dateB - dateA;
+      });
+      
+      setDocumentationRecords(completedRecords);
+      setFacilities(facilitiesRes.data || []);
+    } catch (err) {
+      console.error('Error fetching documentation:', err);
+      setDocumentationRecords([]);
+    } finally {
+      setDocumentationLoading(false);
+    }
+  };
+
+  // DataGrid columns for documentation
+  const documentationColumns = [
+    {
+      field: 'id',
+      headerName: 'ID',
+      width: 80,
+      filterable: true,
+    },
+    {
+      field: 'odn_numbers',
+      headerName: 'ODN Reference',
+      width: 200,
+      filterable: true,
+      valueGetter: (params) => {
+        const row = params.row;
+        const storeDetails = row.store_details || {};
+        const allOdns = [];
+        
+        Object.keys(storeDetails).forEach(storeKey => {
+          const storeInfo = storeDetails[storeKey];
+          if (storeInfo && storeInfo.odns && storeInfo.odns.length > 0) {
+            allOdns.push(...storeInfo.odns.map(odn => `${storeKey}:${odn}`));
+          }
+        });
+        
+        return allOdns.length > 0 ? allOdns.join(', ') : '—';
+      }
+    },
+    {
+      field: 'facility_name',
+      headerName: 'Facility',
+      width: 220,
+      filterable: true,
+      valueGetter: (params) => {
+        const row = params.row;
+        return row.actual_facility_name || 
+               row.facility_name || 
+               facilities.find(f => f.id === row.facility_id)?.facility_name || 
+               row.facility_id || '—';
+      },
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Storefront sx={{ fontSize: 16, color: '#7986cb' }} />
+          <Typography variant="body2">{params.value}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'vehicle_plate',
+      headerName: 'Vehicle Plate',
+      width: 150,
+      filterable: true,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <LocalShipping sx={{ fontSize: 16, color: '#2196f3' }} />
+          <Typography variant="body2">{params.value || '—'}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'total_amount',
+      headerName: 'Amount',
+      width: 120,
+      filterable: true,
+      type: 'number',
+      renderCell: (params) => (
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {params.value || '—'} {params.row.measurement_unit || ''}
+        </Typography>
+      )
+    },
+    {
+      field: 'measurement_unit',
+      headerName: 'Unit',
+      width: 100,
+      filterable: true,
+    },
+    {
+      field: 'receipt_count',
+      headerName: 'Receipts',
+      width: 100,
+      filterable: true,
+      type: 'number',
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Receipt sx={{ fontSize: 16, color: '#9c27b0' }} />
+          <Typography variant="body2">{params.value || '—'}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'receipt_number',
+      headerName: 'Receipt #',
+      width: 130,
+      filterable: true,
+      renderCell: (params) => {
+        const isCash = params.row.customer_type?.toLowerCase() === 'cash';
+        return isCash && params.value ? (
+          <Chip 
+            label={params.value} 
+            size="small" 
+            color="warning" 
+            sx={{ fontWeight: 'bold' }}
+          />
+        ) : (
+          <Typography variant="body2" color="text.secondary">—</Typography>
+        );
+      }
+    },
+    {
+      field: 'assigned_gate_keeper_name',
+      headerName: 'Security Officer',
+      width: 180,
+      filterable: true,
+      renderCell: (params) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Person sx={{ fontSize: 16, color: '#4caf50' }} />
+          <Typography variant="body2">{params.value || 'Security'}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'status',
+      headerName: 'Status',
+      width: 150,
+      filterable: true,
+      renderCell: (params) => {
+        const storeDetails = params.row.store_details || {};
+        const globalStatus = (params.value || '').toLowerCase();
+        
+        // Check all stores' gate status
+        const allStoresAllowed = Object.keys(storeDetails).every(storeKey => {
+          const storeInfo = storeDetails[storeKey];
+          return (storeInfo.gate_status || '').toLowerCase() === 'allowed';
+        });
+        
+        const anyStoreDenied = Object.keys(storeDetails).some(storeKey => {
+          const storeInfo = storeDetails[storeKey];
+          return (storeInfo.gate_status || '').toLowerCase() === 'denied';
+        });
+        
+        let color = 'info';
+        let label = 'Awaiting Gate';
+        
+        if (globalStatus === 'completed' || allStoresAllowed) {
+          color = 'success';
+          label = 'Completed';
+        } else if (anyStoreDenied) {
+          color = 'error';
+          label = 'Exit Denied';
+        } else if (globalStatus === 'archived') {
+          color = 'info';
+          label = 'Awaiting Gate';
+        }
+        
+        return (
+          <Chip 
+            label={label} 
+            color={color} 
+            size="small" 
+            sx={{ fontWeight: 'bold' }}
+          />
+        );
+      }
+    }
+  ];
       const pickRes = await axios.get(`${API_URL}/api/getPicklists`);
       
       let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
@@ -273,6 +503,11 @@ const RDFReport = () => {
           <Tab 
             label="Picklists" 
             icon={<Assignment />} 
+            iconPosition="start"
+          />
+          <Tab 
+            label="Documentation" 
+            icon={<Description />} 
             iconPosition="start"
           />
         </Tabs>
@@ -872,6 +1107,64 @@ const RDFReport = () => {
           <Button onClick={() => setCustomerDetailOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Documentation Tab */}
+      {activeTab === 2 && (
+        <Box>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
+            Documentation Records (Exit Permits)
+          </Typography>
+
+          {documentationLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+              <CircularProgress size={60} />
+            </Box>
+          ) : (
+            <Box sx={{ height: 700, width: '100%' }}>
+              <DataGrid
+                rows={documentationRecords}
+                columns={documentationColumns}
+                pageSize={25}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                checkboxSelection={false}
+                disableSelectionOnClick
+                loading={documentationLoading}
+                components={{
+                  Toolbar: GridToolbar,
+                }}
+                componentsProps={{
+                  toolbar: {
+                    showQuickFilter: true,
+                    quickFilterProps: { debounceMs: 500 },
+                  },
+                }}
+                sx={{
+                  bgcolor: 'white',
+                  borderRadius: 3,
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                  '& .MuiDataGrid-cell': {
+                    borderBottom: '1px solid #f0f0f0',
+                  },
+                  '& .MuiDataGrid-columnHeaders': {
+                    bgcolor: '#f8f9fa',
+                    color: '#5c6bc0',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    borderBottom: '2px solid #e0e0e0',
+                  },
+                  '& .MuiDataGrid-row:hover': {
+                    bgcolor: '#f5f7ff',
+                  },
+                  '& .MuiDataGrid-toolbarContainer': {
+                    padding: 2,
+                    gap: 2,
+                  },
+                }}
+              />
+            </Box>
+          )}
+        </Box>
+      )}
     </Container>
   );
 };

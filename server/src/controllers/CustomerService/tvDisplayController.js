@@ -7,21 +7,22 @@ const getTvDisplayCustomers = async (req, res) => {
     const query = `
       SELECT 
         cq.*,
-        GROUP_CONCAT(DISTINCT odn.store ORDER BY odn.store) as assigned_stores,
+        GROUP_CONCAT(DISTINCT s.store_name ORDER BY s.store_name) as assigned_stores,
         GROUP_CONCAT(
           CONCAT(
-            odn.store, ':', 
+            s.store_name, ':', 
             odn.odn_number, ':', 
             COALESCE(odn.ewm_status, 'pending'), ':', 
             COALESCE(odn.dispatch_status, 'pending'), ':',
             COALESCE(odn.exit_permit_status, 'pending'), ':',
             COALESCE(odn.gate_status, 'pending')
           )
-          ORDER BY odn.store
+          ORDER BY s.store_name
           SEPARATOR '|'
         ) as store_details
       FROM customer_queue cq
       LEFT JOIN odns_rdf odn ON cq.id = odn.process_id
+      LEFT JOIN stores s ON odn.store_id = s.id
       WHERE cq.status != 'completed' 
         AND cq.status != 'canceled'
         AND cq.status != 'rejected'
