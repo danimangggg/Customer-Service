@@ -18,10 +18,16 @@ const retrievePicklists = async (req, res) => {
   try {
     console.log('Fetching picklists...');
     
+    // Add pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100; // Default to 100 records
+    const offset = (page - 1) * limit;
+    
     const baseUrl = `${req.protocol}://${req.get('host')}/picklists`;
     
     // Use raw SQL query with proper JOINs to get facility information
     // HP picklists use 'processes' table, AA picklists use 'customer_queue' table
+    // Filter: Only show uncompleted picklists (status != 'completed')
     const query = `
       SELECT 
         p.id,
@@ -44,12 +50,23 @@ const retrievePicklists = async (req, res) => {
       LEFT JOIN facilities f_hp ON pr.facility_id = f_hp.id
       LEFT JOIN customer_queue cq ON CAST(p.process_id AS UNSIGNED) = cq.id AND p.store != 'HP'
       LEFT JOIN facilities f_aa ON cq.facility_id = f_aa.id
+      WHERE LOWER(COALESCE(p.status, '')) != 'completed'
       ORDER BY p.id DESC
+      LIMIT ${limit} OFFSET ${offset}
     `;
+    
+    // Get total count for pagination (only uncompleted)
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM picklist 
+      WHERE LOWER(COALESCE(status, '')) != 'completed'
+    `;
+    const [countResult] = await db.sequelize.query(countQuery);
+    const total = countResult[0].total;
 
     const [results] = await db.sequelize.query(query);
     
-    console.log(`Found ${results.length} picklists`);
+    console.log(`Found ${results.length} uncompleted picklists (page ${page}, total: ${total})`);
     
     // Debug: Log first few results to see actual data
     if (results.length > 0) {
@@ -60,7 +77,8 @@ const retrievePicklists = async (req, res) => {
         operator_id: results[0].operator_id,
         operator_id_ref: results[0].operator_id_ref,
         operator_name: results[0].operator_name,
-        store: results[0].store
+        store: results[0].store,
+        status: results[0].status
       });
       
       // Check if any have operator data
@@ -112,7 +130,17 @@ const retrievePicklists = async (req, res) => {
 
     console.log('Sample picklist with facility:', formatted[0]);
     console.log('Picklists formatted successfully with facility information');
-    res.status(200).json(formatted);
+    
+    // Return with pagination info
+    res.status(200).json({
+      data: formatted,
+      pagination: {
+        page: page,
+        limit: limit,
+        total: total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
     
   } catch (error) {
     console.error('Error fetching picklists:', error);

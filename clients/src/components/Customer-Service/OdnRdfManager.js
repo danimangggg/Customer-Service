@@ -43,25 +43,56 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
   const [odns, setOdns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [newOdn, setNewOdn] = useState('');
-  const [selectedStore, setSelectedStore] = useState('AA1');
+  const [selectedStore, setSelectedStore] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editOdn, setEditOdn] = useState('');
   const [editStore, setEditStore] = useState('');
+  const [stores, setStores] = useState([]);
 
   const userId = localStorage.getItem('EmployeeID');
   const userName = localStorage.getItem('FullName');
-
-  const stores = [
-    { value: 'AA1', label: 'AA1' },
-    { value: 'AA2', label: 'AA2' },
-    { value: 'AA3', label: 'AA3' }
-  ];
 
   useEffect(() => {
     if (open && processId) {
       fetchOdns();
     }
   }, [open, processId]);
+
+  // Fetch stores from database
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const response = await axios.get(`${api_url}/api/stores`);
+        const storeData = response.data.map(store => ({
+          value: store.store_name,
+          label: store.store_name
+        }));
+        setStores(storeData);
+        
+        // Set default selected store to first RDF store (AA11, AA12, AA3, AA4)
+        const rdfStores = storeData.filter(s => 
+          s.value.startsWith('AA') && s.value !== 'HP' && s.value !== 'CR'
+        );
+        if (rdfStores.length > 0 && !selectedStore) {
+          setSelectedStore(rdfStores[0].value);
+        }
+      } catch (error) {
+        console.error('Error fetching stores:', error);
+        // Fallback to default stores if fetch fails
+        setStores([
+          { value: 'AA11', label: 'AA11' },
+          { value: 'AA12', label: 'AA12' },
+          { value: 'AA3', label: 'AA3' },
+          { value: 'AA4', label: 'AA4' }
+        ]);
+        if (!selectedStore) {
+          setSelectedStore('AA11');
+        }
+      }
+    };
+
+    fetchStores();
+  }, []);
 
   const fetchOdns = async () => {
     setLoading(true);
@@ -95,7 +126,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
 
       if (response.data.success) {
         setNewOdn('');
-        setSelectedStore('AA1');
+        // Keep the selected store for convenience
         fetchOdns();
         Swal.fire('Success', 'ODN added successfully', 'success');
       }
@@ -179,12 +210,16 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
   };
 
   const getStoreColor = (store) => {
-    switch (store) {
-      case 'AA1': return 'primary';
-      case 'AA2': return 'secondary';
-      case 'AA3': return 'success';
-      default: return 'default';
-    }
+    // Dynamic color assignment based on store name
+    const storeColors = {
+      'AA11': 'primary',
+      'AA12': 'secondary',
+      'AA3': 'success',
+      'AA4': 'warning',
+      'HP': 'info',
+      'CR': 'error'
+    };
+    return storeColors[store] || 'default';
   };
 
   return (

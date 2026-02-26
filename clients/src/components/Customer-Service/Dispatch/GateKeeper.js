@@ -754,7 +754,8 @@ const GateKeeper = () => {
         open={snackbar.open} 
         autoHideDuration={4000} 
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ zIndex: 9999, mt: 8 }}
       >
         <Alert 
           variant="filled" 

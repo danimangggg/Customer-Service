@@ -41,6 +41,9 @@ const RDFReport = () => {
   const [picklists, setPicklists] = useState([]);
   const [picklistsLoading, setPicklistsLoading] = useState(false);
   const [combinedPicklists, setCombinedPicklists] = useState([]);
+  const [picklistPage, setPicklistPage] = useState(0);
+  const [picklistRowsPerPage, setPicklistRowsPerPage] = useState(25);
+  const [picklistTotalCount, setPicklistTotalCount] = useState(0);
   
   // Documentation states
   const [documentationRecords, setDocumentationRecords] = useState([]);
@@ -59,7 +62,7 @@ const RDFReport = () => {
     } else if (activeTab === 2) {
       fetchDocumentation();
     }
-  }, [activeTab]);
+  }, [activeTab, picklistPage, picklistRowsPerPage]);
 
   const fetchCustomers = async () => {
     try {
@@ -107,51 +110,67 @@ const RDFReport = () => {
   const fetchPicklists = async () => {
     try {
       setPicklistsLoading(true);
-      const pickRes = await axios.get(`${API_URL}/api/getPicklists`);
-      let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+      // Fetch with pagination
+      const pickRes = await axios.get(`${API_URL}/api/getPicklists`, {
+        params: { 
+          page: picklistPage + 1, 
+          limit: picklistRowsPerPage 
+        }
+      });
+      
+      // Handle both old format (array) and new format (object with data property)
+      let allPicklists = [];
+      let total = 0;
+      
+      if (Array.isArray(pickRes.data)) {
+        allPicklists = pickRes.data;
+        total = pickRes.data.length;
+      } else if (pickRes.data.data && Array.isArray(pickRes.data.data)) {
+        allPicklists = pickRes.data.data;
+        total = pickRes.data.pagination?.total || 0;
+      }
+      
       setPicklists(allPicklists);
+      setPicklistTotalCount(total);
       
       const combined = allPicklists.map((p) => ({ ...p }));
       setCombinedPicklists(combined);
     } catch (err) {
       console.error('Error fetching picklists:', err);
+      setPicklists([]);
+      setCombinedPicklists([]);
+      setPicklistTotalCount(0);
     } finally {
       setPicklistsLoading(false);
     }
+  };
+
+  const handlePicklistChangePage = (event, newPage) => {
+    setPicklistPage(newPage);
+  };
+
+  const handlePicklistChangeRowsPerPage = (event) => {
+    setPicklistRowsPerPage(parseInt(event.target.value, 10));
+    setPicklistPage(0);
   };
 
   const fetchDocumentation = async () => {
     try {
       setDocumentationLoading(true);
       
-      // Fetch TV display customers and facilities
+      // Fetch completed customers with includeCompleted parameter
       const [customersRes, facilitiesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`),
+        axios.get(`${API_URL}/api/tv-display-customers`, {
+          params: { includeCompleted: 'true' }
+        }),
         axios.get(`${API_URL}/api/facilities`)
       ]);
       
-      // Filter for records that have completed exit permit for any store
-      const completedRecords = customersRes.data.filter(row => {
-        const storeDetails = row.store_details || {};
-        const globalStatus = (row.status || '').toLowerCase();
-        
-        // Check if ANY store has completed exit permit
-        const hasCompletedExitPermit = Object.keys(storeDetails).some(storeKey => {
-          const storeInfo = storeDetails[storeKey];
-          const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
-          return exitPermitStatus === 'completed';
-        });
-        
-        return hasCompletedExitPermit || globalStatus === 'completed' || globalStatus === 'archived';
-      });
+      console.log('Completed customers fetched:', customersRes.data.length);
       
-      // Sort by most recent first
-      completedRecords.sort((a, b) => {
-        const dateA = new Date(a.started_at || a.created_at || 0);
-        const dateB = new Date(b.started_at || b.created_at || 0);
-        return dateB - dateA;
-      });
+      const completedRecords = customersRes.data;
       
+      // Sort by most recent first (already sorted DESC in backend)
       setDocumentationRecords(completedRecords);
       setFacilities(facilitiesRes.data || []);
     } catch (err) {
@@ -165,42 +184,16 @@ const RDFReport = () => {
   // DataGrid columns for documentation
   const documentationColumns = [
     {
-      field: 'id',
-      headerName: 'ID',
-      width: 80,
-      filterable: true,
-    },
-    {
-      field: 'odn_numbers',
-      headerName: 'ODN Reference',
-      width: 200,
-      filterable: true,
-      valueGetter: (params) => {
-        const row = params.row;
-        const storeDetails = row.store_details || {};
-        const allOdns = [];
-        
-        Object.keys(storeDetails).forEach(storeKey => {
-          const storeInfo = storeDetails[storeKey];
-          if (storeInfo && storeInfo.odns && storeInfo.odns.length > 0) {
-            allOdns.push(...storeInfo.odns.map(odn => `${storeKey}:${odn}`));
-          }
-        });
-        
-        return allOdns.length > 0 ? allOdns.join(', ') : '—';
-      }
-    },
-    {
       field: 'facility_name',
       headerName: 'Facility',
-      width: 220,
+      width: 250,
       filterable: true,
       valueGetter: (params) => {
         const row = params.row;
         return row.actual_facility_name || 
                row.facility_name || 
                facilities.find(f => f.id === row.facility_id)?.facility_name || 
-               row.facility_id || '—';
+               '—';
       },
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -286,46 +279,16 @@ const RDFReport = () => {
     {
       field: 'status',
       headerName: 'Status',
-      width: 150,
+      width: 120,
       filterable: true,
-      renderCell: (params) => {
-        const storeDetails = params.row.store_details || {};
-        const globalStatus = (params.value || '').toLowerCase();
-        
-        // Check all stores' gate status
-        const allStoresAllowed = Object.keys(storeDetails).every(storeKey => {
-          const storeInfo = storeDetails[storeKey];
-          return (storeInfo.gate_status || '').toLowerCase() === 'allowed';
-        });
-        
-        const anyStoreDenied = Object.keys(storeDetails).some(storeKey => {
-          const storeInfo = storeDetails[storeKey];
-          return (storeInfo.gate_status || '').toLowerCase() === 'denied';
-        });
-        
-        let color = 'info';
-        let label = 'Awaiting Gate';
-        
-        if (globalStatus === 'completed' || allStoresAllowed) {
-          color = 'success';
-          label = 'Completed';
-        } else if (anyStoreDenied) {
-          color = 'error';
-          label = 'Exit Denied';
-        } else if (globalStatus === 'archived') {
-          color = 'info';
-          label = 'Awaiting Gate';
-        }
-        
-        return (
-          <Chip 
-            label={label} 
-            color={color} 
-            size="small" 
-            sx={{ fontWeight: 'bold' }}
-          />
-        );
-      }
+      renderCell: (params) => (
+        <Chip 
+          label="Completed" 
+          color="success" 
+          size="small" 
+          sx={{ fontWeight: 'bold' }}
+        />
+      )
     }
   ];
 
@@ -567,22 +530,6 @@ const RDFReport = () => {
                         <TableCell sx={{ 
                           color: 'white', 
                           fontWeight: 'bold', 
-                          minWidth: 100,
-                          fontSize: '0.9rem',
-                          bgcolor: '#1976d2 !important'
-                        }}>
-                          <TableSortLabel
-                            active={sortBy === 'id'}
-                            direction={sortBy === 'id' ? sortOrder.toLowerCase() : 'asc'}
-                            onClick={() => handleSort('id')}
-                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
-                          >
-                            Customer ID
-                          </TableSortLabel>
-                        </TableCell>
-                        <TableCell sx={{ 
-                          color: 'white', 
-                          fontWeight: 'bold', 
                           minWidth: 250,
                           fontSize: '0.9rem',
                           bgcolor: '#1976d2 !important'
@@ -651,7 +598,7 @@ const RDFReport = () => {
                     <TableBody>
                       {customers.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                             <Typography color="text.secondary">
                               {searchTerm ? 'No customers found matching your search.' : 'No customers found. Make sure customers are registered in the system.'}
                             </Typography>
@@ -660,7 +607,6 @@ const RDFReport = () => {
                       ) : (
                         customers.map((customer) => (
                           <TableRow key={customer.id} hover sx={{ '&:nth-of-type(odd)': { bgcolor: '#f9f9f9' } }}>
-                            <TableCell sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{customer.id}</TableCell>
                             <TableCell sx={{ fontSize: '0.9rem', maxWidth: 200 }}>
                               <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                 {customer.actual_facility_name || customer.facility_name || 'N/A'}
@@ -800,80 +746,99 @@ const RDFReport = () => {
                     </Box>
                   </Fade>
                 ) : (
-                  <Grid container spacing={3}>
-                    {combinedPicklists.map((p) => (
-                      <Grid item xs={12} key={p.id}>
-                        <Card sx={{ 
-                          transition: 'all 0.3s ease',
-                          borderRadius: 3,
-                          border: '1px solid rgba(0,0,0,0.08)',
-                          '&:hover': {
-                            transform: 'translateX(8px)',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                            borderColor: 'rgba(99, 102, 241, 0.3)'
-                          }
-                        }}>
-                          <CardContent>
-                            <Grid container spacing={3} alignItems="center">
-                              <Grid item xs={12} md={6}>
-                                <Stack spacing={2}>
-                                  <Chip 
-                                    label={`ODN: ${p.odn}`} 
-                                    color="primary" 
-                                    variant="filled"
-                                    sx={{ 
-                                      fontSize: '1rem', 
-                                      fontWeight: 'bold',
-                                      height: 32,
-                                      borderRadius: 2,
-                                      width: 'fit-content'
-                                    }} 
-                                  />
-                                  
-                                  {p.facility && (
-                                    <Stack spacing={1}>
-                                      <Typography variant="body1" fontWeight="bold">
-                                        {p.facility.facility_name}
-                                      </Typography>
-                                      <Typography variant="body2" color="text.secondary">
-                                        {p.facility.woreda_name}, {p.facility.zone_name}, {p.facility.region_name}
-                                      </Typography>
-                                    </Stack>
-                                  )}
-
-                                  {p.store && (
+                  <>
+                    <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
+                      Picklists ({picklistTotalCount} total)
+                    </Typography>
+                    <Grid container spacing={3}>
+                      {combinedPicklists.map((p) => (
+                        <Grid item xs={12} key={p.id}>
+                          <Card sx={{ 
+                            transition: 'all 0.3s ease',
+                            borderRadius: 3,
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            '&:hover': {
+                              transform: 'translateX(8px)',
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                              borderColor: 'rgba(99, 102, 241, 0.3)'
+                            }
+                          }}>
+                            <CardContent>
+                              <Grid container spacing={3} alignItems="center">
+                                <Grid item xs={12} md={6}>
+                                  <Stack spacing={2}>
                                     <Chip 
-                                      label={`Store: ${p.store}`}
-                                      color="secondary"
-                                      size="small"
-                                      sx={{ width: 'fit-content' }}
+                                      label={`ODN: ${p.odn}`} 
+                                      color="primary" 
+                                      variant="filled"
+                                      sx={{ 
+                                        fontSize: '1rem', 
+                                        fontWeight: 'bold',
+                                        height: 32,
+                                        borderRadius: 2,
+                                        width: 'fit-content'
+                                      }} 
                                     />
-                                  )}
-                                  
-                                  <Typography variant="body2" color="success.main" fontWeight="bold">
-                                    Operator: {p.operator_name || 'N/A'}
-                                  </Typography>
-                                </Stack>
-                              </Grid>
+                                    
+                                    {p.facility && (
+                                      <Stack spacing={1}>
+                                        <Typography variant="body1" fontWeight="bold">
+                                          {p.facility.facility_name}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                          {p.facility.woreda_name}, {p.facility.zone_name}, {p.facility.region_name}
+                                        </Typography>
+                                      </Stack>
+                                    )}
 
-                              <Grid item xs={12} md={6}>
-                                <Stack direction="row" spacing={2} justifyContent="flex-end">
-                                  <Button
-                                    variant="outlined"
-                                    onClick={() => window.open(p.url, '_blank')}
-                                    startIcon={<GetApp />}
-                                    sx={{ minWidth: 120 }}
-                                  >
-                                    View PDF
-                                  </Button>
-                                </Stack>
+                                    {p.store && (
+                                      <Chip 
+                                        label={`Store: ${p.store}`}
+                                        color="secondary"
+                                        size="small"
+                                        sx={{ width: 'fit-content' }}
+                                      />
+                                    )}
+                                    
+                                    <Typography variant="body2" color="success.main" fontWeight="bold">
+                                      Operator: {p.operator_name || 'N/A'}
+                                    </Typography>
+                                  </Stack>
+                                </Grid>
+
+                                <Grid item xs={12} md={6}>
+                                  <Stack direction="row" spacing={2} justifyContent="flex-end">
+                                    <Button
+                                      variant="outlined"
+                                      onClick={() => window.open(p.url, '_blank')}
+                                      startIcon={<GetApp />}
+                                      sx={{ minWidth: 120 }}
+                                    >
+                                      View PDF
+                                    </Button>
+                                  </Stack>
+                                </Grid>
                               </Grid>
-                            </Grid>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    ))}
-                  </Grid>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                    
+                    {/* Pagination */}
+                    <TablePagination
+                      component="div"
+                      count={picklistTotalCount}
+                      page={picklistPage}
+                      onPageChange={handlePicklistChangePage}
+                      rowsPerPage={picklistRowsPerPage}
+                      onRowsPerPageChange={handlePicklistChangeRowsPerPage}
+                      rowsPerPageOptions={[10, 25, 50, 100]}
+                      showFirstButton
+                      showLastButton
+                      sx={{ mt: 3 }}
+                    />
+                  </>
                 )}
               </Box>
             </Card>
@@ -894,20 +859,59 @@ const RDFReport = () => {
         <DialogContent>
           {selectedCustomer && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
+              {/* Top Section - Basic Info */}
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" color="text.secondary">Customer ID</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.id}</Typography>
+                <Typography variant="body1" sx={{ mb: 2, fontWeight: 600 }}>{selectedCustomer.id}</Typography>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" color="text.secondary">Facility Name</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ mb: 2, fontWeight: 600 }}>
                   {selectedCustomer.actual_facility_name || selectedCustomer.facility_name}
+                </Typography>
+              </Grid>
+              
+              {/* Delegate Information */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Delegate Name</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedCustomer.delegate || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Delegate Phone</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedCustomer.delegate_phone || 'N/A'}
+                </Typography>
+              </Grid>
+              
+              {/* Letter Number */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Letter Number</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedCustomer.letter_number || 'N/A'}
+                </Typography>
+              </Grid>
+              
+              {/* Location Information */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Region</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedCustomer.region_name || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle2" color="text.secondary">Zone</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedCustomer.zone_name || 'N/A'}
                 </Typography>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" color="text.secondary">Woreda</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.woreda_name}</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.woreda_name || 'N/A'}</Typography>
               </Grid>
+              
+              {/* Waiting Time */}
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" color="text.secondary">Total Waiting Time</Typography>
                 <Chip 
@@ -1061,7 +1065,7 @@ const RDFReport = () => {
       {activeTab === 2 && (
         <Box>
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
-            Documentation Records (Exit Permits)
+            Completed Process Documentation
           </Typography>
 
           {documentationLoading ? (

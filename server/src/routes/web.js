@@ -256,6 +256,12 @@ let routes =  (app) => {
   router.get('/api/hp-customers-detail-report', hpCustomerDetailReportController.getHPCustomersDetailReport);
   router.get('/api/hp-customers/:customerId/service-details', hpCustomerDetailReportController.getHPCustomerServiceDetails);
 
+  // App Settings routes (YouTube playlist, etc.)
+  const appSettingsController = require('../controllers/Settings/appSettingsController');
+  router.get('/api/settings', appSettingsController.getAllSettings);
+  router.get('/api/settings/:key', appSettingsController.getSetting);
+  router.put('/api/settings/:key', appSettingsController.updateSetting);
+
   return app.use("/", router);
 };
 

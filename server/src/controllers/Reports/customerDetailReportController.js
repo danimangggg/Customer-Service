@@ -80,6 +80,9 @@ const getCustomersDetailReport = async (req, res) => {
       SELECT 
         cq.id,
         COALESCE(cq.delegate, 'Unknown') as facility_name,
+        cq.delegate,
+        cq.delegate_phone,
+        cq.letter_number,
         COALESCE(cq.customer_type, 'Unknown') as customer_type,
         COALESCE(cq.status, 'Unknown') as status,
         COALESCE(cq.next_service_point, 'Unknown') as next_service_point,

@@ -36,6 +36,7 @@ const ExitPermit = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState(null);
   const [editFormData, setEditFormData] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
 
   // Access control - only for Dispatch-Documentation users
   const userJobTitle = localStorage.getItem('JobTitle') || '';
@@ -244,6 +245,17 @@ const ExitPermit = () => {
   // Handle edit dialog
   const handleEditClick = (record) => {
     setEditingRecord(record);
+    
+    // Convert assigned_gate_keeper_id to number for proper matching
+    const gateKeeperId = record.assigned_gate_keeper_id ? 
+      parseInt(record.assigned_gate_keeper_id) : '';
+    
+    console.log('=== EDIT DIALOG DEBUG ===');
+    console.log('Record gate keeper ID:', record.assigned_gate_keeper_id, 'Type:', typeof record.assigned_gate_keeper_id);
+    console.log('Converted gate keeper ID:', gateKeeperId, 'Type:', typeof gateKeeperId);
+    console.log('Available gate keepers:', gateKeepers.map(gk => ({ id: gk.id, name: gk.name, type: typeof gk.id })));
+    console.log('Matching gate keeper:', gateKeepers.find(gk => gk.id == gateKeeperId));
+    
     setEditFormData({
       facility_id: record.facility_id || '',
       vehicle_plate: record.vehicle_plate || '',
@@ -251,7 +263,7 @@ const ExitPermit = () => {
       receipt_number: record.receipt_number || '',
       total_amount: record.total_amount || '',
       measurement_unit: record.measurement_unit || '',
-      assigned_gate_keeper_id: record.assigned_gate_keeper_id || '',
+      assigned_gate_keeper_id: gateKeeperId,
       assigned_gate_keeper_name: record.assigned_gate_keeper_name || '',
       customer_type: record.customer_type || ''
     });
@@ -262,43 +274,67 @@ const ExitPermit = () => {
     setEditDialogOpen(false);
     setEditingRecord(null);
     setEditFormData({});
+    setEditSaving(false);
   };
 
   const handleEditSave = async () => {
     if (!editingRecord) return;
 
+    setEditSaving(true);
+    
     try {
-      // Find selected gate keeper
-      const selectedGateKeeper = gateKeepers.find(gk => gk.id === editFormData.assigned_gate_keeper_id);
+      // Find selected gate keeper (use loose equality to handle string/number mismatch)
+      const selectedGateKeeper = gateKeepers.find(gk => gk.id == editFormData.assigned_gate_keeper_id);
+
+      // Prepare update data - only include fields that have values
+      const updateData = {};
+      
+      if (editFormData.facility_id) updateData.facility_id = editFormData.facility_id;
+      if (editFormData.vehicle_plate) updateData.vehicle_plate = editFormData.vehicle_plate;
+      if (editFormData.receipt_count) updateData.receipt_count = editFormData.receipt_count;
+      if (editFormData.receipt_number) updateData.receipt_number = editFormData.receipt_number;
+      if (editFormData.total_amount) updateData.total_amount = editFormData.total_amount;
+      if (editFormData.measurement_unit) updateData.measurement_unit = editFormData.measurement_unit;
+      if (editFormData.customer_type) updateData.customer_type = editFormData.customer_type;
+      if (editFormData.assigned_gate_keeper_id) {
+        updateData.assigned_gate_keeper_id = editFormData.assigned_gate_keeper_id;
+        updateData.assigned_gate_keeper_name = selectedGateKeeper ? selectedGateKeeper.name : editFormData.assigned_gate_keeper_name;
+      }
+
+      console.log('=== EDIT SAVE DEBUG ===');
+      console.log('Record ID:', editingRecord.id);
+      console.log('Update data:', updateData);
 
       // Update customer_queue with edited data
-      await axios.put(`${API_URL}/api/update-service-status/${editingRecord.id}`, {
-        facility_id: editFormData.facility_id,
-        vehicle_plate: editFormData.vehicle_plate,
-        receipt_count: editFormData.receipt_count,
-        receipt_number: editFormData.receipt_number,
-        total_amount: editFormData.total_amount,
-        measurement_unit: editFormData.measurement_unit,
-        customer_type: editFormData.customer_type,
-        assigned_gate_keeper_id: editFormData.assigned_gate_keeper_id,
-        assigned_gate_keeper_name: selectedGateKeeper ? selectedGateKeeper.name : editFormData.assigned_gate_keeper_name
-      });
+      const response = await axios.put(`${API_URL}/api/update-service-status/${editingRecord.id}`, updateData);
+      
+      console.log('Update response:', response.data);
 
+      // Close dialog first
+      handleEditClose();
+      
+      // Show success message
       setSnackbar({ 
         open: true, 
         message: 'Record updated successfully!', 
         severity: 'success' 
       });
 
-      handleEditClose();
+      // Refresh history data
       fetchHistoryData(historyPage);
     } catch (error) {
-      console.error('Edit error:', error);
+      console.error('=== EDIT SAVE ERROR ===');
+      console.error('Error:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
       setSnackbar({ 
         open: true, 
-        message: 'Failed to update record', 
+        message: error.response?.data?.message || 'Failed to update record', 
         severity: 'error' 
       });
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -1061,7 +1097,7 @@ const ExitPermit = () => {
               fullWidth
               options={gateKeepers}
               getOptionLabel={(option) => option.label || option.name}
-              value={gateKeepers.find(gk => gk.id === editFormData.assigned_gate_keeper_id) || null}
+              value={gateKeepers.find(gk => gk.id == editFormData.assigned_gate_keeper_id) || null}
               onChange={(event, newValue) => {
                 setEditFormData({ 
                   ...editFormData, 
@@ -1090,23 +1126,35 @@ const ExitPermit = () => {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleEditClose} variant="outlined" startIcon={<Close />}>
+          <Button 
+            onClick={handleEditClose} 
+            variant="outlined" 
+            startIcon={<Close />}
+            disabled={editSaving}
+          >
             Cancel
           </Button>
           <Button 
             onClick={handleEditSave} 
             variant="contained" 
-            startIcon={<Save />}
+            startIcon={editSaving ? <CircularProgress size={20} color="inherit" /> : <Save />}
+            disabled={editSaving}
             sx={{ 
               background: 'linear-gradient(45deg, #2e3b8b 30%, #5c6bc0 90%)'
             }}
           >
-            Save Changes
+            {editSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        sx={{ zIndex: 9999, mt: 8 }}
+      >
         <Alert variant="filled" severity={snackbar.severity} sx={{ borderRadius: '8px' }}>
           {snackbar.message}
         </Alert>

@@ -4,6 +4,16 @@ const { Sequelize } = require('sequelize');
 // Get customers for TV display with ODN-based store assignments
 const getTvDisplayCustomers = async (req, res) => {
   try {
+    // Check if we should include completed customers
+    const includeCompleted = req.query.includeCompleted === 'true';
+    
+    // Build WHERE clause based on includeCompleted parameter
+    const whereClause = includeCompleted 
+      ? `WHERE cq.status = 'completed'` // Only completed
+      : `WHERE cq.status != 'completed' 
+         AND cq.status != 'canceled'
+         AND cq.status != 'rejected'`;
+    
     const query = `
       SELECT 
         cq.*,
@@ -23,11 +33,9 @@ const getTvDisplayCustomers = async (req, res) => {
       FROM customer_queue cq
       LEFT JOIN odns_rdf odn ON cq.id = odn.process_id
       LEFT JOIN stores s ON odn.store_id = s.id
-      WHERE cq.status != 'completed' 
-        AND cq.status != 'canceled'
-        AND cq.status != 'rejected'
+      ${whereClause}
       GROUP BY cq.id
-      ORDER BY cq.started_at ASC
+      ORDER BY cq.started_at ${includeCompleted ? 'DESC' : 'ASC'}
     `;
 
     const [results] = await db.sequelize.query(query);

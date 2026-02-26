@@ -1,17 +1,21 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
+import YouTubePlayerIsolated from './YouTubePlayerIsolated';
 import { 
   Box, Typography, CircularProgress, Button, IconButton, 
   Card, CardContent, Fade, Chip, Stack, Divider, Drawer,
-  Grid, Paper
+  Grid, Paper, TextField, List, ListItem, ListItemText,
+  ListItemSecondaryAction, Dialog, DialogTitle, DialogContent,
+  DialogActions, Tabs, Tab, Alert
 } from '@mui/material';
 import {
   AccessTime, PrecisionManufacturing, LocalShipping, 
   CheckCircleOutline, NotificationsActive, Assignment,
   Tv, VolumeUp, VolumeOff, Fullscreen, FullscreenExit,
   PlayArrow, Pause, SkipNext, SkipPrevious, Settings,
-  YouTube, LiveTv, Radio, Movie, ControlCamera, Satellite,
-  Cable, Wifi, Input, ConnectedTv, VideoLibrary, MusicNote
+  YouTube as YouTubeIcon, LiveTv, Radio, Movie, ControlCamera, Satellite,
+  Cable, Wifi, Input, ConnectedTv, VideoLibrary, MusicNote,
+  Add, Delete, Close, Save
 } from '@mui/icons-material';
 import dayjs from 'dayjs';
 
@@ -25,9 +29,14 @@ const TvRealEntertainment = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   // TV States
-  const [currentInput, setCurrentInput] = useState('satellite');
+  const [currentInput, setCurrentInput] = useState('youtube'); // Default to YouTube
   const [showInstructions, setShowInstructions] = useState(true);
   const [tvPower, setTvPower] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [youtubeVideos, setYoutubeVideos] = useState([]);
+  
+  // Mute control for calling audio only
+  const [callingAudioMuted, setCallingAudioMuted] = useState(false);
   
   // Audio queue for customer notifications
   const audioQueueRef = useRef([]);
@@ -36,6 +45,14 @@ const TvRealEntertainment = () => {
 
   // TV Input options for real TV
   const tvInputs = [
+    {
+      id: 'youtube',
+      name: 'YouTube',
+      icon: YouTubeIcon,
+      color: '#ff0000',
+      description: 'YouTube Videos Playlist',
+      instruction: 'Auto-playing YouTube videos from your playlist'
+    },
     {
       id: 'satellite',
       name: 'Satellite TV',
@@ -86,13 +103,15 @@ const TvRealEntertainment = () => {
     }
   ];
 
-  // Time update effect
+  // Time update effect - stop on YouTube
   useEffect(() => {
+    if (currentInput === 'youtube') return;
+    
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [currentInput]);
 
   // Hide instructions after 15 seconds
   useEffect(() => {
@@ -106,13 +125,28 @@ const TvRealEntertainment = () => {
     if (isInitial) setLoading(true);
     try {
       const [custRes, facRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`),
-        axios.get(`${API_URL}/api/facilities`)
+        axios.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000 }),
+        axios.get(`${API_URL}/api/facilities`, { timeout: 5000 })
       ]);
-      setCustomers(custRes.data);
-      setFacilities(facRes.data);
+      
+      // Only update state if data actually changed to prevent unnecessary re-renders
+      setCustomers(prevCustomers => {
+        const newData = custRes.data;
+        if (JSON.stringify(prevCustomers) === JSON.stringify(newData)) {
+          return prevCustomers;
+        }
+        return newData;
+      });
+      
+      setFacilities(prevFacilities => {
+        const newData = facRes.data;
+        if (JSON.stringify(prevFacilities) === JSON.stringify(newData)) {
+          return prevFacilities;
+        }
+        return newData;
+      });
     } catch (error) {
-      console.error('Fetch Error:', error);
+      console.error('Fetch Error:', error.message || error);
     } finally {
       if (isInitial) setLoading(false);
     }
@@ -120,7 +154,9 @@ const TvRealEntertainment = () => {
 
   useEffect(() => {
     fetchData(true);
-    const interval = setInterval(() => fetchData(false), 4000);
+    
+    // Always run interval to keep queue updated
+    const interval = setInterval(() => fetchData(false), 8000);
     
     // Add TV display class to body
     document.body.classList.add('tv-display');
@@ -176,7 +212,7 @@ const TvRealEntertainment = () => {
                 Icon = LocalShipping;
                 currentStep = 3;
               } else if (ewmStatus === 'started') {
-                statusLabel = `${storeKey} STORE PROCESSING`; 
+                statusLabel = `${storeKey} STORE PROCESS STARTED`; 
                 themeColor = '#0984e3';
                 Icon = PrecisionManufacturing;
                 currentStep = 2;
@@ -205,7 +241,8 @@ const TvRealEntertainment = () => {
                 Icon,
                 currentStep,
                 assignedStore: storeKey,
-                storeOdns: storeInfo.odns || []
+                storeOdns: storeInfo.odns || [],
+                uniqueKey: `${cust.id}-${storeKey}` // Unique key for each customer-store combination
               });
             });
           } catch (error) {
@@ -233,6 +270,11 @@ const TvRealEntertainment = () => {
     }, [customers])
 
   const playNumber = useCallback(async (number) => {
+    // Skip if calling audio is muted
+    if (callingAudioMuted) {
+      return Promise.resolve();
+    }
+    
     return new Promise((resolve) => {
       try {
         const audio = new Audio(`/audio/amharic/${number}.mp3`);
@@ -250,7 +292,7 @@ const TvRealEntertainment = () => {
         resolve();
       }
     });
-  }, []);
+  }, [callingAudioMuted]);
 
   const processQueue = useCallback(async () => {
     try {
@@ -261,10 +303,10 @@ const TvRealEntertainment = () => {
       if (order && order.displayTicket) {
         await playNumber(order.displayTicket);
       }
+      // Wait 3 seconds after audio finishes before allowing next audio
       setTimeout(() => {
         isPlayingAudio.current = false;
-        processQueue();
-      }, 2000);
+      }, 3000);
     } catch (error) {
       console.error('Error in processQueue:', error);
       isPlayingAudio.current = false;
@@ -272,26 +314,38 @@ const TvRealEntertainment = () => {
   }, [activeOrders, playNumber]);
 
   useEffect(() => {
-    try {
-      if (!audioStarted) return;
-      const now = Date.now();
-      activeOrders.forEach(cust => {
-        try {
-          if (cust && cust.isCalling && cust.id) {
-            const lastTime = lastCallTimes.current.get(cust.id) || 0;
-            if (now - lastTime > 15000) {
-              if (!audioQueueRef.current.includes(cust.id)) audioQueueRef.current.push(cust.id);
-              lastCallTimes.current.set(cust.id, now);
+    if (!audioStarted) return;
+    
+    // Set up interval to check for calling customers every 2 seconds
+    const checkInterval = setInterval(() => {
+      try {
+        const now = Date.now();
+        activeOrders.forEach(cust => {
+          try {
+            if (cust && cust.isCalling && cust.id) {
+              const lastTime = lastCallTimes.current.get(cust.id) || 0;
+              // Call every 10 seconds (10000ms)
+              if (now - lastTime >= 10000) {
+                if (!audioQueueRef.current.includes(cust.id)) {
+                  audioQueueRef.current.push(cust.id);
+                  lastCallTimes.current.set(cust.id, now);
+                }
+              }
+            } else if (cust && !cust.isCalling && cust.id) {
+              // Clear the last call time when customer is no longer in calling state
+              lastCallTimes.current.delete(cust.id);
             }
+          } catch (error) {
+            console.error('Error processing customer audio:', error, cust);
           }
-        } catch (error) {
-          console.error('Error processing customer audio:', error, cust);
-        }
-      });
-      processQueue();
-    } catch (error) {
-      console.error('Error in audio useEffect:', error);
-    }
+        });
+        processQueue();
+      } catch (error) {
+        console.error('Error in audio check interval:', error);
+      }
+    }, 2000); // Check every 2 seconds
+    
+    return () => clearInterval(checkInterval);
   }, [activeOrders, audioStarted, processQueue]);
 
   const getFacilityWithStore = (facilityId, storeKey) => {
@@ -305,6 +359,332 @@ const TvRealEntertainment = () => {
   };
 
   const currentInputData = tvInputs.find(input => input.id === currentInput);
+
+  // Memoize derived data before any early returns
+  const callingOrders = useMemo(() => activeOrders.filter(o => o.isCalling), [activeOrders]);
+  const regularOrders = useMemo(() => activeOrders.filter(o => !o.isCalling), [activeOrders]);
+  const shouldScroll = regularOrders.length > 6;
+
+  // Load YouTube videos from database
+  useEffect(() => {
+    const loadYoutubePlaylist = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/settings/youtube_playlist`);
+        if (response.data.success && response.data.value) {
+          setYoutubeVideos(response.data.value);
+        }
+      } catch (error) {
+        console.error('Error loading YouTube playlist:', error);
+        // Fallback to localStorage for migration
+        const savedVideos = localStorage.getItem('tv_youtube_videos');
+        if (savedVideos) {
+          try {
+            const videos = JSON.parse(savedVideos);
+            setYoutubeVideos(videos);
+            // Migrate to database
+            await axios.put(`${API_URL}/api/settings/youtube_playlist`, {
+              value: videos,
+              description: 'YouTube videos playlist for TV entertainment'
+            });
+            // Clear localStorage after successful migration
+            localStorage.removeItem('tv_youtube_videos');
+          } catch (err) {
+            console.error('Error migrating YouTube videos:', err);
+          }
+        }
+      }
+    };
+    
+    loadYoutubePlaylist();
+  }, []);
+
+  // Extract YouTube video ID from URL
+  const extractVideoId = (url) => {
+    try {
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+      const match = url.match(regExp);
+      return (match && match[2].length === 11) ? match[2] : null;
+    } catch (error) {
+      console.error('Error extracting video ID:', error);
+      return null;
+    }
+  };
+
+  // Settings Dialog Component
+  const SettingsDialog = () => {
+    const [newVideoUrl, setNewVideoUrl] = useState('');
+    const [tempVideos, setTempVideos] = useState([...youtubeVideos]);
+    const [settingsTab, setSettingsTab] = useState(0); // 0 = Play, 1 = Manage
+
+    // Update tempVideos when youtubeVideos changes
+    useEffect(() => {
+      setTempVideos([...youtubeVideos]);
+    }, [youtubeVideos]);
+
+    const handleAddVideo = () => {
+      try {
+        const videoId = extractVideoId(newVideoUrl);
+        if (videoId) {
+          setTempVideos([...tempVideos, { id: videoId, url: newVideoUrl }]);
+          setNewVideoUrl('');
+        } else {
+          alert('Invalid YouTube URL');
+        }
+      } catch (error) {
+        console.error('Error adding video:', error);
+        alert('Error adding video. Please check the URL.');
+      }
+    };
+
+    const handleDeleteVideo = (index) => {
+      try {
+        setTempVideos(tempVideos.filter((_, i) => i !== index));
+      } catch (error) {
+        console.error('Error deleting video:', error);
+      }
+    };
+
+    const handleSave = async () => {
+      try {
+        // Save to database
+        await axios.put(`${API_URL}/api/settings/youtube_playlist`, {
+          value: tempVideos,
+          description: 'YouTube videos playlist for TV entertainment'
+        });
+        
+        setYoutubeVideos(tempVideos);
+        setShowSettings(false);
+      } catch (error) {
+        console.error('Error saving videos:', error);
+        alert('Error saving playlist. Please try again.');
+      }
+    };
+
+    const handleClose = () => {
+      try {
+        setTempVideos([...youtubeVideos]); // Reset to original
+        setShowSettings(false);
+      } catch (error) {
+        console.error('Error closing dialog:', error);
+        setShowSettings(false);
+      }
+    };
+
+    return (
+      <Dialog open={showSettings} onClose={handleClose} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <YouTubeIcon sx={{ color: '#ff0000' }} />
+              <Typography variant="h6">YouTube Entertainment</Typography>
+            </Box>
+            <IconButton onClick={handleClose}>
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        {/* Tabs */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}>
+          <Tabs value={settingsTab} onChange={(e, v) => setSettingsTab(v)}>
+            <Tab label="Now Playing" icon={<PlayArrow />} iconPosition="start" />
+            <Tab label="Manage Playlist" icon={<Settings />} iconPosition="start" />
+          </Tabs>
+        </Box>
+
+        <DialogContent>
+          {/* Tab 0: Now Playing */}
+          {settingsTab === 0 && (
+            <Box>
+              <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
+                Current Playlist
+              </Typography>
+
+              {tempVideos.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 6 }}>
+                  <YouTubeIcon sx={{ fontSize: 80, color: '#ccc', mb: 2 }} />
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No videos in playlist
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Switch to "Manage Playlist" tab to add videos
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => setSettingsTab(1)}
+                    sx={{ bgcolor: '#ff0000', '&:hover': { bgcolor: '#cc0000' } }}
+                  >
+                    Add Videos Now
+                  </Button>
+                </Box>
+              ) : (
+                <Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    {tempVideos.length} video{tempVideos.length !== 1 ? 's' : ''} in playlist • Auto-playing in sequence
+                  </Typography>
+                  
+                  <List sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    {tempVideos.map((video, index) => (
+                      <ListItem
+                        key={index}
+                        sx={{
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 2,
+                          mb: 1,
+                          bgcolor: 'background.paper'
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                          <Box sx={{
+                            minWidth: 40,
+                            height: 40,
+                            bgcolor: '#ff0000',
+                            borderRadius: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <Typography variant="h6" sx={{ color: '#fff', fontWeight: 'bold' }}>
+                              {index + 1}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              Video {index + 1}
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              color="text.secondary"
+                              sx={{ 
+                                display: 'block',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {video.url}
+                            </Typography>
+                          </Box>
+                          <Chip 
+                            label="Ready" 
+                            size="small" 
+                            color="success"
+                            sx={{ fontWeight: 'bold' }}
+                          />
+                        </Box>
+                      </ListItem>
+                    ))}
+                  </List>
+
+                  <Alert severity="info" sx={{ mt: 2 }}>
+                    Videos will play automatically in sequence. Use the controls on screen to skip or pause.
+                  </Alert>
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {/* Tab 1: Manage Playlist */}
+          {settingsTab === 1 && (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                Add YouTube Videos
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Paste YouTube video URLs to build your playlist. Videos will auto-play in order.
+              </Typography>
+
+              {/* Add Video Form */}
+              <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+                <Stack direction="row" spacing={2}>
+                  <TextField
+                    fullWidth
+                    label="YouTube Video URL"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={newVideoUrl}
+                    onChange={(e) => setNewVideoUrl(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddVideo()}
+                    size="small"
+                  />
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={handleAddVideo}
+                    sx={{ 
+                      minWidth: 120,
+                      bgcolor: '#ff0000',
+                      '&:hover': { bgcolor: '#cc0000' }
+                    }}
+                  >
+                    Add
+                  </Button>
+                </Stack>
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="subtitle1" gutterBottom>
+                Playlist ({tempVideos.length} videos)
+              </Typography>
+
+              {tempVideos.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <YouTubeIcon sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
+                  <Typography color="text.secondary">
+                    No videos in playlist. Add YouTube URLs above.
+                  </Typography>
+                </Box>
+              ) : (
+                <List sx={{ maxHeight: 300, overflow: 'auto' }}>
+                  {tempVideos.map((video, index) => (
+                    <ListItem
+                      key={index}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        mb: 1
+                      }}
+                    >
+                      <ListItemText
+                        primary={`Video ${index + 1}`}
+                        secondary={video.url}
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleDeleteVideo(index)}
+                          color="error"
+                        >
+                          <Delete />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={handleClose}>Cancel</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSave} 
+            startIcon={<Save />}
+            sx={{ 
+              bgcolor: '#ff0000',
+              '&:hover': { bgcolor: '#cc0000' }
+            }}
+          >
+            Save & Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+    );
+  };
 
   if (!audioStarted) return (
     <Box sx={{ 
@@ -355,11 +735,8 @@ const TvRealEntertainment = () => {
     </Box>
   );
 
-  const callingOrders = activeOrders.filter(o => o.isCalling);
-  const regularOrders = activeOrders.filter(o => !o.isCalling);
-  const shouldScroll = regularOrders.length > 6;
-
-  const CustomerRow = ({ cust, isSpecial }) => {
+  // Memoize CustomerRow to prevent re-renders
+  const CustomerRow = React.memo(({ cust, isSpecial }) => {
     // Add error handling for missing data
     if (!cust || !cust.facility_id) {
       return null;
@@ -459,7 +836,12 @@ const TvRealEntertainment = () => {
         </Box>
       </Box>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Only re-render if customer data actually changes
+    return prevProps.cust.uniqueKey === nextProps.cust.uniqueKey &&
+           prevProps.cust.statusLabel === nextProps.cust.statusLabel &&
+           prevProps.isSpecial === nextProps.isSpecial;
+  });
 
   return (
     <>
@@ -494,9 +876,26 @@ const TvRealEntertainment = () => {
           
           {/* Header */}
           <Box sx={{ mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#00d2ff', mb: 1 }}>
-              ALL STORES QUEUE
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#00d2ff' }}>
+                ALL STORES QUEUE
+              </Typography>
+              {/* Calling Audio Mute Toggle */}
+              <IconButton
+                onClick={() => setCallingAudioMuted(!callingAudioMuted)}
+                sx={{
+                  bgcolor: callingAudioMuted ? 'rgba(255, 63, 52, 0.2)' : 'rgba(0, 210, 255, 0.2)',
+                  color: callingAudioMuted ? '#ff3f34' : '#00d2ff',
+                  '&:hover': {
+                    bgcolor: callingAudioMuted ? 'rgba(255, 63, 52, 0.3)' : 'rgba(0, 210, 255, 0.3)',
+                  },
+                  border: `2px solid ${callingAudioMuted ? '#ff3f34' : '#00d2ff'}`,
+                }}
+                title={callingAudioMuted ? 'Calling Audio Muted' : 'Calling Audio On'}
+              >
+                {callingAudioMuted ? <VolumeOff /> : <VolumeUp />}
+              </IconButton>
+            </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <AccessTime sx={{ color: '#00d2ff', fontSize: 16 }} />
               <Typography variant="caption" sx={{ color: '#ccc', fontWeight: 'bold' }}>
@@ -529,7 +928,7 @@ const TvRealEntertainment = () => {
                 🔔 READY NOW (ALL STORES)
               </Typography>
               {callingOrders.map((cust) => (
-                <CustomerRow key={cust.id} cust={cust} isSpecial={true} />
+                <CustomerRow key={cust.uniqueKey} cust={cust} isSpecial={true} />
               ))}
             </Box>
           )}
@@ -551,10 +950,10 @@ const TvRealEntertainment = () => {
                 animation: shouldScroll ? `scrollUp ${Math.max(regularOrders.length * 2, 10)}s linear infinite` : 'none'
               }}>
                 {regularOrders.map((cust) => (
-                  <CustomerRow key={cust.id} cust={cust} isSpecial={false} />
+                  <CustomerRow key={cust.uniqueKey} cust={cust} isSpecial={false} />
                 ))}
                 {shouldScroll && regularOrders.map((cust) => (
-                  <CustomerRow key={`clone-${cust.id}`} cust={cust} isSpecial={false} />
+                  <CustomerRow key={`clone-${cust.uniqueKey}`} cust={cust} isSpecial={false} />
                 ))}
               </Box>
             </Box>
@@ -570,51 +969,82 @@ const TvRealEntertainment = () => {
           zIndex: 1
         }}>
           
-          {/* TV Status Bar */}
+          {/* TV Status Bar - Simplified for YouTube */}
           <Box sx={{ 
-            p: 2, 
+            p: 1.5, 
             bgcolor: 'rgba(0,0,0,0.8)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             borderBottom: '1px solid rgba(255,255,255,0.1)'
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <currentInputData.icon sx={{ color: currentInputData.color, fontSize: 32 }} />
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-                  {currentInputData.name}
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#ccc', fontWeight: 'bold' }}>
-                  {currentInputData.description}
-                </Typography>
-              </Box>
-            </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Chip 
-                label="LIVE TV"
-                sx={{ bgcolor: '#ff3f34', color: '#fff', fontWeight: 'bold' }}
-              />
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => setShowInstructions(true)}
-                sx={{ 
-                  color: '#00d2ff', 
-                  borderColor: '#00d2ff',
-                  '&:hover': { bgcolor: 'rgba(0, 210, 255, 0.1)' }
-                }}
-              >
-                📺 TV Help
-              </Button>
-              <Typography variant="h6" sx={{ color: '#00d2ff', fontWeight: 'bold' }}>
-                Use Your TV Remote
-              </Typography>
+              {currentInput === 'youtube' ? (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Settings />}
+                  onClick={() => setShowSettings(true)}
+                  sx={{ 
+                    color: '#ff0000', 
+                    borderColor: '#ff0000',
+                    '&:hover': { bgcolor: 'rgba(255, 0, 0, 0.1)' }
+                  }}
+                >
+                  YouTube Settings
+                </Button>
+              ) : (
+                <>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mr: 'auto' }}>
+                    <currentInputData.icon sx={{ color: currentInputData.color, fontSize: 32 }} />
+                    <Box>
+                      <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+                        {currentInputData.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#ccc', fontWeight: 'bold' }}>
+                        {currentInputData.description}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Chip 
+                    label="LIVE TV"
+                    sx={{ bgcolor: '#ff3f34', color: '#fff', fontWeight: 'bold' }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Settings />}
+                    onClick={() => setShowSettings(true)}
+                    sx={{ 
+                      color: '#ff0000', 
+                      borderColor: '#ff0000',
+                      '&:hover': { bgcolor: 'rgba(255, 0, 0, 0.1)' }
+                    }}
+                  >
+                    YouTube Settings
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setShowInstructions(true)}
+                    sx={{ 
+                      color: '#00d2ff', 
+                      borderColor: '#00d2ff',
+                      '&:hover': { bgcolor: 'rgba(0, 210, 255, 0.1)' }
+                    }}
+                  >
+                    📺 TV Help
+                  </Button>
+                  <Typography variant="h6" sx={{ color: '#00d2ff', fontWeight: 'bold' }}>
+                    Use Your TV Remote
+                  </Typography>
+                </>
+              )}
             </Box>
           </Box>
 
-          {/* Input Selection */}
+          {/* Input Selection - Hidden on YouTube */}
+          {currentInput !== 'youtube' && (
           <Box sx={{ 
             p: 2, 
             bgcolor: 'rgba(0,0,0,0.6)',
@@ -646,6 +1076,7 @@ const TvRealEntertainment = () => {
               ))}
             </Grid>
           </Box>
+          )}
 
           {/* Main TV Display Area */}
           <Box sx={{ 
@@ -660,8 +1091,8 @@ const TvRealEntertainment = () => {
             
             {/* TV Screen Simulation */}
             <Box sx={{
-              width: '90%',
-              height: '80%',
+              width: currentInput === 'youtube' ? '98%' : '90%',
+              height: currentInput === 'youtube' ? '96%' : '80%',
               bgcolor: '#111',
               border: '4px solid #333',
               borderRadius: 3,
@@ -674,21 +1105,43 @@ const TvRealEntertainment = () => {
             }}>
               
               {/* TV Content Area */}
-              <Box sx={{ textAlign: 'center', p: 4 }}>
-                <currentInputData.icon sx={{ fontSize: 120, color: currentInputData.color, mb: 3 }} />
-                <Typography variant="h3" sx={{ color: '#fff', fontWeight: 'bold', mb: 2 }}>
-                  {currentInputData.name}
-                </Typography>
-                <Typography variant="h6" sx={{ color: '#ccc', mb: 3 }}>
-                  {currentInputData.description}
-                </Typography>
-                <Typography variant="body1" sx={{ color: currentInputData.color, fontWeight: 'bold' }}>
-                  {currentInputData.instruction}
-                </Typography>
-              </Box>
+              {currentInput === 'youtube' && youtubeVideos.length > 0 ? (
+                <YouTubePlayerIsolated videos={youtubeVideos} />
+              ) : currentInput === 'youtube' ? (
+                <Box sx={{ textAlign: 'center', p: 4 }}>
+                  <YouTubeIcon sx={{ fontSize: 120, color: '#ff0000', mb: 3 }} />
+                  <Typography variant="h3" sx={{ color: '#fff', fontWeight: 'bold', mb: 2 }}>
+                    YouTube Playlist
+                  </Typography>
+                  <Typography variant="h6" sx={{ color: '#ccc', mb: 3 }}>
+                    No videos in playlist
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<Settings />}
+                    onClick={() => setShowSettings(true)}
+                    sx={{ bgcolor: '#ff0000', '&:hover': { bgcolor: '#cc0000' } }}
+                  >
+                    Add YouTube Videos
+                  </Button>
+                </Box>
+              ) : (
+                <Box sx={{ textAlign: 'center', p: 4 }}>
+                  <currentInputData.icon sx={{ fontSize: 120, color: currentInputData.color, mb: 3 }} />
+                  <Typography variant="h3" sx={{ color: '#fff', fontWeight: 'bold', mb: 2 }}>
+                    {currentInputData.name}
+                  </Typography>
+                  <Typography variant="h6" sx={{ color: '#ccc', mb: 3 }}>
+                    {currentInputData.description}
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: currentInputData.color, fontWeight: 'bold' }}>
+                    {currentInputData.instruction}
+                  </Typography>
+                </Box>
+              )}
 
               {/* TV Remote Instructions Overlay */}
-              {showInstructions && (
+              {showInstructions && currentInput !== 'youtube' && (
                 <Box sx={{
                   position: 'absolute',
                   top: 20,
@@ -782,7 +1235,8 @@ const TvRealEntertainment = () => {
                 </Box>
               )}
 
-              {/* Channel/Input Info */}
+              {/* Channel/Input Info - Hidden on YouTube */}
+              {currentInput !== 'youtube' && (
               <Box sx={{
                 position: 'absolute',
                 bottom: 20,
@@ -803,8 +1257,10 @@ const TvRealEntertainment = () => {
                   📋 {currentInputData.instruction}
                 </Typography>
               </Box>
+              )}
 
-              {/* EPSS-MT Branding */}
+              {/* EPSS-MT Branding - Hidden on YouTube */}
+              {currentInput !== 'youtube' && (
               <Box sx={{
                 position: 'absolute',
                 bottom: 20,
@@ -818,6 +1274,7 @@ const TvRealEntertainment = () => {
                   EPSS-MT Entertainment
                 </Typography>
               </Box>
+              )}
             </Box>
           </Box>
         </Box>
@@ -841,7 +1298,19 @@ const TvRealEntertainment = () => {
             display: none !important;
           }
         `}</style>
+        <style>{`
+          .youtube-iframe {
+            width: 100% !important;
+            height: 100% !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+          }
+        `}</style>
       </Box>
+
+      {/* Settings Dialog */}
+      <SettingsDialog />
     </>
   );
 };

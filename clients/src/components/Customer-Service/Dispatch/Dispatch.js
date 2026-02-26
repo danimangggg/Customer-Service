@@ -582,7 +582,8 @@ const DispatcherAccount = () => {
                     open={snackbar.open}
                     autoHideDuration={3000}
                     onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                    sx={{ zIndex: 9999, mt: 8 }}
                 >
                     <Alert severity={snackbar.severity} sx={{ borderRadius: 2 }}>
                         {snackbar.message}
