@@ -290,7 +290,8 @@ const completeEwm = async (req, res) => {
       });
     }
 
-    const result = await db.sequelize.query(
+    // Update ODNs EWM status
+    await db.sequelize.query(
       `UPDATE odns_rdf 
        SET ewm_status = 'completed',
            ewm_completed_at = NOW(),
@@ -303,6 +304,32 @@ const completeEwm = async (req, res) => {
         type: db.sequelize.QueryTypes.UPDATE
       }
     );
+
+    // Check if all stores have completed EWM for this process
+    const [allCompleted] = await db.sequelize.query(
+      `SELECT COUNT(*) as pending_count
+       FROM odns_rdf
+       WHERE process_id = ? AND ewm_status != 'completed'`,
+      {
+        replacements: [process_id],
+        type: db.sequelize.QueryTypes.SELECT
+      }
+    );
+
+    // If all stores completed EWM, update global status
+    if (allCompleted.pending_count === 0) {
+      await db.sequelize.query(
+        `UPDATE customer_queue 
+         SET status = 'ewm_completed',
+             updated_at = NOW()
+         WHERE id = ?`,
+        {
+          replacements: [process_id],
+          type: db.sequelize.QueryTypes.UPDATE
+        }
+      );
+      console.log('All stores completed EWM - updated global status to ewm_completed');
+    }
 
     console.log('EWM completed successfully');
 

@@ -24,27 +24,56 @@ const TvCustomer = () => {
   const fetchData = useCallback(async (isInitial = false) => {
     if (isInitial) setLoading(true);
     try {
+      console.log('TvCustomer: Fetching data...', new Date().toLocaleTimeString());
       const [custRes, facRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`),
-        axios.get(`${API_URL}/api/facilities`)
+        axios.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000 }),
+        axios.get(`${API_URL}/api/facilities`, { timeout: 5000 })
       ]);
-      setCustomers(custRes.data);
-      setFacilities(facRes.data);
+      
+      console.log('TvCustomer: Received', custRes.data.length, 'customers');
+      
+      // Only update state if data actually changed to prevent unnecessary re-renders
+      setCustomers(prevCustomers => {
+        const newData = custRes.data;
+        if (JSON.stringify(prevCustomers) === JSON.stringify(newData)) {
+          console.log('TvCustomer: Data unchanged, skipping update');
+          return prevCustomers;
+        }
+        console.log('TvCustomer: Data changed, updating state');
+        return newData;
+      });
+      
+      setFacilities(prevFacilities => {
+        const newData = facRes.data;
+        if (JSON.stringify(prevFacilities) === JSON.stringify(newData)) {
+          return prevFacilities;
+        }
+        return newData;
+      });
     } catch (error) {
-      console.error('Fetch Error:', error);
+      console.error('TvCustomer Fetch Error:', error.message || error);
     } finally {
       if (isInitial) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    console.log('TvCustomer: Component mounted, starting fetch cycle');
     fetchData(true);
-    const interval = setInterval(() => fetchData(false), 4000);
+    
+    // Always run interval for TvCustomer (no YouTube mode)
+    const interval = setInterval(() => {
+      console.log('TvCustomer: Interval tick - fetching data');
+      fetchData(false);
+    }, 8000);
+    
+    console.log('TvCustomer: Interval started with ID:', interval);
     
     // Add TV display class to body
     document.body.classList.add('tv-display');
     
     return () => {
+      console.log('TvCustomer: Component unmounting, clearing interval');
       clearInterval(interval);
       document.body.classList.remove('tv-display');
     };
@@ -149,7 +178,8 @@ const TvCustomer = () => {
                 processFlow,
                 currentStep,
                 assignedStore: storeKey,
-                storeOdns: storeInfo.odns || []
+                storeOdns: storeInfo.odns || [],
+                uniqueKey: `${cust.id}-${storeKey}` // Unique key for each customer-store combination
               });
             });
           } catch (error) {
@@ -205,10 +235,10 @@ const TvCustomer = () => {
       if (order && order.displayTicket) {
         await playNumber(order.displayTicket);
       }
+      // Wait 3 seconds after audio finishes before allowing next audio
       setTimeout(() => {
         isPlayingAudio.current = false;
-        processQueue();
-      }, 2000);
+      }, 3000);
     } catch (error) {
       console.error('Error in processQueue:', error);
       isPlayingAudio.current = false;
@@ -216,23 +246,49 @@ const TvCustomer = () => {
   }, [activeOrders, playNumber]);
 
   useEffect(() => {
+    console.log('TvCustomer: Audio effect running, audioStarted:', audioStarted);
     try {
       if (!audioStarted) return;
-      const now = Date.now();
-      activeOrders.forEach(cust => {
+      
+      console.log('TvCustomer: Setting up audio check interval');
+      // Set up interval to check for calling customers every 2 seconds
+      const checkInterval = setInterval(() => {
         try {
-          if (cust && cust.isCalling && cust.id) {
-            const lastTime = lastCallTimes.current.get(cust.id) || 0;
-            if (now - lastTime > 15000) {
-              if (!audioQueueRef.current.includes(cust.id)) audioQueueRef.current.push(cust.id);
-              lastCallTimes.current.set(cust.id, now);
+          const now = Date.now();
+          const callingCustomers = activeOrders.filter(c => c.isCalling);
+          console.log('TvCustomer: Checking audio queue, calling customers:', callingCustomers.length);
+          
+          activeOrders.forEach(cust => {
+            try {
+              if (cust && cust.isCalling && cust.id) {
+                const lastTime = lastCallTimes.current.get(cust.id) || 0;
+                // Call every 15 seconds
+                if (now - lastTime >= 15000) {
+                  if (!audioQueueRef.current.includes(cust.id)) {
+                    console.log('TvCustomer: Adding customer to audio queue:', cust.id, 'ticket:', cust.displayTicket);
+                    audioQueueRef.current.push(cust.id);
+                    lastCallTimes.current.set(cust.id, now);
+                  }
+                }
+              } else if (cust && !cust.isCalling && cust.id) {
+                // Clear the last call time when customer is no longer in calling state
+                lastCallTimes.current.delete(cust.id);
+              }
+            } catch (error) {
+              console.error('Error processing customer audio:', error, cust);
             }
-          }
+          });
+          processQueue();
         } catch (error) {
-          console.error('Error processing customer audio:', error, cust);
+          console.error('Error in audio check interval:', error);
         }
-      });
-      processQueue();
+      }, 2000); // Check every 2 seconds
+      
+      console.log('TvCustomer: Audio check interval started');
+      return () => {
+        console.log('TvCustomer: Clearing audio check interval');
+        clearInterval(checkInterval);
+      };
     } catch (error) {
       console.error('Error in audio useEffect:', error);
     }
@@ -283,44 +339,44 @@ const TvCustomer = () => {
     return (
       <Box sx={{ 
         display: 'grid', 
-        gridTemplateColumns: '120px 2fr 1fr 160px', 
+        gridTemplateColumns: '140px 2.5fr 1.2fr 180px', 
         gap: 2, 
         mb: 2,
         animation: isSpecial ? 'vibrantGlow 1.5s infinite alternate' : 'none',
         opacity: isSpecial ? 1 : 0.95,
-        minHeight: '100px'
+        minHeight: '110px'
       }}>
         {/* Ticket Badge */}
         <Box sx={{ 
-          height: '80px', bgcolor: '#011122', borderRadius: '15px 0 0 15px', 
+          height: '90px', bgcolor: '#011122', borderRadius: '15px 0 0 15px', 
           border: `2px solid ${cust.themeColor}`, display: 'flex', 
           justifyContent: 'center', alignItems: 'center', position: 'relative'
         }}>
           <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', bgcolor: cust.themeColor }} />
-          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff' }}>{cust.displayTicket}</Typography>
+          <Typography variant="h2" sx={{ fontWeight: 900, color: '#fff', fontSize: '3.5rem' }}>{cust.displayTicket}</Typography>
         </Box>
 
         {/* Facility Box */}
         <Box sx={{ 
           bgcolor: 'rgba(255,255,255,0.03)', borderY: '2px solid rgba(255,255,255,0.1)', 
           px: 3, py: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', 
-          border: `1px solid ${cust.themeColor}33`, minHeight: '80px'
+          border: `1px solid ${cust.themeColor}33`, minHeight: '90px'
         }}>
           {/* Store Badge and Facility Name */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-            <Typography variant="h6" sx={{ 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, flexWrap: 'wrap' }}>
+            <Typography variant="h5" sx={{ 
               color: cust.themeColor, 
               fontWeight: 'bold',
               backgroundColor: `${cust.themeColor}22`,
-              px: 1.5,
-              py: 0.5,
+              px: 2,
+              py: 0.8,
               borderRadius: 2,
               border: `2px solid ${cust.themeColor}`,
-              fontSize: '1rem'
+              fontSize: '1.4rem'
             }}>
               {facilityInfo.storeKey}
             </Typography>
-            <Typography variant="h5" sx={{ 
+            <Typography variant="h4" sx={{ 
               fontWeight: 'bold', 
               color: '#fff', 
               textTransform: 'uppercase', 
@@ -329,7 +385,8 @@ const TvCustomer = () => {
               overflowWrap: 'break-word',
               lineHeight: 1.3,
               overflow: 'visible',
-              flex: 1
+              flex: 1,
+              fontSize: '1.8rem'
             }}>
               {facilityInfo.facilityName}
             </Typography>
@@ -340,15 +397,15 @@ const TvCustomer = () => {
             {cust.processFlow?.map((step, index) => (
               <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Box sx={{
-                  width: 8,
-                  height: 8,
+                  width: 10,
+                  height: 10,
                   borderRadius: '50%',
                   bgcolor: step.status === 'completed' ? '#00b894' : 
                            step.status === 'in_progress' ? step.color : '#444',
                   border: index === cust.currentStep ? `2px solid ${cust.themeColor}` : 'none'
                 }} />
                 {index < cust.processFlow.length - 1 && (
-                  <Box sx={{ width: 12, height: 2, bgcolor: '#444' }} />
+                  <Box sx={{ width: 14, height: 2, bgcolor: '#444' }} />
                 )}
               </Box>
             ))}
@@ -362,8 +419,8 @@ const TvCustomer = () => {
           flexDirection: 'column', py: 2, px: 1
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: 'column' }}>
-            <cust.Icon sx={{ color: cust.themeColor, fontSize: '2.5rem' }} />
-            <Typography variant="body1" sx={{ 
+            <cust.Icon sx={{ color: cust.themeColor, fontSize: '3rem' }} />
+            <Typography variant="h6" sx={{ 
               fontWeight: 'bold', 
               color: '#fff', 
               letterSpacing: 1,
@@ -372,13 +429,13 @@ const TvCustomer = () => {
               wordWrap: 'break-word',
               overflowWrap: 'break-word',
               lineHeight: 1.2,
-              fontSize: '0.9rem'
+              fontSize: '1.1rem'
             }}>
               {cust.statusLabel}
             </Typography>
           </Box>
           {/* Current Step Indicator */}
-          <Typography variant="caption" sx={{ color: cust.themeColor, fontWeight: 'bold' }}>
+          <Typography variant="body2" sx={{ color: cust.themeColor, fontWeight: 'bold', fontSize: '0.95rem' }}>
             Step {cust.currentStep + 1} of {cust.processFlow?.length || 5}
           </Typography>
         </Box>
@@ -389,10 +446,10 @@ const TvCustomer = () => {
           borderRadius: '0 15px 15px 0', display: 'flex', 
           justifyContent: 'center', alignItems: 'center', gap: 1 
         }}>
-          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff' }}>
+          <Typography variant="h2" sx={{ fontWeight: 900, color: '#fff', fontSize: '3.5rem' }}>
             {dayjs().diff(dayjs(cust.started_at), 'm')}
           </Typography>
-          <Typography variant="caption" sx={{ color: cust.themeColor, fontWeight: 'bold' }}>MIN</Typography>
+          <Typography variant="body1" sx={{ color: cust.themeColor, fontWeight: 'bold', fontSize: '1rem' }}>MIN</Typography>
         </Box>
       </Box>
     );
@@ -417,19 +474,19 @@ const TvCustomer = () => {
     }}>
       
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
-          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff' }}>EPSS-MT MONITOR</Typography>
-          <Typography variant="caption" sx={{ color: '#00d2ff', letterSpacing: 5, fontWeight: 'bold' }}>REAL-TIME DISPATCH FLOW</Typography>
+          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff', fontSize: '2.5rem' }}>EPSS-MT MONITOR</Typography>
+          <Typography variant="caption" sx={{ color: '#00d2ff', letterSpacing: 4, fontWeight: 'bold', fontSize: '0.75rem' }}>REAL-TIME DISPATCH FLOW</Typography>
         </Box>
-        <img src="/pharmalog-logo.png" alt="EPSS-MT Logo" style={{ height: '65px' }} />
+        <img src="/pharmalog-logo.png" alt="EPSS-MT Logo" style={{ height: '55px' }} />
       </Box>
 
       {/* FIXED READY ITEMS */}
       {callingOrders.length > 0 && (
         <Box sx={{ mb: 3 }}>
           {callingOrders.map((cust) => (
-            <RowItem key={cust.id} cust={cust} isSpecial={true} />
+            <RowItem key={cust.uniqueKey} cust={cust} isSpecial={true} />
           ))}
         </Box>
       )}
@@ -442,8 +499,8 @@ const TvCustomer = () => {
           height: '100%',
           animation: shouldScroll ? `scrollList ${Math.max(regularOrders.length * 4, 15)}s linear infinite` : 'none' 
         }}>
-          {regularOrders.map((cust) => <RowItem key={cust.id} cust={cust} isSpecial={false} />)}
-          {shouldScroll && regularOrders.map((cust) => <RowItem key={`clone-${cust.id}`} cust={cust} isSpecial={false} />)}
+          {regularOrders.map((cust) => <RowItem key={cust.uniqueKey} cust={cust} isSpecial={false} />)}
+          {shouldScroll && regularOrders.map((cust) => <RowItem key={`clone-${cust.uniqueKey}`} cust={cust} isSpecial={false} />)}
         </Box>
       </Box>
 

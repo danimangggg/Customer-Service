@@ -66,8 +66,10 @@ const Sidebar = () => {
   const accountType = rawAccountType;
   const jobTitle = localStorage.getItem("JobTitle");
 
+  console.log('Navbar Debug:', { accountType, jobTitle, rawAccountType });
+
   const isAdmin = accountType === "Admin";
-  const isCreditManager = accountType === "Credit Manager";
+  const isFinance = accountType === "Finance";
 
   // Helper function to check if current path matches the menu item
   const isActivePath = (path) => location.pathname === path;
@@ -244,6 +246,34 @@ const Sidebar = () => {
              >
                <ListItemIcon>
                  <Assignment sx={{ color: '#ff9800' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Outstanding Process"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/outstandingProcess') ? 600 : 500,
+                     fontSize: '0.85rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Outstanding Process - for Finance */}
+         {jobTitle === "Finance" && (
+           <MenuTooltip title={"Outstanding Process"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/outstandingProcess"
+               sx={getActiveStyles('/outstandingProcess')}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#4caf50' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 

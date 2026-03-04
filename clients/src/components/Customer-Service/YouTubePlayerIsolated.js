@@ -8,6 +8,12 @@ const YouTubePlayerIsolated = ({ videos, initialIndex = 0 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const playerRef = useRef(null);
 
+  console.log('YouTubePlayerIsolated render:', { 
+    videosLength: videos.length, 
+    currentIndex,
+    firstVideoId: videos[0]?.id 
+  });
+
   // Update current index when videos array changes (new videos added)
   useEffect(() => {
     // If current index is out of bounds, reset to 0
@@ -133,6 +139,16 @@ const YouTubePlayerIsolated = ({ videos, initialIndex = 0 }) => {
 
 // Only re-render if videos array length changes (new videos added/removed)
 export default React.memo(YouTubePlayerIsolated, (prevProps, nextProps) => {
-  return prevProps.videos.length === nextProps.videos.length &&
+  const shouldNotRerender = prevProps.videos.length === nextProps.videos.length &&
          prevProps.videos[0]?.id === nextProps.videos[0]?.id;
+  
+  console.log('YouTubePlayerIsolated memo check:', {
+    prevLength: prevProps.videos.length,
+    nextLength: nextProps.videos.length,
+    prevFirstId: prevProps.videos[0]?.id,
+    nextFirstId: nextProps.videos[0]?.id,
+    shouldNotRerender: shouldNotRerender
+  });
+  
+  return shouldNotRerender;
 });

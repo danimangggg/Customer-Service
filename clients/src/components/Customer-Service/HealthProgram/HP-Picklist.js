@@ -39,6 +39,7 @@ const HPPickListDetail = () => {
   const [error, setError] = useState(null);
 
   const [pdfFile, setPdfFile] = useState(null);
+  const [pdfFiles, setPdfFiles] = useState([]);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploading, setUploading] = useState(false);
   const [submittedPicklists, setSubmittedPicklists] = useState([]);
@@ -78,27 +79,75 @@ const HPPickListDetail = () => {
       const picklistsRes = await axios.get(`${api_url}/api/getPicklists`);
       let allPicklists = Array.isArray(picklistsRes.data) ? picklistsRes.data : [];
 
+      console.log('=== PICKLIST FILTERING DEBUG ===');
+      console.log('Total picklists from API:', allPicklists.length);
+      console.log('Current process_id:', process_id);
+      console.log('Current userStore:', userStore);
+      
+      // Show all picklists for this process_id
+      const processPicklists = allPicklists.filter(p => String(p.process_id) === process_id);
+      console.log('Picklists for this process_id:', processPicklists.length);
+      if (processPicklists.length > 0) {
+        console.log('Sample picklist:', processPicklists[0]);
+      }
+
       // Filter by store AND by process_id for HP processes
       let filtered = allPicklists.filter(
         p => String(p.store || '').toUpperCase() === userStore &&
              String(p.process_id) === process_id
       );
 
+      console.log('Filtered by store AND process_id:', filtered.length);
+
       // Remove completed picklists
       filtered = filtered.filter(
         p => String(p.status || '').toLowerCase() !== 'completed'
       );
 
+      console.log('After removing completed:', filtered.length);
+      console.log('=== END PICKLIST DEBUG ===');
+
       setSubmittedPicklists(filtered);
 
-      // Fetch WIM Operators filtered by store
+      // Fetch WIM Operators with store information
       const empRes = await axios.get(`${api_url}/api/get-employee`);
       const employees = Array.isArray(empRes.data) ? empRes.data : [];
-      const wimOps = employees.filter(
-        emp =>
-          emp.jobTitle?.toLowerCase() === 'wim operator' &&
-          String(emp.store || '').toUpperCase() === userStore
-      );
+      
+      console.log('=== WIM OPERATOR DEBUG ===');
+      console.log('Total employees:', employees.length);
+      console.log('EWM Officer store from localStorage:', userStore);
+      
+      // Find all WIM Operators
+      const allWimOps = employees.filter(emp => {
+        const jobTitle = emp.jobTitle || emp.JobTitle || emp.job_title || '';
+        return jobTitle.toLowerCase() === 'wim operator';
+      });
+      
+      console.log('All WIM Operators found:', allWimOps.length);
+      
+      // Log each WIM Operator with their store info
+      allWimOps.forEach(op => {
+        console.log('  - Name:', op.full_name, '| Store Object:', op.store, '| Store Name:', op.store?.store_name);
+      });
+      
+      // Filter WIM Operators by store - must match exactly
+      console.log('Filtering by store:', userStore);
+      const wimOps = allWimOps.filter(emp => {
+        // Check if employee has store object from join
+        const empStoreName = emp.store?.store_name || '';
+        const empStoreUpper = empStoreName.toUpperCase();
+        const matches = empStoreUpper === userStore;
+        console.log('  - Checking:', emp.full_name, '| Store:', empStoreName, '| Upper:', empStoreUpper, '| Match with', userStore, ':', matches);
+        return matches;
+      });
+      
+      console.log('Filtered WIM Operators:', wimOps.length);
+      if (wimOps.length === 0) {
+        console.warn('⚠️ No WIM Operators found for store:', userStore);
+        console.warn('⚠️ Make sure WIM Operators have store_id assigned in the database');
+      }
+      console.log('=== END DEBUG ===');
+      
       setOperators(wimOps);
 
     } catch (err) {
@@ -114,45 +163,47 @@ const HPPickListDetail = () => {
   }, [fetchAll]);
 
   const handlePdfChange = (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (f) {
-      setPdfFile(f);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setPdfFiles(Array.from(files));
+      setPdfFile(null); // Clear single file
       setUploadMessage('');
     }
   };
 
   const handleSubmit = async (ev) => {
     ev.preventDefault();
-    if (!selectedODN || !pdfFile || !selectedOperator) {
-      setUploadMessage('Please provide PDF and select a WIM Operator.');
-      return;
-    }
-
-    if (submittedPicklists.some(p => p.odn === selectedODN)) {
-      setUploadMessage('This ODN number is already submitted!');
+    if ((!selectedODN || pdfFiles.length === 0 || !selectedOperator)) {
+      setUploadMessage('Please provide PDF file(s) and select a WIM Operator.');
       return;
     }
 
     setUploading(true);
+    
     try {
-      const formData = new FormData();
-      formData.append('odn', selectedODN);
-      formData.append('attachment', pdfFile);
-      formData.append('process_id', process_id);
-      formData.append('store', userStore);
-      formData.append('operator_id', selectedOperator);
+      // Upload each file separately
+      for (let i = 0; i < pdfFiles.length; i++) {
+        const file = pdfFiles[i];
+        const formData = new FormData();
+        formData.append('odn', selectedODN);
+        formData.append('attachment', file);
+        formData.append('process_id', process_id);
+        formData.append('store', userStore);
+        formData.append('operator_id', selectedOperator);
 
-      const res = await axios.post(`${api_url}/api/uploadPicklist`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+        await axios.post(`${api_url}/api/uploadPicklist`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
 
       Swal.fire({
         icon: 'success',
         title: 'Uploaded',
-        text: res.data?.message || 'Picklist uploaded successfully',
+        text: `${pdfFiles.length} picklist(s) uploaded successfully`,
       });
 
       await fetchAll();
+      setPdfFiles([]);
       setPdfFile(null);
       setSelectedOperator('');
     } catch (err) {
@@ -187,6 +238,39 @@ const HPPickListDetail = () => {
     }
   };
 
+  const handleCompletePicklist = async (id) => {
+    const result = await Swal.fire({
+      title: 'Complete Picklist?',
+      text: 'Mark this picklist as completed?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, complete it',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await axios.put(`${api_url}/api/completePicklist/${id}`);
+      
+      Swal.fire({ 
+        icon: 'success', 
+        title: 'Completed', 
+        text: 'Picklist marked as completed.' 
+      });
+      
+      // Remove from list since we filter out completed picklists
+      setSubmittedPicklists(prev => prev.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('Complete error:', err);
+      Swal.fire({ 
+        icon: 'error', 
+        title: 'Failed', 
+        text: err.response?.data?.message || 'Could not complete picklist.' 
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}>
@@ -204,7 +288,7 @@ const HPPickListDetail = () => {
     ? `${facility.facility_name}, ${facility.woreda_name}, ${facility.zone_name}, ${facility.region_name}`
     : 'N/A';
 
-  const canUpload = jobTitle === 'EWM Officer - HP' || jobTitle === 'EWM Officer';
+  const canUpload = jobTitle === 'EWM Officer - HP' || jobTitle === 'EWM Officer' || jobTitle === 'WIM Operator';
 
   return (
     <Box sx={{ p: 3 }}>
@@ -257,23 +341,32 @@ const HPPickListDetail = () => {
               >
                 {operators.map((op) => (
                   <MenuItem key={op.id} value={op.id}>
-                    {op.full_name} ({op.store})
+                    {op.full_name} {op.store?.store_name ? `(${op.store.store_name})` : ''}
                   </MenuItem>
                 ))}
               </TextField>
 
               <Button variant="contained" component="label" startIcon={<CloudUploadIcon />}>
-                Choose PDF File
-                <input type="file" accept=".pdf" hidden onChange={handlePdfChange} />
+                Choose PDF File(s)
+                <input type="file" accept=".pdf" multiple hidden onChange={handlePdfChange} />
               </Button>
 
-              {pdfFile && (
-                <Chip
-                  icon={<PictureAsPdfIcon color="error" />}
-                  label={`Selected: ${pdfFile.name}`}
-                  color="success"
-                  variant="outlined"
-                />
+              {pdfFiles.length > 0 && (
+                <Box>
+                  <Typography variant="body2" color="text.secondary" mb={1}>
+                    Selected {pdfFiles.length} file(s):
+                  </Typography>
+                  {pdfFiles.map((file, index) => (
+                    <Chip
+                      key={index}
+                      icon={<PictureAsPdfIcon color="error" />}
+                      label={file.name}
+                      color="success"
+                      variant="outlined"
+                      sx={{ mr: 1, mb: 1 }}
+                    />
+                  ))}
+                </Box>
               )}
 
               <Button type="submit" variant="contained" color="primary" disabled={uploading}>
@@ -301,6 +394,14 @@ const HPPickListDetail = () => {
                 secondaryAction={
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={() => window.open(item.url, '_blank')}>View</Button>
+                    <Button 
+                      variant="outlined" 
+                      color="success" 
+                      startIcon={<CheckCircleIcon />} 
+                      onClick={() => handleCompletePicklist(item.id)}
+                    >
+                      Complete
+                    </Button>
                     <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={() => handleDelete(item.id, item.url)}>Delete</Button>
                   </Stack>
                 }

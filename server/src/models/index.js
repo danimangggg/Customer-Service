@@ -3,6 +3,7 @@ const dbConfig = require("../config/db.config.js");
 const Sequelize = require("sequelize");
 const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
   host: dbConfig.HOST,
+  port: dbConfig.PORT, // Add port configuration
   dialect: dbConfig.dialect,
   timezone: '+03:00', // East Africa Time
   dialectOptions: {
@@ -144,6 +145,17 @@ db.employee.hasMany(db.routeAssignment, {
 db.employee.hasMany(db.routeAssignment, {
   foreignKey: 'assigned_by',
   as: 'managerAssignments'
+});
+
+// Employee and Store associations
+db.employee.belongsTo(db.store, {
+  foreignKey: 'store_id',
+  as: 'store'
+});
+
+db.store.hasMany(db.employee, {
+  foreignKey: 'store_id',
+  as: 'employees'
 });
 
 module.exports = db;

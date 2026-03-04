@@ -23,11 +23,18 @@ const retrievePicklists = async (req, res) => {
     const limit = parseInt(req.query.limit) || 100; // Default to 100 records
     const offset = (page - 1) * limit;
     
+    // Add includeCompleted parameter
+    const includeCompleted = req.query.includeCompleted === 'true';
+    
     const baseUrl = `${req.protocol}://${req.get('host')}/picklists`;
+    
+    // Build WHERE clause based on includeCompleted parameter
+    const whereClause = includeCompleted 
+      ? '' // No filter - show all
+      : `WHERE LOWER(COALESCE(p.status, '')) != 'completed'`;
     
     // Use raw SQL query with proper JOINs to get facility information
     // HP picklists use 'processes' table, AA picklists use 'customer_queue' table
-    // Filter: Only show uncompleted picklists (status != 'completed')
     const query = `
       SELECT 
         p.id,
@@ -50,16 +57,20 @@ const retrievePicklists = async (req, res) => {
       LEFT JOIN facilities f_hp ON pr.facility_id = f_hp.id
       LEFT JOIN customer_queue cq ON CAST(p.process_id AS UNSIGNED) = cq.id AND p.store != 'HP'
       LEFT JOIN facilities f_aa ON cq.facility_id = f_aa.id
-      WHERE LOWER(COALESCE(p.status, '')) != 'completed'
+      ${whereClause}
       ORDER BY p.id DESC
       LIMIT ${limit} OFFSET ${offset}
     `;
     
-    // Get total count for pagination (only uncompleted)
+    // Get total count for pagination
+    const countWhereClause = includeCompleted 
+      ? '' 
+      : `WHERE LOWER(COALESCE(status, '')) != 'completed'`;
+    
     const countQuery = `
       SELECT COUNT(*) as total 
       FROM picklist 
-      WHERE LOWER(COALESCE(status, '')) != 'completed'
+      ${countWhereClause}
     `;
     const [countResult] = await db.sequelize.query(countQuery);
     const total = countResult[0].total;
@@ -98,10 +109,16 @@ const retrievePicklists = async (req, res) => {
 
     // Format the results
     const formatted = results.map(row => {
+      // Handle URL - if it's just a filename, prepend /picklists/
+      let fullUrl = row.url;
+      if (fullUrl && !fullUrl.startsWith('http') && !fullUrl.startsWith('/')) {
+        fullUrl = `/picklists/${fullUrl}`;
+      }
+      
       const picklist = {
         id: row.id,
         odn: row.odn,
-        url: row.url ? `${baseUrl}/${row.url}` : null,
+        url: fullUrl ? `${baseUrl}/${fullUrl.replace('/picklists/', '')}` : null,
         process_id: row.process_id,
         operator_id: row.operator_id,
         store: row.store,
@@ -216,10 +233,15 @@ const deletePdf = async (req, res) => {
       return res.status(404).json({ message: 'Picklist not found' });
     }
 
-    console.log('Found picklist:', picklists.id, picklists.odn);
+    console.log('Found picklist:', {
+      id: picklists.id,
+      odn: picklists.odn,
+      current_status: picklists.status,
+      store: picklists.store
+    });
 
     // Update using raw SQL
-    await db.sequelize.query(
+    const [updateResult] = await db.sequelize.query(
       'UPDATE picklist SET status = ? WHERE id = ?',
       {
         replacements: ['completed', picklistId],
@@ -227,11 +249,27 @@ const deletePdf = async (req, res) => {
       }
     );
 
-    console.log('✅ Picklist marked as completed');
+    console.log('Update result:', updateResult);
+
+    // Verify the update
+    const [verifyPicklist] = await db.sequelize.query(
+      'SELECT id, odn, status FROM picklist WHERE id = ?',
+      {
+        replacements: [picklistId],
+        type: db.sequelize.QueryTypes.SELECT
+      }
+    );
+
+    console.log('✅ Picklist after update:', {
+      id: verifyPicklist.id,
+      odn: verifyPicklist.odn,
+      status: verifyPicklist.status
+    });
     
     res.json({ 
       success: true,
-      message: 'Picklist marked as completed' 
+      message: 'Picklist marked as completed',
+      picklist: verifyPicklist
     });
   } catch (err) {
     console.error('=== COMPLETE PICKLIST ERROR ===');

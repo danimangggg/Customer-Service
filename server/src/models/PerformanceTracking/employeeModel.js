@@ -37,6 +37,8 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
+  }, {
+    tableName: 'employees'  // Explicitly use the 'employees' table
   });
 
   return Employee;

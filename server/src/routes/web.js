@@ -186,6 +186,24 @@ let routes =  (app) => {
   router.post('/api/pi-vehicle-requests/request', piVehicleRequestController.submitVehicleRequest);
   router.delete('/api/pi-vehicle-requests/:route_id', piVehicleRequestController.deleteVehicleRequest);
 
+  // TM (Transportation Manager) routes
+  const tmController = require('../controllers/HealthProgram/tmController');
+  router.get('/api/tm-processes', tmController.getTMProcesses);
+  router.post('/api/tm-notify', tmController.notifyTM);
+  router.post('/api/tm-create-freight-order', tmController.createFreightOrder);
+  router.post('/api/tm-send-to-ewm', tmController.sendToEWM);
+
+  // EWM Goods Issue routes
+  const ewmGoodsIssueController = require('../controllers/HealthProgram/ewmGoodsIssueController');
+  router.get('/api/ewm-goods-issue-processes', ewmGoodsIssueController.getGoodsIssueProcesses);
+  router.post('/api/ewm-issue-goods', ewmGoodsIssueController.issueGoods);
+
+  // Biller routes
+  const billerController = require('../controllers/HealthProgram/billerController');
+  router.get('/api/biller-processes', billerController.getBillerProcesses);
+  router.post('/api/biller-receive-goods', billerController.receiveGoods);
+  router.post('/api/biller-print-documents', billerController.printDocuments);
+
   // Dispatch Management routes
   const dispatchController = require('../controllers/Transportation/dispatchController');
   router.get('/api/dispatch-routes', dispatchController.getDispatchRoutes);

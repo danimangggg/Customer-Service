@@ -556,7 +556,7 @@ const HpFacilities = () => {
   const handleEWMCompleteProcess = async (processId) => {
     const result = await Swal.fire({
       title: 'Complete EWM Process?',
-      text: 'This will mark the EWM process as completed.',
+      text: 'This will mark the EWM process as completed and notify TM Manager.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, Complete EWM',
@@ -570,6 +570,11 @@ const HpFacilities = () => {
           process_id: processId
         });
         
+        // Notify TM that goods are ready
+        await axios.post(`${api_url}/api/tm-notify`, { 
+          process_id: processId
+        });
+        
         // Update the process status in local state
         setActiveProcesses(prev => 
           prev.map(p => 
@@ -579,7 +584,7 @@ const HpFacilities = () => {
           )
         );
         
-        Swal.fire('Completed!', 'EWM Process has been marked as completed.', 'success');
+        Swal.fire('Completed!', 'EWM Process completed and TM Manager notified.', 'success');
         
       } catch (err) {
         console.error('EWM Complete process error:', err);

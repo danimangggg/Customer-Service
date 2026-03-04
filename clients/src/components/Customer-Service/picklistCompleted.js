@@ -33,12 +33,16 @@ const CompletedPicklists = () => {
     try {
       setLoading(true);
       const [pickRes, empRes] = await Promise.all([
-        axios.get(`${api_url}/api/getPicklists`),
+        axios.get(`${api_url}/api/getPicklists?includeCompleted=true`),
         axios.get(`${api_url}/api/get-employee`),
       ]);
 
       // Filter picklists with status "completed" (facility info now comes from backend)
-      const completed = (Array.isArray(pickRes.data) ? pickRes.data : []).filter(
+      const allPicklists = Array.isArray(pickRes.data) 
+        ? pickRes.data 
+        : (pickRes.data.data || []);
+      
+      const completed = allPicklists.filter(
         (p) => String(p.status || '').toLowerCase() === 'completed'
       );
 

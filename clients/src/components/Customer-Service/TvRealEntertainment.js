@@ -155,7 +155,7 @@ const TvRealEntertainment = () => {
   useEffect(() => {
     fetchData(true);
     
-    // Always run interval to keep queue updated
+    // Always run interval to keep queue updated, even on YouTube
     const interval = setInterval(() => fetchData(false), 8000);
     
     // Add TV display class to body
@@ -275,6 +275,7 @@ const TvRealEntertainment = () => {
       return Promise.resolve();
     }
     
+    // Always play audio even on YouTube - customers need to hear their number
     return new Promise((resolve) => {
       try {
         const audio = new Audio(`/audio/amharic/${number}.mp3`);
@@ -363,7 +364,7 @@ const TvRealEntertainment = () => {
   // Memoize derived data before any early returns
   const callingOrders = useMemo(() => activeOrders.filter(o => o.isCalling), [activeOrders]);
   const regularOrders = useMemo(() => activeOrders.filter(o => !o.isCalling), [activeOrders]);
-  const shouldScroll = regularOrders.length > 6;
+  const shouldScroll = regularOrders.length > 4; // Scroll if more than 4 customers
 
   // Load YouTube videos from database
   useEffect(() => {
@@ -748,18 +749,18 @@ const TvRealEntertainment = () => {
       <Box sx={{ 
         display: 'flex', 
         alignItems: 'flex-start',
-        mb: 1,
-        p: 1.5,
+        mb: 1.5,
+        p: 2,
         bgcolor: isSpecial ? `${cust.themeColor}22` : 'rgba(255,255,255,0.05)',
         borderRadius: 2,
-        border: `1px solid ${isSpecial ? cust.themeColor : 'rgba(255,255,255,0.1)'}`,
+        border: `2px solid ${isSpecial ? cust.themeColor : 'rgba(255,255,255,0.1)'}`,
         animation: isSpecial ? 'pulse 1.5s infinite' : 'none',
-        minHeight: '70px'
+        minHeight: '85px'
       }}>
         {/* Ticket Number */}
         <Box sx={{ 
-          minWidth: '50px',
-          height: '35px',
+          minWidth: '65px',
+          height: '50px',
           bgcolor: cust.themeColor,
           borderRadius: 2,
           display: 'flex',
@@ -768,31 +769,31 @@ const TvRealEntertainment = () => {
           mr: 2,
           flexShrink: 0
         }}>
-          <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#000' }}>
+          <Typography variant="h5" sx={{ fontWeight: 900, color: '#000', fontSize: '1.8rem' }}>
             {cust.displayTicket}
           </Typography>
         </Box>
 
         {/* Main Content Area */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.8, minWidth: 0 }}>
           {/* Facility Name with Bold Store Prefix */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-            <Typography variant="body2" sx={{ 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+            <Typography variant="body1" sx={{ 
               color: cust.themeColor, 
-              fontWeight: 'bold',
-              fontSize: '0.9rem',
+              fontWeight: 900,
+              fontSize: '1.1rem',
               backgroundColor: `${cust.themeColor}22`,
-              px: 1,
-              py: 0.2,
+              px: 1.5,
+              py: 0.5,
               borderRadius: 1,
-              border: `1px solid ${cust.themeColor}`
+              border: `2px solid ${cust.themeColor}`
             }}>
               {facilityInfo.storeKey}
             </Typography>
-            <Typography variant="body2" sx={{ 
+            <Typography variant="body1" sx={{ 
               color: '#fff', 
-              fontWeight: 'bold',
-              fontSize: '0.85rem',
+              fontWeight: 900,
+              fontSize: '1.05rem',
               whiteSpace: 'normal',
               wordWrap: 'break-word',
               overflowWrap: 'break-word',
@@ -804,12 +805,12 @@ const TvRealEntertainment = () => {
           </Box>
 
           {/* Status */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-            <cust.Icon sx={{ color: cust.themeColor, fontSize: '1rem' }} />
-            <Typography variant="caption" sx={{ 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+            <cust.Icon sx={{ color: cust.themeColor, fontSize: '1.4rem' }} />
+            <Typography variant="body2" sx={{ 
               color: cust.themeColor,
-              fontWeight: 'bold',
-              fontSize: '0.75rem',
+              fontWeight: 900,
+              fontSize: '0.95rem',
               whiteSpace: 'normal',
               wordWrap: 'break-word',
               overflowWrap: 'break-word',
@@ -822,14 +823,14 @@ const TvRealEntertainment = () => {
 
         {/* Timer */}
         <Box sx={{ 
-          minWidth: '40px',
+          minWidth: '55px',
           textAlign: 'center',
           flexShrink: 0
         }}>
-          <Typography variant="caption" sx={{ 
+          <Typography variant="body1" sx={{ 
             color: cust.themeColor, 
-            fontWeight: 'bold',
-            fontSize: '0.75rem'
+            fontWeight: 900,
+            fontSize: '1rem'
           }}>
             {dayjs().diff(dayjs(cust.started_at), 'm')}m
           </Typography>
@@ -860,9 +861,9 @@ const TvRealEntertainment = () => {
         zIndex: 9999
       }}>
         
-        {/* Left Side - Compact Customer Queue (30% width) */}
+        {/* Left Side - Compact Customer Queue (40% width) */}
         <Box sx={{ 
-          width: '30%', 
+          width: '40%', 
           p: 2, 
           display: 'flex', 
           flexDirection: 'column',
@@ -877,7 +878,7 @@ const TvRealEntertainment = () => {
           {/* Header */}
           <Box sx={{ mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#00d2ff' }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: '#00d2ff', fontSize: '1.5rem' }}>
                 ALL STORES QUEUE
               </Typography>
               {/* Calling Audio Mute Toggle */}
@@ -897,8 +898,8 @@ const TvRealEntertainment = () => {
               </IconButton>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <AccessTime sx={{ color: '#00d2ff', fontSize: 16 }} />
-              <Typography variant="caption" sx={{ color: '#ccc', fontWeight: 'bold' }}>
+              <AccessTime sx={{ color: '#00d2ff', fontSize: 20 }} />
+              <Typography variant="body2" sx={{ color: '#ccc', fontWeight: 'bold', fontSize: '1rem' }}>
                 {currentTime.toLocaleTimeString()}
               </Typography>
             </Box>
@@ -910,13 +911,13 @@ const TvRealEntertainment = () => {
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
               <Chip 
                 label={`${activeOrders.length} Total`}
-                size="small"
-                sx={{ bgcolor: '#00d2ff', color: '#000', fontWeight: 'bold', fontSize: '0.8rem' }}
+                size="medium"
+                sx={{ bgcolor: '#00d2ff', color: '#000', fontWeight: 'bold', fontSize: '1rem', py: 2.5 }}
               />
               <Chip 
                 label={`${callingOrders.length} Ready`}
-                size="small"
-                sx={{ bgcolor: '#ff3f34', color: '#fff', fontWeight: 'bold', fontSize: '0.8rem' }}
+                size="medium"
+                sx={{ bgcolor: '#ff3f34', color: '#fff', fontWeight: 'bold', fontSize: '1rem', py: 2.5 }}
               />
             </Stack>
           </Box>
@@ -924,7 +925,7 @@ const TvRealEntertainment = () => {
           {/* Ready/Calling Customers */}
           {callingOrders.length > 0 && (
             <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" sx={{ color: '#ff3f34', mb: 1, fontWeight: 'bold', display: 'block', fontSize: '0.8rem' }}>
+              <Typography variant="body1" sx={{ color: '#ff3f34', mb: 1, fontWeight: 900, display: 'block', fontSize: '1.1rem' }}>
                 🔔 READY NOW (ALL STORES)
               </Typography>
               {callingOrders.map((cust) => (
@@ -935,7 +936,7 @@ const TvRealEntertainment = () => {
 
           {/* Regular Queue */}
           <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 }}>
-            <Typography variant="caption" sx={{ color: '#ccc', mb: 1, fontWeight: 'bold', display: 'block', fontSize: '0.8rem' }}>
+            <Typography variant="body1" sx={{ color: '#ccc', mb: 1, fontWeight: 900, display: 'block', fontSize: '1.1rem' }}>
               WAITING (ALL STORES)
             </Typography>
             
@@ -960,9 +961,9 @@ const TvRealEntertainment = () => {
           </Box>
         </Box>
 
-        {/* Right Side - Real TV Control (70% width) */}
+        {/* Right Side - Real TV Control (60% width) */}
         <Box sx={{ 
-          width: '70%', 
+          width: '60%', 
           display: 'flex', 
           flexDirection: 'column',
           position: 'relative',
@@ -1106,7 +1107,10 @@ const TvRealEntertainment = () => {
               
               {/* TV Content Area */}
               {currentInput === 'youtube' && youtubeVideos.length > 0 ? (
-                <YouTubePlayerIsolated videos={youtubeVideos} />
+                <YouTubePlayerIsolated 
+                  key="youtube-player-stable" 
+                  videos={youtubeVideos} 
+                />
               ) : currentInput === 'youtube' ? (
                 <Box sx={{ textAlign: 'center', p: 4 }}>
                   <YouTubeIcon sx={{ fontSize: 120, color: '#ff0000', mb: 3 }} />

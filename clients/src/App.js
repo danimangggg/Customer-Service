@@ -9,6 +9,7 @@ import UserListPage from './pages/UserAccountPage/UserListPage';
 import EmployeePage from './pages/Performance-tracking/EmployeePage';
 import RegisterCustomer from './pages/Customer-Service/RegisterCustomerPage';
 import TvRegisterList from './pages/Customer-Service/TvRegistrationListPage';
+import CustomerSlideSettings from './components/Customer-Service/CustomerSlideSettings';
 import DashboardCustomer from './pages/Customer-Service/DashboardCS';
 import Picklist from './pages/Customer-Service/Picklist';
 import AllPicklist from './pages/Customer-Service/AllPicklists';
@@ -29,6 +30,9 @@ import facilityManager from './pages/Customer-Service/HealthProgram/FacilityMana
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
 import HPFacilitiesCS from './components/Customer-Service/HealthProgram/HP-Facilities';
 import PIVehicleRequests from './components/Customer-Service/HealthProgram/PIVehicleRequests';
+import TMManager from './components/Customer-Service/HealthProgram/TMManager';
+import EWMGoodsIssue from './components/Customer-Service/HealthProgram/EWMGoodsIssue';
+import Biller from './components/Customer-Service/HealthProgram/Biller';
 import HPDashboard from './pages/Customer-Service/HealthProgram/HPDashboard';
 import DispatchManagement from './components/Transportation/DispatchManagement';
 import DocumentationManagement from './components/Documentation/DocumentationManagement';
@@ -86,6 +90,7 @@ const AppContent = () => {
             <Route path = '/all-employee' Component={EmployeePage} />
             <Route path = '/register-customer' Component={RegisterCustomer} />
             <Route path = '/customer-slide' Component={TvRegisterList} />
+            <Route path = '/customer-slide-settings' Component={CustomerSlideSettings} />
             <Route path = '/customer-dashboard' Component={DashboardCustomer} />
             <Route path = '/picklist/:processId' Component={Picklist} />
             <Route path = '/hp-picklist/:processId' Component={HPPicklist} />
@@ -108,6 +113,9 @@ const AppContent = () => {
             <Route path = '/hp-facilities' Component={HPFacilitiesCS} />
             <Route path = '/hp-dashboard' Component={HPDashboard} />
             <Route path = '/pi-vehicle-requests' Component={PIVehicleRequests} />
+            <Route path = '/tm-manager' Component={TMManager} />
+            <Route path = '/ewm-goods-issue' Component={EWMGoodsIssue} />
+            <Route path = '/biller' Component={Biller} />
             <Route path = '/dispatch-management' Component={DispatchManagement} />
             <Route path = '/documentation-management' Component={DocumentationManagement} />
             <Route path = '/document-followup' Component={DocumentFollowup} />

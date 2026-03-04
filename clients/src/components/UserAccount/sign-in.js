@@ -385,6 +385,14 @@ export default function SignIn() {
           console.log("→ Routing to PI Vehicle Requests - PI Officer HP");
           navigate('/pi-vehicle-requests');
         }
+        else if(jobTitle === "TM Manager"){
+          console.log("→ Routing to TM Manager - TM Manager");
+          navigate('/tm-manager');
+        }
+        else if(jobTitle === "Biller"){
+          console.log("→ Routing to Biller - Biller");
+          navigate('/biller');
+        }
         else if(jobTitle === "Dispatcher"){
           console.log("→ Routing to Dispatch - Dispatcher");
           navigate('/dispatch');

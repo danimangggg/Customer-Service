@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import './disableErrorOverlay'; // Disable error overlay for TV display
 
 // Define a more vibrant Material-UI theme
 const theme = createTheme({

@@ -5,42 +5,73 @@ const jwt = require('jsonwebtoken');
 const User = db.employee;
 
 const login =  async (req, res) => {
-
-        const { user_name, password } = req.body;
-        const user = await User.findOne({ where: { user_name } });
-        if (!user) {
-          return res.status(400).json({ error: 'Invalid username or password' });
+  try {
+    console.log('Login attempt:', req.body);
+    
+    const { user_name, password } = req.body;
+    
+    if (!user_name || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+    
+    console.log('Looking for user:', user_name);
+    const user = await User.findOne({ where: { user_name } });
+    
+    if (!user) {
+      console.log('User not found:', user_name);
+      return res.status(400).json({ error: 'Invalid username or password' });
+    }
+    
+    console.log('User found, checking password');
+    const isMatch = await bcrypt.compare(password, user.password);
+   
+    if (!isMatch) {
+      console.log('Password mismatch for user:', user_name);
+      return res.status(400).json({ error: 'Invalid username or password' });
+    }
+    
+    console.log('Password match, getting store info');
+    
+    // Get store name from stores table if store_id exists
+    let storeName = null;
+    if (user.store_id) {
+      try {
+        const [storeResult] = await db.sequelize.query(
+          'SELECT store_name FROM stores WHERE id = ?',
+          { replacements: [user.store_id] }
+        );
+        if (storeResult && storeResult.length > 0) {
+          storeName = storeResult[0].store_name;
         }
-        console.log(user.password)
-        const isMatch = await bcrypt.compare(password, user.password);
-       
-        if (!isMatch) {
-          return res.status(400).json({ error: 'Invalid username or password' });
-        }
-        
-        // Get store name from stores table if store_id exists
-        let storeName = null;
-        if (user.store_id) {
-          const [storeResult] = await db.sequelize.query(
-            'SELECT store_name FROM stores WHERE id = ?',
-            { replacements: [user.store_id] }
-          );
-          if (storeResult && storeResult.length > 0) {
-            storeName = storeResult[0].store_name;
-          }
-        }
-        
-        const token = jwt.sign({ id: user.id }, 'your_jwt_secret', { expiresIn: '1h' });
-        res.json({ 
-          message: 'Login successful', 
-          token, 
-          UserId: user.id, 
-          FullName: user.full_name, 
-          AccountType: user.account_type, 
-          JobTitle: user.jobTitle, 
-          store: storeName
-        });
-     
+      } catch (storeError) {
+        console.error('Store query error:', storeError.message);
+        // Continue without store name
+      }
+    }
+    
+    console.log('Creating JWT token');
+    const jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret';
+    const token = jwt.sign({ id: user.id }, jwtSecret, { expiresIn: '1h' });
+    
+    console.log('Login successful for user:', user_name);
+    res.json({ 
+      message: 'Login successful', 
+      token, 
+      UserId: user.id, 
+      FullName: user.full_name, 
+      AccountType: user.account_type, 
+      JobTitle: user.jobTitle, 
+      store: storeName
+    });
+    
+  } catch (error) {
+    console.error('Login error:', error.message);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Login failed', 
+      details: error.message 
+    });
+  }
 }
 
 module.exports = {

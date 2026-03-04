@@ -60,7 +60,10 @@ const AllPicklists = () => {
         axios.get(`${api_url}/api/get-employee`),
       ]);
 
-      let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+      // Handle both old format (array) and new format (object with data property)
+      let allPicklists = Array.isArray(pickRes.data) 
+        ? pickRes.data 
+        : (pickRes.data.data || []);
 
       // ✅ Remove completed picklists
       allPicklists = allPicklists.filter(
@@ -135,7 +138,10 @@ const AllPicklists = () => {
     const interval = setInterval(async () => {
       try {
         const pickRes = await axios.get(`${api_url}/api/getPicklists`);
-        let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+        // Handle both old format (array) and new format (object with data property)
+        let allPicklists = Array.isArray(pickRes.data) 
+          ? pickRes.data 
+          : (pickRes.data.data || []);
 
         // Remove completed
         allPicklists = allPicklists.filter(

@@ -48,7 +48,7 @@ const PickListDetail = () => {
 
   const [odnInput, setOdnInput] = useState('');
   const [odnOptions, setOdnOptions] = useState([]);
-  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfFiles, setPdfFiles] = useState([]); // Changed to array for multiple files
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploading, setUploading] = useState(false);
   const [submittedPicklists, setSubmittedPicklists] = useState([]);
@@ -100,7 +100,10 @@ const PickListDetail = () => {
       setFacility(fac || null);
 
       const picklistsRes = await axios.get(`${api_url}/api/getPicklists`);
-      let allPicklists = Array.isArray(picklistsRes.data) ? picklistsRes.data : [];
+      // Handle both old format (array) and new format (object with data property)
+      let allPicklists = Array.isArray(picklistsRes.data) 
+        ? picklistsRes.data 
+        : (picklistsRes.data.data || []);
 
       // ✅ Filter by store AND by process_id for EWM Officers
       let filtered = allPicklists.filter(
@@ -121,9 +124,12 @@ const PickListDetail = () => {
       const empRes = await axios.get(`${api_url}/api/get-employee`);
       const employees = Array.isArray(empRes.data) ? empRes.data : [];
       const wimOps = employees.filter(
-        emp =>
-          emp.jobTitle?.toLowerCase() === 'wim operator' &&
-          String(emp.store || '').toUpperCase() === userStore
+        emp => {
+          const isWimOperator = emp.jobTitle?.toLowerCase() === 'wim operator';
+          const empStoreName = emp.store?.store_name || '';
+          const storeMatch = empStoreName.toUpperCase() === userStore;
+          return isWimOperator && storeMatch;
+        }
       );
       setOperators(wimOps);
     } catch (err) {
@@ -139,32 +145,37 @@ const PickListDetail = () => {
   }, [fetchAll]);
 
   const handlePdfChange = (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (f) {
-      setPdfFile(f);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Convert FileList to Array
+      const filesArray = Array.from(files);
+      setPdfFiles(filesArray);
       setUploadMessage('');
     }
   };
 
   const handleSubmit = async (ev) => {
     ev.preventDefault();
-    if (!odnInput || !pdfFile || !selectedOperator) {
-      setUploadMessage('Please provide ODN, PDF, and select a WIM Operator.');
+    if (!odnInput || pdfFiles.length === 0 || !selectedOperator) {
+      setUploadMessage('Please provide ODN, at least one PDF, and select a WIM Operator.');
       return;
     }
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('odn', odnInput);
-      formData.append('attachment', pdfFile);
-      formData.append('process_id', process_id);
-      formData.append('store', userStore);
-      formData.append('operator_id', selectedOperator);
+      // Upload each PDF file separately
+      for (let i = 0; i < pdfFiles.length; i++) {
+        const formData = new FormData();
+        formData.append('odn', odnInput);
+        formData.append('attachment', pdfFiles[i]);
+        formData.append('process_id', process_id);
+        formData.append('store', userStore);
+        formData.append('operator_id', selectedOperator);
 
-      const res = await axios.post(`${api_url}/api/uploadPicklist`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+        await axios.post(`${api_url}/api/uploadPicklist`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
 
       // Record service time for EWM Officer with store
       try {
@@ -173,7 +184,7 @@ const PickListDetail = () => {
           serviceUnit: `EWM ${userStore}`,
           endTime: formatTimestamp(),
           isHP: false,
-          notes: `Uploaded picklist for ODN ${odnInput}, assigned to WIM operator`
+          notes: `Uploaded ${pdfFiles.length} picklist(s) for ODN ${odnInput}, assigned to WIM operator`
         });
         console.log(`✅ EWM ${userStore} service time recorded`);
       } catch (err) {
@@ -184,11 +195,11 @@ const PickListDetail = () => {
       Swal.fire({
         icon: 'success',
         title: 'Uploaded',
-        text: res.data?.message || 'Picklist uploaded successfully',
+        text: `${pdfFiles.length} picklist(s) uploaded successfully`,
       });
 
       await fetchAll();
-      setPdfFile(null);
+      setPdfFiles([]);
       setSelectedOperator('');
     } catch (err) {
       console.error('upload error', err);
@@ -219,6 +230,48 @@ const PickListDetail = () => {
     } catch (err) {
       console.error('delete error', err);
       Swal.fire({ icon: 'error', title: 'Delete failed', text: 'Could not delete picklist.' });
+    }
+  };
+
+  const handleCompletePicklist = async (id) => {
+    console.log('🔵 Complete button clicked for picklist ID:', id);
+    
+    const result = await Swal.fire({
+      title: 'Complete Picklist?',
+      text: 'Mark this picklist as completed?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, complete it',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!result.isConfirmed) {
+      console.log('❌ User cancelled completion');
+      return;
+    }
+
+    try {
+      console.log('📤 Sending PUT request to:', `${api_url}/api/completePicklist/${id}`);
+      const response = await axios.put(`${api_url}/api/completePicklist/${id}`);
+      console.log('✅ Server response:', response.data);
+      
+      Swal.fire({ 
+        icon: 'success', 
+        title: 'Completed', 
+        text: 'Picklist marked as completed.' 
+      });
+      
+      // Remove from list since we filter out completed picklists
+      setSubmittedPicklists(prev => prev.filter(p => p.id !== id));
+      console.log('✅ Picklist removed from local list');
+    } catch (err) {
+      console.error('❌ Complete error:', err);
+      console.error('Error response:', err.response?.data);
+      Swal.fire({ 
+        icon: 'error', 
+        title: 'Failed', 
+        text: err.response?.data?.message || 'Could not complete picklist.' 
+      });
     }
   };
 
@@ -490,16 +543,23 @@ const PickListDetail = () => {
                           }
                         }}
                       >
-                        {operators.map((op) => (
-                          <MenuItem key={op.id} value={op.id}>
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                              <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
-                                <PersonIcon fontSize="small" />
-                              </Avatar>
-                              <span>{op.full_name} ({op.store})</span>
-                            </Stack>
-                          </MenuItem>
-                        ))}
+                        {operators.map((op) => {
+                          // Count assigned picklists for this operator
+                          const assignedCount = submittedPicklists.filter(
+                            p => Number(p.operator_id) === Number(op.id)
+                          ).length;
+                          
+                          return (
+                            <MenuItem key={op.id} value={op.id}>
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <Avatar sx={{ width: 24, height: 24, bgcolor: 'primary.main' }}>
+                                  <PersonIcon fontSize="small" />
+                                </Avatar>
+                                <span>{op.full_name} ({assignedCount})</span>
+                              </Stack>
+                            </MenuItem>
+                          );
+                        })}
                       </TextField>
                     </Grid>
 
@@ -511,18 +571,29 @@ const PickListDetail = () => {
                         className="upload-button"
                         sx={{ mb: 2 }}
                       >
-                        Choose PDF File
-                        <input type="file" accept=".pdf" hidden onChange={handlePdfChange} />
+                        Choose PDF Files (Multiple)
+                        <input type="file" accept=".pdf" multiple hidden onChange={handlePdfChange} />
                       </Button>
 
-                      {pdfFile && (
-                        <Chip
-                          icon={<PictureAsPdfIcon />}
-                          label={`Selected: ${pdfFile.name}`}
-                          color="success"
-                          variant="filled"
-                          sx={{ ml: 2, borderRadius: 2 }}
-                        />
+                      {pdfFiles.length > 0 && (
+                        <Box sx={{ ml: 2, display: 'inline-block' }}>
+                          {pdfFiles.map((file, index) => (
+                            <Chip
+                              key={index}
+                              icon={<PictureAsPdfIcon />}
+                              label={file.name}
+                              color="success"
+                              variant="filled"
+                              sx={{ mr: 1, mb: 1, borderRadius: 2 }}
+                              onDelete={() => {
+                                setPdfFiles(prev => prev.filter((_, i) => i !== index));
+                              }}
+                            />
+                          ))}
+                          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
+                            {pdfFiles.length} file(s) selected
+                          </Typography>
+                        </Box>
                       )}
                     </Grid>
 
@@ -609,6 +680,17 @@ const PickListDetail = () => {
                         >
                           View
                         </Button>
+                        {canUpload && (
+                          <Button 
+                            variant="contained" 
+                            color="success" 
+                            startIcon={<CheckCircleIcon />} 
+                            onClick={() => handleCompletePicklist(item.id)}
+                            sx={{ borderRadius: 2 }}
+                          >
+                            Complete
+                          </Button>
+                        )}
                         <Button 
                           variant="outlined" 
                           color="error" 

@@ -23,10 +23,18 @@ const CreateEmployee = async (req, res) => {
 // Get all employees
 const getEmployees = async (req, res) => {
   try {
-    const employees = await Employee.findAll();
+    const employees = await Employee.findAll({
+      include: [{
+        model: db.store,
+        as: 'store',
+        attributes: ['id', 'store_name'],
+        required: false
+      }]
+    });
     res.json(employees);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch employees', error });
+    console.error('Get employees error:', error);
+    res.status(500).json({ message: 'Failed to fetch employees', error: error.message });
   }
 };
 

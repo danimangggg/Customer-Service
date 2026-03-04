@@ -227,6 +227,12 @@ const OutstandingCustomers = () => {
                     c.next_service_point?.toLowerCase() === 'ewm' &&
                     c.odn_numbers // Has ODNs for this store
                 );
+                // Sort by started_at: oldest first (newer at bottom)
+                filtered.sort((a, b) => {
+                    const dateA = new Date(a.started_at || 0);
+                    const dateB = new Date(b.started_at || 0);
+                    return dateA - dateB; // Ascending order: oldest first
+                });
             } else {
                 filtered = customers.filter(c => c.next_service_point?.toLowerCase() === normalizedJobTitle);
             }
