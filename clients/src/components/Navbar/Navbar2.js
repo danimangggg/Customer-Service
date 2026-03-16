@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import {
   Drawer,
   List,
@@ -45,7 +46,8 @@ import {
   ExpandLess,
   ExpandMore,
   Receipt,
-  Security
+  Security,
+  Print
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -53,9 +55,27 @@ const drawerWidth = 260;
 const Sidebar = () => {
   const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tmSettingsOpen, setTmSettingsOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
 
-  const signOut = () => {
+  const signOut = async () => {
+    const jobTitle = localStorage.getItem('JobTitle');
+    const userId = localStorage.getItem('UserId') || localStorage.getItem('EmployeeID');
+    
+    // If Gate Keeper, deactivate their sessions
+    if (jobTitle === 'Gate Keeper' && userId) {
+      try {
+        const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
+        await axios.post(`${API_URL}/api/gate-keeper-sessions/logout`, {
+          user_id: userId
+        });
+        console.log('✅ Gate Keeper sessions deactivated');
+      } catch (error) {
+        console.error('❌ Error deactivating Gate Keeper sessions:', error);
+        // Continue with logout even if this fails
+      }
+    }
+    
     localStorage.clear();
     window.location.href = '/';
   };
@@ -79,11 +99,11 @@ const Sidebar = () => {
     borderRadius: 2,
     mx: 1,
     mb: 1,
-    bgcolor: isActivePath(path) ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
+    bgcolor: isActivePath(path) ? 'rgba(198, 40, 40, 0.12)' : 'transparent',
     borderLeft: isActivePath(path) ? 4 : 0,
-    borderColor: isActivePath(path) ? '#1976d2' : 'transparent',
+    borderColor: isActivePath(path) ? '#c62828' : 'transparent',
     '&:hover': {
-      bgcolor: 'rgba(25, 118, 210, 0.1)',
+      bgcolor: 'rgba(198, 40, 40, 0.08)',
       transform: 'translateX(4px)',
       transition: 'all 0.2s ease'
     },
@@ -109,22 +129,22 @@ const Sidebar = () => {
           '& .MuiDrawer-paper': {
             width: drawerWidth,
             boxSizing: 'border-box',
-            bgcolor: '#1a1a2e',
-            background: 'linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-            color: 'white',
+            bgcolor: '#ffffff',
+            background: '#ffffff',
+            color: '#1a1a1a',
             overflowX: 'hidden',
             position: 'fixed',
             height: '100vh',
-            boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
-            border: 'none',
+            boxShadow: '4px 0 20px rgba(198,40,40,0.12)',
+            borderRight: '2px solid #c62828',
             '&::-webkit-scrollbar': {
               width: '6px',
             },
             '&::-webkit-scrollbar-track': {
-              background: 'rgba(255,255,255,0.1)',
+              background: '#f5f5f5',
             },
             '&::-webkit-scrollbar-thumb': {
-              background: 'rgba(255,255,255,0.3)',
+              background: 'rgba(198,40,40,0.3)',
               borderRadius: '3px',
             },
             // Global text wrapping for all menu items
@@ -138,7 +158,8 @@ const Sidebar = () => {
                 textOverflow: 'ellipsis',
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical'
+                WebkitBoxOrient: 'vertical',
+                color: '#1a1a1a',
               }
             }
           },
@@ -146,11 +167,10 @@ const Sidebar = () => {
       >
         {/* Enhanced Header */}
         <Box sx={{ 
-          bgcolor: 'rgba(107, 66, 38, 0.9)',
-          backdropFilter: 'blur(10px)',
+          bgcolor: '#c62828',
           px: 2,
           py: 0.5,
-          borderBottom: '1px solid rgba(255,255,255,0.1)'
+          borderBottom: '1px solid rgba(198,40,40,0.3)'
         }}>
           <Stack direction="column" alignItems="center" spacing={-2}>
             <Box
@@ -166,10 +186,11 @@ const Sidebar = () => {
             />
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2" fontWeight="bold" sx={{ 
-                fontSize: '0.85rem',
+                fontSize: '0.95rem',
                 lineHeight: 1.2,
                 whiteSpace: 'normal',
-                wordWrap: 'break-word'
+                wordWrap: 'break-word',
+                color: 'white'
               }}>
                 EPSS Monitoring Tool
               </Typography>
@@ -180,8 +201,8 @@ const Sidebar = () => {
        <List sx={{ pt: 2, px: 1 }}>
          {/* DASHBOARDS SECTION - AT THE TOP */}
          
-         {/* HP Dashboard - for HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, HP Dispatchers, TM Managers, and Admin */}
-         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || isAdmin) && (
+         {/* HP Dashboard - for HP Officers, PI Officers, Documentation Officers, Quality Evaluators, HP Dispatchers, TM Managers, and Admin */}
+         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || isAdmin) && (
            <MenuTooltip title={"HP Dashboard"}>
              <ListItem 
                button 
@@ -190,7 +211,7 @@ const Sidebar = () => {
                sx={getActiveStyles('/hp-dashboard')}
              >
                <ListItemIcon>
-                 <Dashboard sx={{ color: '#4caf50' }} />
+                 <Dashboard sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"HP Dashboard"} 
@@ -207,9 +228,9 @@ const Sidebar = () => {
 
          {/* MAIN NAVIGATION ITEMS */}
 
-         {/* Outstanding Process (HP Facilities) - for HP Officers */}
-         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP") && (
-           <MenuTooltip title={"Outstanding Process (HP)"}>
+         {/* Outstanding Process - for O2C Officer - HP (goes to hp-facilities) */}
+         {jobTitle === "O2C Officer - HP" && (
+           <MenuTooltip title={"Outstanding Process"}>
              <ListItem 
                button 
                component={Link} 
@@ -217,19 +238,31 @@ const Sidebar = () => {
                sx={getActiveStyles('/hp-facilities')}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#4caf50' }} />
+                 <Assignment sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Outstanding Process (HP)"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/hp-facilities') ? 600 : 500,
-                     fontSize: '0.85rem',
-                     lineHeight: 1.2,
-                     whiteSpace: 'normal',
-                     wordWrap: 'break-word'
-                   } 
-                 }} 
+                 primary={"Outstanding Process"} 
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/hp-facilities') ? 600 : 500, fontSize: '0.95rem' } }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Outstanding - for EWM Officer - HP (combined Outstanding + Goods Issue) */}
+         {jobTitle === "EWM Officer - HP" && (
+           <MenuTooltip title={"Outstanding"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/ewm-outstanding"
+               sx={getActiveStyles('/ewm-outstanding')}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#c62828' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Outstanding"} 
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/ewm-outstanding') ? 600 : 500, fontSize: '0.95rem' } }} 
                />
              </ListItem>
            </MenuTooltip>
@@ -245,14 +278,14 @@ const Sidebar = () => {
                sx={getActiveStyles('/outstandingProcess')}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#ff9800' }} />
+                 <Assignment sx={{ color: '#e53935' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: isActivePath('/outstandingProcess') ? 600 : 500,
-                     fontSize: '0.85rem',
+                     fontSize: '0.95rem',
                      lineHeight: 1.2,
                      whiteSpace: 'normal',
                      wordWrap: 'break-word'
@@ -273,14 +306,14 @@ const Sidebar = () => {
                sx={getActiveStyles('/outstandingProcess')}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#4caf50' }} />
+                 <Assignment sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: isActivePath('/outstandingProcess') ? 600 : 500,
-                     fontSize: '0.85rem',
+                     fontSize: '0.95rem',
                      lineHeight: 1.2,
                      whiteSpace: 'normal',
                      wordWrap: 'break-word'
@@ -301,7 +334,7 @@ const Sidebar = () => {
                sx={getActiveStyles('/register-customer')}
              >
                <ListItemIcon>
-                 <AddCircleOutline sx={{ color: '#4caf50' }} />
+                 <AddCircleOutline sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Register Customer"} 
@@ -329,7 +362,7 @@ const Sidebar = () => {
                sx={getActiveStyles('/queue-manager')}
              >
                <ListItemIcon>
-                 <Store sx={{ color: '#4caf50' }} />
+                 <Store sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Customer Availability"} 
@@ -359,7 +392,7 @@ const Sidebar = () => {
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -367,7 +400,7 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#ff9800' }} />
+                 <Assignment sx={{ color: '#e53935' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 
@@ -394,7 +427,7 @@ const Sidebar = () => {
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -402,7 +435,7 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <LocalShipping sx={{ color: '#4caf50' }} />
+                 <LocalShipping sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Dispatch Management"} 
@@ -417,19 +450,19 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Documentation Management - for Documentation Officer */}
-         {jobTitle === "Documentation Officer" && (
-           <MenuTooltip title={"Documentation Management"}>
+         {/* HP Documentation - for Documentation Officer - HP */}
+         {jobTitle === "Documentation Officer - HP" && (
+           <MenuTooltip title={"HP Documentation"}>
              <ListItem 
                button 
                component={Link} 
-               to="/documentation-management"
+               to="/documentation-hp"
                sx={{
                  borderRadius: 2,
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -437,10 +470,10 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <Description sx={{ color: '#9c27b0' }} />
+                 <Description sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Doc Management"} 
+                 primary={"HP Documentation"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
@@ -448,41 +481,6 @@ const Sidebar = () => {
                      whiteSpace: 'nowrap',
                      overflow: 'hidden',
                      textOverflow: 'ellipsis'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
-         {/* Document Follow-up - for Documentation Follower */}
-         {jobTitle === "Documentation Follower" && (
-           <MenuTooltip title={"Document Follow-up"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/document-followup"
-               sx={{
-                 borderRadius: 2,
-                 mx: 1,
-                 mb: 1,
-                 '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
-                   transform: 'translateX(4px)',
-                   transition: 'all 0.2s ease'
-                 },
-                 transition: 'all 0.2s ease'
-               }}
-             >
-               <ListItemIcon>
-                 <Assignment sx={{ color: '#2196f3' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"Document Follow-up"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: 500,
-                     fontSize: '0.95rem'
                    } 
                  }} 
                />
@@ -502,7 +500,7 @@ const Sidebar = () => {
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -510,7 +508,7 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#4caf50' }} />
+                 <Assignment sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Quality Evaluation"} 
@@ -537,7 +535,7 @@ const Sidebar = () => {
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -545,14 +543,14 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#ff9800' }} />
+                 <Assignment sx={{ color: '#e53935' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Outstanding Process"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
-                     fontSize: '0.85rem',
+                     fontSize: '0.95rem',
                      lineHeight: 1.2,
                      whiteSpace: 'normal',
                      wordWrap: 'break-word'
@@ -573,7 +571,7 @@ const Sidebar = () => {
                sx={getActiveStyles('/exit-permit')}
              >
                <ListItemIcon>
-                 <Receipt sx={{ color: '#4caf50' }} />
+                 <Receipt sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Exit Permit"} 
@@ -598,7 +596,7 @@ const Sidebar = () => {
                sx={getActiveStyles('/gate-keeper')}
              >
                <ListItemIcon>
-                 <Security sx={{ color: '#2196f3' }} />
+                 <Security sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Security"} 
@@ -625,7 +623,7 @@ const Sidebar = () => {
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -633,7 +631,7 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <Inventory sx={{ color: '#9c27b0' }} />
+                 <Inventory sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Picklists"} 
@@ -660,7 +658,7 @@ const Sidebar = () => {
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -668,7 +666,7 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <Description sx={{ color: '#ff9800' }} />
+                 <Description sx={{ color: '#e53935' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Invoice Management"} 
@@ -685,7 +683,7 @@ const Sidebar = () => {
 
          {/* TV Main Menu - for TV Operator only */}
          {jobTitle === "TV Operator" && (
-           <MenuTooltip title={"TV Main Menu"}>
+           <MenuTooltip title={"TV"}>
              <ListItem 
                button 
                component={Link} 
@@ -695,7 +693,7 @@ const Sidebar = () => {
                  mx: 1,
                  mb: 1,
                  '&:hover': {
-                   bgcolor: 'rgba(25, 118, 210, 0.1)',
+                   bgcolor: 'rgba(198, 40, 40, 0.08)',
                    transform: 'translateX(4px)',
                    transition: 'all 0.2s ease'
                  },
@@ -703,10 +701,10 @@ const Sidebar = () => {
                }}
              >
                <ListItemIcon>
-                 <Tv sx={{ color: '#2196f3' }} />
+                 <Tv sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"TV Main Menu"} 
+                 primary={"TV"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
@@ -729,9 +727,9 @@ const Sidebar = () => {
                    borderRadius: 2,
                    mx: 1,
                    mb: 1,
-                   bgcolor: settingsOpen ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
+                   bgcolor: settingsOpen ? 'rgba(198, 40, 40, 0.12)' : 'transparent',
                    '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     bgcolor: 'rgba(198, 40, 40, 0.08)',
                      transform: 'translateX(4px)',
                      transition: 'all 0.2s ease'
                    },
@@ -777,7 +775,7 @@ const Sidebar = () => {
                        sx={{ 
                          '& .MuiListItemText-primary': { 
                            fontWeight: isActivePath('/settings/organization-profile') ? 600 : 500,
-                           fontSize: '0.85rem',
+                           fontSize: '0.95rem',
                            lineHeight: 1.2,
                            whiteSpace: 'normal',
                            wordWrap: 'break-word'
@@ -801,14 +799,14 @@ const Sidebar = () => {
                      }}
                    >
                      <ListItemIcon>
-                       <Store sx={{ color: '#9c27b0' }} />
+                       <Store sx={{ color: '#c62828' }} />
                      </ListItemIcon>
                      <ListItemText 
                        primary={"Store Management"} 
                        sx={{ 
                          '& .MuiListItemText-primary': { 
                            fontWeight: isActivePath('/settings/store-management') ? 600 : 500,
-                           fontSize: '0.85rem',
+                           fontSize: '0.95rem',
                            lineHeight: 1.2,
                            whiteSpace: 'normal',
                            wordWrap: 'break-word'
@@ -832,14 +830,14 @@ const Sidebar = () => {
                      }}
                    >
                      <ListItemIcon>
-                       <ManageAccounts sx={{ color: '#9c27b0' }} />
+                       <ManageAccounts sx={{ color: '#c62828' }} />
                      </ListItemIcon>
                      <ListItemText 
                        primary={"User Management"} 
                        sx={{ 
                          '& .MuiListItemText-primary': { 
                            fontWeight: isActivePath('/settings/user-management') ? 600 : 500,
-                           fontSize: '0.85rem',
+                           fontSize: '0.95rem',
                            lineHeight: 1.2,
                            whiteSpace: 'normal',
                            wordWrap: 'break-word'
@@ -863,14 +861,14 @@ const Sidebar = () => {
                      }}
                    >
                      <ListItemIcon>
-                       <Group sx={{ color: '#f44336' }} />
+                       <Group sx={{ color: '#c62828' }} />
                      </ListItemIcon>
                      <ListItemText 
                        primary={"Account Types & Roles"} 
                        sx={{ 
                          '& .MuiListItemText-primary': { 
                            fontWeight: isActivePath('/settings/account-types') ? 600 : 500,
-                           fontSize: '0.85rem',
+                           fontSize: '0.95rem',
                            lineHeight: 1.2,
                            whiteSpace: 'normal',
                            wordWrap: 'break-word'
@@ -894,7 +892,7 @@ const Sidebar = () => {
                      }}
                    >
                      <ListItemIcon>
-                       <VpnKey sx={{ color: '#ff9800' }} />
+                       <VpnKey sx={{ color: '#e53935' }} />
                      </ListItemIcon>
                      <ListItemText 
                        primary={"Reset Password"} 
@@ -922,42 +920,17 @@ const Sidebar = () => {
              <ListItem 
                button 
                component={Link} 
-               to="/transportation/route-management"
-               sx={getActiveStyles('/transportation/route-management')}
+               to="/tm-manager"
+               sx={getActiveStyles('/tm-manager')}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#607d8b' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"Route Assignment"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/transportation/route-management') ? 600 : 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
-         {/* Routes - TM Manager only */}
-         {jobTitle === "TM Manager" && (
-           <MenuTooltip title={"Routes"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/transportation/routes"
-               sx={getActiveStyles('/transportation/routes')}
-             >
-               <ListItemIcon>
-                 <Route sx={{ color: '#2196f3' }} />
+                 <LocalShipping sx={{ color: '#e53935' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"Routes"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/transportation/routes') ? 600 : 500,
+                     fontWeight: isActivePath('/tm-manager') ? 600 : 500,
                      fontSize: '0.95rem'
                    } 
                  }} 
@@ -966,51 +939,88 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Vehicle Management - TM Manager only */}
+         {/* Settings (Routes, Vehicles, HP Facilities) - TM Manager only */}
          {jobTitle === "TM Manager" && (
-           <MenuTooltip title={"Vehicle Management"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/transportation/vehicle-management"
-               sx={getActiveStyles('/transportation/vehicle-management')}
-             >
-               <ListItemIcon>
-                 <DirectionsCar sx={{ color: '#ff9800' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"Vehicle Management"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/transportation/vehicle-management') ? 600 : 500,
-                     fontSize: '0.85rem',
-                     lineHeight: 1.2,
-                     whiteSpace: 'normal',
-                     wordWrap: 'break-word'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
+           <>
+             <MenuTooltip title={"Settings"}>
+               <ListItem
+                 button
+                 onClick={() => setTmSettingsOpen(!tmSettingsOpen)}
+                 sx={{
+                   borderRadius: 2,
+                   mx: 1,
+                   mb: 1,
+                   bgcolor: tmSettingsOpen ? 'rgba(198, 40, 40, 0.12)' : 'transparent',
+                   '&:hover': { bgcolor: 'rgba(198, 40, 40, 0.08)' }
+                 }}
+               >
+                 <ListItemIcon>
+                   <Settings sx={{ color: '#607d8b' }} />
+                 </ListItemIcon>
+                 <ListItemText
+                   primary={"Settings"}
+                   sx={{ '& .MuiListItemText-primary': { fontWeight: tmSettingsOpen ? 600 : 500, fontSize: '0.95rem' } }}
+                 />
+                 {tmSettingsOpen ? <ExpandLess /> : <ExpandMore />}
+               </ListItem>
+             </MenuTooltip>
+
+             <Collapse in={tmSettingsOpen} timeout="auto" unmountOnExit>
+               <List component="div" disablePadding>
+
+                 <MenuTooltip title={"Routes"}>
+                   <ListItem button component={Link} to="/transportation/routes"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/routes') }}>
+                     <ListItemIcon><Route sx={{ color: '#c62828' }} /></ListItemIcon>
+                     <ListItemText primary={"Routes"}
+                       sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/routes') ? 600 : 500, fontSize: '0.95rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+
+                 <MenuTooltip title={"Vehicles"}>
+                   <ListItem button component={Link} to="/transportation/vehicle-management"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/vehicle-management') }}>
+                     <ListItemIcon><DirectionsCar sx={{ color: '#e53935' }} /></ListItemIcon>
+                     <ListItemText primary={"Vehicles"}
+                       sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/vehicle-management') ? 600 : 500, fontSize: '0.95rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+
+                 <MenuTooltip title={"HP Facilities"}>
+                   <ListItem button component={Link} to="/transportation/hp-facilities"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/hp-facilities') }}>
+                     <ListItemIcon><LocalHospital sx={{ color: '#c62828' }} /></ListItemIcon>
+                     <ListItemText primary={"HP Facilities"}
+                       sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/hp-facilities') ? 600 : 500, fontSize: '0.95rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+
+               </List>
+             </Collapse>
+           </>
          )}
 
-         {/* HP Facilities - TM Manager only */}
-         {jobTitle === "TM Manager" && (
-           <MenuTooltip title={"HP Facilities"}>
+
+
+
+
+         {/* Biller - for Biller only */}
+         {jobTitle === "Biller" && (
+           <MenuTooltip title={"Biller"}>
              <ListItem 
                button 
                component={Link} 
-               to="/transportation/hp-facilities"
-               sx={getActiveStyles('/transportation/hp-facilities')}
+               to="/biller"
+               sx={getActiveStyles('/biller')}
              >
                <ListItemIcon>
-                 <LocalHospital sx={{ color: '#4caf50' }} />
+                 <Print sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"HP Facilities"} 
+                 primary={"Biller"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/transportation/hp-facilities') ? 600 : 500,
+                     fontWeight: isActivePath('/biller') ? 600 : 500,
                      fontSize: '0.95rem'
                    } 
                  }} 
@@ -1021,8 +1031,8 @@ const Sidebar = () => {
 
 
 
-         {/* Reports Menu - for Admin, Manager, Coordinator (shows both HP and RDF) */}
-         {(isAdmin || jobTitle === "Coordinator" || jobTitle === "Manager") && (
+         {/* Reports - for Admin (collapsible) */}
+         {isAdmin && (
            <>
              <MenuTooltip title={"Reports"}>
                <ListItem 
@@ -1032,9 +1042,9 @@ const Sidebar = () => {
                    borderRadius: 2,
                    mx: 1,
                    mb: 1,
-                   bgcolor: reportsOpen ? 'rgba(25, 118, 210, 0.15)' : 'transparent',
+                   bgcolor: reportsOpen ? 'rgba(198, 40, 40, 0.12)' : 'transparent',
                    '&:hover': {
-                     bgcolor: 'rgba(25, 118, 210, 0.1)',
+                     bgcolor: 'rgba(198, 40, 40, 0.08)',
                      transform: 'translateX(4px)',
                      transition: 'all 0.2s ease'
                    },
@@ -1046,78 +1056,27 @@ const Sidebar = () => {
                  </ListItemIcon>
                  <ListItemText 
                    primary={"Reports"} 
-                   sx={{ 
-                     '& .MuiListItemText-primary': { 
-                       fontWeight: reportsOpen ? 600 : 500,
-                       fontSize: '0.95rem'
-                     } 
-                   }} 
+                   sx={{ '& .MuiListItemText-primary': { fontWeight: reportsOpen ? 600 : 500, fontSize: '0.95rem' } }} 
                  />
                  {reportsOpen ? <ExpandLess /> : <ExpandMore />}
                </ListItem>
              </MenuTooltip>
-             
              <Collapse in={reportsOpen} timeout="auto" unmountOnExit>
                <List component="div" disablePadding>
-                 {/* HP Report */}
                  <MenuTooltip title={"HP Report"}>
-                   <ListItem 
-                     button 
-                     component={Link} 
-                     to="/reports/hp-comprehensive"
-                     sx={{
-                       ...getActiveStyles('/reports/hp-comprehensive'),
-                       pl: 4,
-                       ml: 2,
-                       mr: 1
-                     }}
-                   >
-                     <ListItemIcon>
-                       <BarChart sx={{ color: '#4caf50' }} />
-                     </ListItemIcon>
-                     <ListItemText 
-                       primary={"HP Report"} 
-                       sx={{ 
-                         '& .MuiListItemText-primary': { 
-                           fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500,
-                           fontSize: '0.85rem',
-                           lineHeight: 1.2,
-                           whiteSpace: 'normal',
-                           wordWrap: 'break-word'
-                         } 
-                       }} 
-                     />
+                   <ListItem button component={Link} to="/reports/hp-comprehensive"
+                     sx={{ ...getActiveStyles('/reports/hp-comprehensive'), pl: 4, ml: 2, mr: 1 }}>
+                     <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
+                     <ListItemText primary={"HP Report"}
+                       sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.95rem' } }} />
                    </ListItem>
                  </MenuTooltip>
-
-                 {/* RDF Report */}
                  <MenuTooltip title={"RDF Report"}>
-                   <ListItem 
-                     button 
-                     component={Link} 
-                     to="/reports/rdf"
-                     sx={{
-                       ...getActiveStyles('/reports/rdf'),
-                       pl: 4,
-                       ml: 2,
-                       mr: 1
-                     }}
-                   >
-                     <ListItemIcon>
-                       <BarChart sx={{ color: '#2196f3' }} />
-                     </ListItemIcon>
-                     <ListItemText 
-                       primary={"RDF Report"} 
-                       sx={{ 
-                         '& .MuiListItemText-primary': { 
-                           fontWeight: isActivePath('/reports/rdf') ? 600 : 500,
-                           fontSize: '0.85rem',
-                           lineHeight: 1.2,
-                           whiteSpace: 'normal',
-                           wordWrap: 'break-word'
-                         } 
-                       }} 
-                     />
+                   <ListItem button component={Link} to="/reports/rdf"
+                     sx={{ ...getActiveStyles('/reports/rdf'), pl: 4, ml: 2, mr: 1 }}>
+                     <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
+                     <ListItemText primary={"RDF Report"}
+                       sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.95rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                </List>
@@ -1125,8 +1084,44 @@ const Sidebar = () => {
            </>
          )}
 
+         {/* HP Report - flat, for Manager and Coordinator */}
+         {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
+           <MenuTooltip title={"Dashboard"}>
+             <ListItem button component={Link} to="/manager-dashboard"
+               sx={getActiveStyles('/manager-dashboard')}>
+               <ListItemIcon><Dashboard sx={{ color: '#e91e63' }} /></ListItemIcon>
+               <ListItemText primary={"Dashboard"}
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/manager-dashboard') ? 600 : 500, fontSize: '0.95rem' } }} />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* HP Report - flat, for Manager and Coordinator */}
+         {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
+           <MenuTooltip title={"HP Report"}>
+             <ListItem button component={Link} to="/reports/hp-comprehensive"
+               sx={getActiveStyles('/reports/hp-comprehensive')}>
+               <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
+               <ListItemText primary={"HP Report"}
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.95rem' } }} />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* RDF Report - flat, for Manager and Coordinator */}
+         {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
+           <MenuTooltip title={"RDF Report"}>
+             <ListItem button component={Link} to="/reports/rdf"
+               sx={getActiveStyles('/reports/rdf')}>
+               <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
+               <ListItemText primary={"RDF Report"}
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.95rem' } }} />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
          {/* HP Report - for HP users only */}
-         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") && (
+         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") && (
            <MenuTooltip title={"HP Report"}>
              <ListItem 
                button 
@@ -1135,7 +1130,7 @@ const Sidebar = () => {
                sx={getActiveStyles('/reports/hp-comprehensive')}
              >
                <ListItemIcon>
-                 <BarChart sx={{ color: '#4caf50' }} />
+                 <BarChart sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
                  primary={"HP Report"} 
@@ -1150,23 +1145,96 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* RDF Report - removed for regular users, only visible to Admin/Coordinator/Manager via Reports menu */}
+         {/* RDF Report - for RDF users (non-HP users) */}
+         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "O2C Officer - HP" && jobTitle !== "EWM Officer - HP" && jobTitle !== "PI Officer-HP" && jobTitle !== "Documentation Officer - HP" && jobTitle !== "Quality Evaluator" && jobTitle !== "Dispatcher - HP" && jobTitle !== "TM Manager" && jobTitle !== "Biller" && jobTitle && (
+           <MenuTooltip title={"RDF Report"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/reports/rdf"
+               sx={getActiveStyles('/reports/rdf')}
+             >
+               <ListItemIcon>
+                 <BarChart sx={{ color: '#c62828' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"RDF Report"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/reports/rdf') ? 600 : 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Organization Profile - for Customer Service Officers */}
+         {jobTitle === "Customer Service Officer" && (
+           <MenuTooltip title={"Organization Profile"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/settings/organization-profile"
+               sx={getActiveStyles('/settings/organization-profile')}
+             >
+               <ListItemIcon>
+                 <Business sx={{ color: '#795548' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Organization Profile"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/settings/organization-profile') ? 600 : 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* TV Main Menu - for Admin, Manager, and Coordinator */}
+         {(isAdmin || jobTitle === "Manager" || jobTitle === "Coordinator") && (
+           <MenuTooltip title={"TV"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/tv-main-menu"
+               sx={getActiveStyles('/tv-main-menu')}
+             >
+               <ListItemIcon>
+                 <Tv sx={{ color: '#c62828' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"TV"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/tv-main-menu') ? 600 : 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
 
         </List>
 
-        <Divider sx={{ my: 2, bgcolor: 'rgba(255,255,255,0.1)' }} />
+        <Divider sx={{ my: 2, bgcolor: 'rgba(198,40,40,0.15)' }} />
 
         {/* User Info Section - Bottom */}
-        <Box sx={{ mt: 'auto', px: 2, py: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, mx: 1, mb: 1 }}>
+        <Box sx={{ mt: 'auto', px: 2, py: 2, bgcolor: 'rgba(198,40,40,0.06)', borderRadius: 2, mx: 1, mb: 1 }}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Avatar sx={{ width: 40, height: 40, bgcolor: 'rgba(255,255,255,0.2)' }}>
+            <Avatar sx={{ width: 40, height: 40, bgcolor: '#c62828' }}>
               <AccountCircle />
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" fontWeight="600" noWrap sx={{ fontSize: '0.9rem', mb: 0.5 }}>
+              <Typography variant="body2" fontWeight="600" noWrap sx={{ fontSize: '0.9rem', mb: 0.5, color: '#1a1a1a' }}>
                 {fullName}
               </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.75rem' }}>
+              <Typography variant="caption" sx={{ opacity: 0.7, fontSize: '0.75rem', color: '#1a1a1a' }}>
                 {jobTitle || accountType || 'User'}
               </Typography>
             </Box>
@@ -1186,7 +1254,7 @@ const Sidebar = () => {
                   mx: 1,
                   mb: 1,
                   '&:hover': {
-                    bgcolor: 'rgba(25, 118, 210, 0.1)',
+                    bgcolor: 'rgba(198, 40, 40, 0.08)',
                     transform: 'translateX(4px)',
                     transition: 'all 0.2s ease'
                   },
@@ -1194,7 +1262,7 @@ const Sidebar = () => {
                 }}
               >
                 <ListItemIcon>
-                  <VpnKey sx={{ color: '#4caf50' }} />
+                  <VpnKey sx={{ color: '#c62828' }} />
                 </ListItemIcon>
                 <ListItemText 
                   primary={"Change Password"} 
@@ -1227,7 +1295,7 @@ const Sidebar = () => {
               }}
             >
               <ListItemIcon>
-                <ExitToApp sx={{ color: '#f44336' }} />
+                <ExitToApp sx={{ color: '#c62828' }} />
               </ListItemIcon>
               <ListItemText 
                 primary={token !== "guest" ? "Log Out" : "Log In"} 

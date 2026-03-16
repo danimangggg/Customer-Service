@@ -13,6 +13,7 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import DownloadIcon from '@mui/icons-material/Download';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PeopleIcon from '@mui/icons-material/People';
 import axios from 'axios';
 
@@ -71,21 +72,52 @@ const HPComprehensiveReport = () => {
   const initialEth = getCurrentEthiopianMonth();
   const [selectedMonth, setSelectedMonth] = useState(ethiopianMonths[initialEth.monthIndex]);
   const [selectedYear, setSelectedYear] = useState(initialEth.year);
+  const [processType, setProcessType] = useState('regular');
+
+  // Best Of state — default to This Year so data shows immediately
+  const getThisYearRange = () => {
+    const y = new Date().getFullYear();
+    return { from: `${y}-01-01`, to: `${y}-12-31` };
+  };
+  const getLastWeekRange = () => {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    const mon = new Date(today); mon.setDate(today.getDate() - diff - 7);
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    return { from: mon.toISOString().split('T')[0], to: sun.toISOString().split('T')[0] };
+  };
+  const [bestOfRange, setBestOfRange] = useState(getThisYearRange);
+  const [bestOfData, setBestOfData] = useState(null);
+  const [bestOfLoading, setBestOfLoading] = useState(false);
+
+  const fetchBestOfHP = async (range) => {
+    const { from, to } = range || bestOfRange;
+    try {
+      setBestOfLoading(true);
+      const response = await axios.get(`${api_url}/api/best-of-hp`, {
+        params: { startDate: from, endDate: to }
+      });
+      if (response.data.success) setBestOfData(response.data.data);
+    } catch (err) {
+      console.error('Error fetching HP best of:', err);
+      setBestOfData(null);
+    } finally {
+      setBestOfLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchReportData();
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, processType]);
 
   const fetchReportData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`${api_url}/api/hp-comprehensive-report`, {
-        params: {
-          month: selectedMonth,
-          year: selectedYear
-        }
-      });
+      const params = { month: selectedMonth, year: selectedYear };
+      if (processType) params.process_type = processType;
+      const response = await axios.get(`${api_url}/api/hp-comprehensive-report`, { params });
       setReportData(response.data);
     } catch (err) {
       console.error('Error fetching report:', err);
@@ -97,6 +129,7 @@ const HPComprehensiveReport = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+    if (newValue === 7) fetchBestOfHP(bestOfRange);
   };
 
   const handleExportReport = () => {
@@ -105,80 +138,19 @@ const HPComprehensiveReport = () => {
   };
 
   const tabs = [
+    { label: 'HP Customer Detail Report', icon: <PeopleIcon /> },
     { label: 'ODN/POD Details', icon: <AssignmentIcon /> },
     { label: 'ODN/RRF', icon: <AssessmentIcon /> },
     { label: 'Service Units Detail', icon: <TableChartIcon /> },
     { label: 'Route Analysis', icon: <RouteIcon /> },
-    { label: 'HP Customer Detail Report', icon: <PeopleIcon /> },
     { label: 'All Picklists', icon: <TrendingUpIcon /> },
-    { label: 'Organization Profile', icon: <TimelineIcon /> }
+    { label: 'Organization Profile', icon: <TimelineIcon /> },
+    { label: 'Best Of', icon: <EmojiEventsIcon /> }
   ];
 
   return (
     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
-      {/* Header */}
-      <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-        <CardContent>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                <AssessmentIcon fontSize="large" />
-              </Avatar>
-              <Box>
-                <Typography variant="h4" fontWeight="bold" color="white">
-                  HP Comprehensive Report
-                </Typography>
-                <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                  Health Program Performance Analytics
-                </Typography>
-              </Box>
-            </Stack>
-          </Stack>
-        </CardContent>
-      </Card>
 
-      {/* Filters */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                label="Ethiopian Month"
-                size="small"
-                fullWidth
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              >
-                {ethiopianMonths.map(month => (
-                  <MenuItem key={month} value={month}>{month}</MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                label="Ethiopian Year"
-                size="small"
-                fullWidth
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-              >
-                {[selectedYear - 2, selectedYear - 1, selectedYear, selectedYear + 1].map(year => (
-                  <MenuItem key={year} value={year}>{year}</MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Chip
-                label={`Reporting Period: ${selectedMonth} ${selectedYear}`}
-                color="primary"
-                sx={{ fontWeight: 'bold' }}
-              />
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
 
       {/* Error Alert */}
       {error && (
@@ -215,14 +187,134 @@ const HPComprehensiveReport = () => {
             ))}
           </Tabs>
           <Divider />
+
+          {/* Process Type filter — only for tabs that use reportData (3, 4) */}
+          {[3, 4].includes(activeTab) && (
+            <Box sx={{ px: 3, pt: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                <Typography variant="body2" color="text.secondary">Process Type:</Typography>
+                <TextField
+                  select size="small" value={processType}
+                  onChange={e => setProcessType(e.target.value)}
+                  sx={{ minWidth: 160 }}
+                >
+                  <MenuItem value="">All Types</MenuItem>
+                  <MenuItem value="regular">HP Regular</MenuItem>
+                  <MenuItem value="emergency">Emergency</MenuItem>
+                  <MenuItem value="breakdown">Breakdown</MenuItem>
+                  <MenuItem value="vaccine">Vaccine</MenuItem>
+                </TextField>
+              </Stack>
+            </Box>
+          )}
+
           <CardContent sx={{ p: 3 }}>
-            {activeTab === 0 && <ODNPODDetailReport />}
-            {activeTab === 1 && <ReportOverview data={reportData} />}
-            {activeTab === 2 && <ServiceUnitsDetail data={reportData} />}
-            {activeTab === 3 && <RouteAnalysis data={reportData} />}
-            {activeTab === 4 && <HPCustomerDetailReport />}
+            {activeTab === 0 && <HPCustomerDetailReport />}
+            {activeTab === 1 && <ODNPODDetailReport />}
+            {activeTab === 2 && <ReportOverview />}
+            {activeTab === 3 && <ServiceUnitsDetail data={reportData} />}
+            {activeTab === 4 && <RouteAnalysis data={reportData} />}
             {activeTab === 5 && <AllPicklists />}
             {activeTab === 6 && <OrganizationProfileView />}
+            {activeTab === 7 && (
+              <Box>
+                {/* Date Range Controls */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+                  <TextField
+                    label="From" type="date" size="small"
+                    value={bestOfRange.from}
+                    onChange={e => setBestOfRange(r => ({ ...r, from: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <TextField
+                    label="To" type="date" size="small"
+                    value={bestOfRange.to}
+                    onChange={e => setBestOfRange(r => ({ ...r, to: e.target.value }))}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  <Button variant="contained" size="small" onClick={() => fetchBestOfHP(bestOfRange)}>
+                    Apply
+                  </Button>
+                  {[
+                    { label: 'This Week', fn: () => {
+                      const today = new Date(); const day = today.getDay(); const diff = day === 0 ? 6 : day - 1;
+                      const mon = new Date(today); mon.setDate(today.getDate() - diff);
+                      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                      return { from: mon.toISOString().split('T')[0], to: sun.toISOString().split('T')[0] };
+                    }},
+                    { label: 'Last Week', fn: getLastWeekRange },
+                    { label: 'This Month', fn: () => {
+                      const today = new Date();
+                      return { from: new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0], to: new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0] };
+                    }},
+                    { label: 'This Year', fn: () => { const y = new Date().getFullYear(); return { from: `${y}-01-01`, to: `${y}-12-31` }; }},
+                  ].map(({ label, fn }) => (
+                    <Button key={label} variant="outlined" size="small" onClick={() => { const r = fn(); setBestOfRange(r); fetchBestOfHP(r); }}>
+                      {label}
+                    </Button>
+                  ))}
+                </Box>
+
+                {bestOfLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                    <CircularProgress size={60} />
+                  </Box>
+                ) : bestOfData ? (
+                  <Box>
+                    {/* Header */}
+                    <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+                      <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                        <Typography variant="h3" fontWeight="bold" gutterBottom>🏆 Best Performers 🏆</Typography>
+                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                          {new Date(bestOfData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {' — '}
+                          {new Date(bestOfData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+
+                    <Grid container spacing={4}>
+                      {[
+                        { key: 'o2c',           label: 'O2C Officer - HP',        bg: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',  countLabel: 'Processes Completed' },
+                        { key: 'ewm',           label: 'EWM Officer - HP',        bg: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',  countLabel: 'Goods Issued' },
+                        { key: 'biller',        label: 'Biller',                  bg: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)',  countLabel: 'Billings Completed' },
+                        { key: 'tm',            label: 'TM Manager',              bg: 'linear-gradient(135deg, #56ab2f 0%, #a8e063 100%)',  countLabel: 'Vehicles Assigned' },
+                        { key: 'pi',            label: 'PI Officer',              bg: 'linear-gradient(135deg, #0f3460 0%, #533483 100%)',  countLabel: 'Vehicle Requests' },
+                        { key: 'dispatcher',    label: 'Dispatcher - HP',         bg: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',  countLabel: 'Dispatches Completed' },
+                        { key: 'documentation', label: 'Documentation Officer',   bg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',  countLabel: 'Documents Processed' },
+                        { key: 'quality',       label: 'Quality Evaluator',       bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',  countLabel: 'Evaluations Done' },
+                      ].map(({ key, label, bg, countLabel }) => bestOfData.employees[key] && (
+                        <Grid item xs={12} md={6} key={key}>
+                          <Card sx={{ height: '100%', background: bg, color: 'white', transition: 'transform 0.3s, box-shadow 0.3s', '&:hover': { transform: 'translateY(-8px)', boxShadow: '0 12px 40px rgba(0,0,0,0.3)' } }}>
+                            <CardContent sx={{ p: 4 }}>
+                              <Stack spacing={3} alignItems="center">
+                                <Avatar sx={{ width: 100, height: 100, bgcolor: 'rgba(255,255,255,0.3)', fontSize: '3rem' }}>👤</Avatar>
+                                <Box sx={{ textAlign: 'center' }}>
+                                  <Typography variant="overline" sx={{ opacity: 0.9, fontSize: '0.9rem', color: 'white' }}>{label}</Typography>
+                                  <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ color: 'white' }}>{bestOfData.employees[key].full_name}</Typography>
+                                  <Chip
+                                    label={`${bestOfData.employees[key].process_count} ${countLabel}`}
+                                    sx={{ bgcolor: 'rgba(255,255,255,0.3)', color: 'white', fontWeight: 'bold', fontSize: '1rem', px: 2, py: 3 }}
+                                  />
+                                </Box>
+                              </Stack>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+
+                    {!bestOfData.employees.o2c && !bestOfData.employees.ewm && !bestOfData.employees.biller &&
+                     !bestOfData.employees.tm && !bestOfData.employees.pi && !bestOfData.employees.dispatcher &&
+                     !bestOfData.employees.documentation && !bestOfData.employees.quality && (
+                      <Alert severity="info" sx={{ mt: 4 }}>No employee performance data available for this period.</Alert>
+                    )}
+                  </Box>
+                ) : (
+                  <Alert severity="info">Select a date range and click Apply to load data.</Alert>
+                )}
+              </Box>
+            )}
           </CardContent>
         </Card>
       )}

@@ -30,6 +30,7 @@ const odnController = require('../controllers/CustomerService/odnController');
 const odnRdfController = require('../controllers/CustomerService/odnRdfController');
 const facilityController = require('../controllers/CustomerService/facilityController');
 const locationController = require('../controllers/CustomerService/locationController');
+const gateKeeperSessionController = require('../controllers/gateKeeperSessionController');
 
 //settings
 const vehicleController = require('../controllers/Settings/vehicleController');
@@ -91,6 +92,17 @@ let routes =  (app) => {
   router.put('/api/odns-rdf/update-dispatch-status', odnRdfController.updateDispatchStatus);
   router.put('/api/odns-rdf/update-exit-permit-status', odnRdfController.updateExitPermitStatus);
   router.put('/api/odns-rdf/update-gate-status', odnRdfController.updateGateStatus);
+
+  // Gate Keeper Session routes
+  router.post('/api/gate-keeper-sessions', gateKeeperSessionController.createSession);
+  router.get('/api/gate-keeper-sessions/:user_id', gateKeeperSessionController.getActiveSessions);
+  router.get('/api/gate-keepers-by-store/:store', gateKeeperSessionController.getActiveGateKeepersByStore);
+  router.post('/api/gate-keeper-sessions/logout', gateKeeperSessionController.deactivateSessions);
+
+  // Exit History routes
+  const exitHistoryController = require('../controllers/exitHistoryController');
+  router.get('/api/exit-history/:processId', exitHistoryController.getExitHistory);
+  router.post('/api/exit-history', exitHistoryController.createExitHistory);
 
   // Invoice routes (EWM-Documentation)
   const invoiceController = require('../controllers/CustomerService/invoiceController');
@@ -183,7 +195,9 @@ let routes =  (app) => {
   const piVehicleRequestController = require('../controllers/CustomerService/piVehicleRequestController');
   router.get('/api/pi-vehicle-requests', piVehicleRequestController.getPIVehicleRequests);
   router.get('/api/pi-vehicle-requests/stats', piVehicleRequestController.getPIVehicleRequestStats);
+  router.get('/api/pi-vehicle-requests/by-facility', piVehicleRequestController.getPIVehicleRequestsByFacility);
   router.post('/api/pi-vehicle-requests/request', piVehicleRequestController.submitVehicleRequest);
+  router.post('/api/pi-vehicle-requests/request-by-process', piVehicleRequestController.submitVehicleRequestByProcess);
   router.delete('/api/pi-vehicle-requests/:route_id', piVehicleRequestController.deleteVehicleRequest);
 
   // TM (Transportation Manager) routes
@@ -192,6 +206,12 @@ let routes =  (app) => {
   router.post('/api/tm-notify', tmController.notifyTM);
   router.post('/api/tm-create-freight-order', tmController.createFreightOrder);
   router.post('/api/tm-send-to-ewm', tmController.sendToEWM);
+  router.get('/api/tm-vehicle-assignment-processes', tmController.getVehicleAssignmentProcesses);
+  router.post('/api/tm-assign-vehicle', tmController.assignVehicle);
+
+  // Dispatch routes (HP)
+  const dispatchController = require('../controllers/Transportation/dispatchController');
+  router.put('/api/processes/:id/complete-dispatch', dispatchController.completeDispatchHP);
 
   // EWM Goods Issue routes
   const ewmGoodsIssueController = require('../controllers/HealthProgram/ewmGoodsIssueController');
@@ -205,7 +225,6 @@ let routes =  (app) => {
   router.post('/api/biller-print-documents', billerController.printDocuments);
 
   // Dispatch Management routes
-  const dispatchController = require('../controllers/Transportation/dispatchController');
   router.get('/api/dispatch-routes', dispatchController.getDispatchRoutes);
   router.get('/api/dispatch-routes/stats', dispatchController.getDispatchStats);
   router.put('/api/route-assignments/:id/complete-dispatch', dispatchController.completeDispatch);
@@ -218,6 +237,7 @@ let routes =  (app) => {
   router.get('/api/documentation/available-months', documentationController.getAvailableMonths);
   router.put('/api/odns/:id/pod-confirmation', documentationController.updatePODConfirmation);
   router.put('/api/odns/bulk-pod-confirmation', documentationController.bulkUpdatePODConfirmation);
+  router.put('/api/documentation/facility-pod-confirmation', documentationController.bulkUpdateFacilityPODConfirmation);
 
   // Document Follow-up routes
   router.get('/api/followup-odns', documentFollowupController.getODNsForFollowup);
@@ -264,6 +284,18 @@ let routes =  (app) => {
   const customerDetailReportController = require('../controllers/Reports/customerDetailReportController');
   router.get('/api/customers-detail-report', customerDetailReportController.getCustomersDetailReport);
   router.get('/api/customers/:customerId/service-details', customerDetailReportController.getCustomerServiceDetails);
+
+  // RDF Dashboard Stats
+  const rdfDashboardController = require('../controllers/Reports/rdfDashboardController');
+  router.get('/api/rdf-dashboard-stats', rdfDashboardController.getRDFDashboardStats);
+
+  // Best of Week routes
+  const bestOfController = require('../controllers/Reports/bestOfController');
+  router.get('/api/best-of-week', bestOfController.getBestOfWeek);
+
+  // Best of HP routes
+  const bestOfHPController = require('../controllers/Reports/bestOfHPController');
+  router.get('/api/best-of-hp', bestOfHPController.getBestOfHP);
 
   // Picklist History routes
   const picklistHistoryController = require('../controllers/Reports/picklistHistoryController');

@@ -358,18 +358,7 @@ const HPDashboard = () => {
           />
         </Grid>
 
-        {/* Month-dependent cards */}
-        <Grid item xs={12} sm={6} md={4}>
-          <MetricCard
-            title="Total ODNs"
-            value={data.totalODNs || 0}
-            icon={<Assignment />}
-            color="primary"
-            subtitle="ODNs for selected period"
-            isMonthDependent={true}
-          />
-        </Grid>
-        
+        {/* RRF Sent - Second position */}
         <Grid item xs={12} sm={6} md={4}>
           <MetricCard
             title="RRF Sent"
@@ -378,6 +367,18 @@ const HPDashboard = () => {
             color="success"
             subtitle="Facilities that reported RRF sent"
             progress={data.totalFacilities > 0 ? (data.rrfSent / data.totalFacilities) * 100 : 0}
+            isMonthDependent={true}
+          />
+        </Grid>
+
+        {/* Month-dependent cards */}
+        <Grid item xs={12} sm={6} md={4}>
+          <MetricCard
+            title="Total ODNs"
+            value={data.totalODNs || 0}
+            icon={<Assignment />}
+            color="primary"
+            subtitle="ODNs for selected period"
             isMonthDependent={true}
           />
         </Grid>

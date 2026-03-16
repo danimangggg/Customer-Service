@@ -11,11 +11,35 @@ const getHPCustomersDetailReport = async (req, res) => {
       search = '',
       sortBy = 'created_at',
       sortOrder = 'DESC',
-      statusFilter = ''
+      statusFilter = '',
+      month = '',
+      year = '',
+      process_type = ''
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
+    // Build process_type filter
+    let processTypeCondition = '';
+    if (process_type) {
+      processTypeCondition = `AND p.process_type = '${process_type}'`;
+    }
+
+    // Emergency/breakdown have NULL reporting_month — skip month filter for them
+    const skipMonthFilter = process_type === 'emergency' || process_type === 'breakdown';
+
+    // Build month/year filter condition
+    let monthYearCondition = '';
+    if (!skipMonthFilter) {
+      if (month && year) {
+        monthYearCondition = `AND p.reporting_month = '${month} ${year}'`;
+      } else if (month && !year) {
+        monthYearCondition = `AND p.reporting_month LIKE '${month} %'`;
+      } else if (!month && year) {
+        monthYearCondition = `AND p.reporting_month LIKE '% ${year}'`;
+      }
+    }
+
     // Build search conditions
     let searchCondition = '';
     if (search) {
@@ -37,13 +61,7 @@ const getHPCustomersDetailReport = async (req, res) => {
     // Build status filter condition
     let statusFilterCondition = '';
     if (statusFilter) {
-      if (statusFilter === 'In Progress') {
-        statusFilterCondition = `AND p.status = 'in_progress'`;
-      } else if (statusFilter === 'Completed') {
-        statusFilterCondition = `AND p.status = 'completed'`;
-      } else if (statusFilter === 'Vehicle Requested') {
-        statusFilterCondition = `AND p.status = 'vehicle_requested'`;
-      }
+      statusFilterCondition = `AND p.status = '${statusFilter}'`;
     }
 
     // Validate sort column
@@ -57,6 +75,8 @@ const getHPCustomersDetailReport = async (req, res) => {
       FROM processes p
       LEFT JOIN facilities f ON p.facility_id = f.id
       WHERE f.route IS NOT NULL AND f.route != ''
+      ${monthYearCondition}
+      ${processTypeCondition}
       ${searchCondition}
       ${statusFilterCondition}
     `;
@@ -82,6 +102,19 @@ const getHPCustomersDetailReport = async (req, res) => {
         f.woreda_name,
         f.route,
         f.facility_type,
+        -- Calculate total kilometers from route assignments
+        (
+          SELECT COALESCE(
+            (ra.arrival_kilometer - ra.departure_kilometer), 
+            0
+          )
+          FROM route_assignments ra
+          INNER JOIN routes r ON ra.route_id = r.id
+          WHERE r.route_name = f.route
+            AND ra.ethiopian_month = p.reporting_month
+          ORDER BY ra.created_at DESC
+          LIMIT 1
+        ) as total_km,
         -- Service unit statuses based on service_point and status
         CASE 
           WHEN p.service_point = 'registration' AND p.status = 'completed' THEN 'completed'
@@ -110,6 +143,8 @@ const getHPCustomersDetailReport = async (req, res) => {
         CASE 
           WHEN p.status = 'vehicle_requested' THEN 'Vehicle Requested'
           WHEN p.status = 'completed' THEN 'Completed'
+          WHEN p.status = 'documentation_completed' THEN 'Completed'
+          WHEN p.status = 'dispatch_completed' THEN 'Dispatch Completed'
           WHEN p.status = 'in_progress' THEN 'In Progress'
           ELSE p.status
         END as process_status
@@ -117,6 +152,8 @@ const getHPCustomersDetailReport = async (req, res) => {
       FROM processes p
       LEFT JOIN facilities f ON p.facility_id = f.id
       WHERE f.route IS NOT NULL AND f.route != ''
+      ${monthYearCondition}
+      ${processTypeCondition}
       ${searchCondition}
       ${statusFilterCondition}
       ORDER BY ${validSortBy === 'facility_name' ? 'f.facility_name' : 'p.' + validSortBy} ${validSortOrder}
@@ -130,6 +167,45 @@ const getHPCustomersDetailReport = async (req, res) => {
     });
 
     console.log('Query successful, found', customers.length, 'real HP processes');
+
+    // Enrich with total waiting time from service_time_hp
+    for (const customer of customers) {
+      try {
+        const waitingTimeQuery = `
+          SELECT 
+            st.end_time,
+            st.created_at
+          FROM service_time_hp st
+          WHERE st.process_id = ?
+          ORDER BY st.created_at ASC
+        `;
+        
+        const serviceTimes = await db.sequelize.query(waitingTimeQuery, {
+          replacements: [customer.id],
+          type: db.sequelize.QueryTypes.SELECT
+        });
+        
+        let totalMinutes = 0;
+        serviceTimes.forEach((service, index) => {
+          if (index === 0) {
+            // First service: from process creation to end_time
+            const start = new Date(customer.created_at);
+            const end = new Date(service.end_time);
+            totalMinutes += Math.round((end - start) / (1000 * 60));
+          } else {
+            // Subsequent: from previous end_time to current end_time
+            const start = new Date(serviceTimes[index - 1].end_time);
+            const end = new Date(service.end_time);
+            totalMinutes += Math.round((end - start) / (1000 * 60));
+          }
+        });
+        
+        customer.total_waiting_time = Math.max(0, totalMinutes);
+      } catch (err) {
+        console.error(`Failed to calculate waiting time for process ${customer.id}:`, err);
+        customer.total_waiting_time = 0;
+      }
+    }
 
     res.json({
       success: true,
@@ -156,8 +232,26 @@ const getHPCustomersDetailReport = async (req, res) => {
 const getHPCustomerServiceDetails = async (req, res) => {
   try {
     const { customerId } = req.params;
+    
+    console.log('=== GET HP CUSTOMER SERVICE DETAILS ===');
+    console.log('Process ID:', customerId);
 
-    // Query HP service time from service_time table
+    // Get process record to get creation time
+    const processQuery = `
+      SELECT created_at
+      FROM processes
+      WHERE id = :customerId
+    `;
+    
+    const [process] = await db.sequelize.query(processQuery, {
+      type: db.sequelize.QueryTypes.SELECT,
+      replacements: { customerId }
+    });
+    
+    console.log('Process record:', process);
+
+    // Get all service time records from service_time_hp table
+    // Note: service_time_hp only has end_time, not start_time
     const query = `
       SELECT 
         st.service_unit,
@@ -166,19 +260,82 @@ const getHPCustomerServiceDetails = async (req, res) => {
         st.status,
         st.notes,
         st.created_at
-      FROM service_time st
+      FROM service_time_hp st
       WHERE st.process_id = :customerId
       ORDER BY st.created_at ASC
     `;
 
-    const serviceDetails = await db.sequelize.query(query, {
+    const allServiceDetails = await db.sequelize.query(query, {
       type: db.sequelize.QueryTypes.SELECT,
       replacements: { customerId }
     });
+    
+    console.log('All HP service records found:', allServiceDetails.length);
+
+    // Deduplicate: keep only the first record for each service unit
+    const serviceMap = new Map();
+    allServiceDetails.forEach(service => {
+      const existing = serviceMap.get(service.service_unit);
+      if (!existing) {
+        // Only set if this is the first occurrence
+        serviceMap.set(service.service_unit, service);
+      }
+    });
+    
+    console.log('After deduplication:', serviceMap.size, 'unique service units');
+    
+    // Convert back to array and sort by created_at
+    const serviceDetails = Array.from(serviceMap.values())
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    // Calculate start times and waiting times
+    const enrichedDetails = serviceDetails.map((service, index) => {
+      let waitingMinutes = 0;
+      let startTime = null;
+      
+      if (index === 0) {
+        // First service: start time is process creation, end time is service end_time
+        startTime = process?.created_at;
+        if (startTime && service.end_time) {
+          const start = new Date(startTime);
+          const end = new Date(service.end_time);
+          waitingMinutes = Math.round((end - start) / (1000 * 60));
+          console.log(`Service ${index} (${service.service_unit}): start=${start.toISOString()}, end=${end.toISOString()}, duration=${waitingMinutes}min`);
+        }
+      } else {
+        // Subsequent services: start time is previous service end_time
+        const previousService = serviceDetails[index - 1];
+        startTime = previousService.end_time;
+        if (startTime && service.end_time) {
+          const start = new Date(startTime);
+          const end = new Date(service.end_time);
+          waitingMinutes = Math.round((end - start) / (1000 * 60));
+          console.log(`Service ${index} (${service.service_unit}): start=${start.toISOString()}, end=${end.toISOString()}, duration=${waitingMinutes}min`);
+        }
+      }
+      
+      // If duration is negative, something is wrong with the timestamps
+      if (waitingMinutes < 0) {
+        console.warn(`⚠️ Negative duration detected for ${service.service_unit}: ${waitingMinutes}min`);
+        console.warn(`  Start: ${startTime}, End: ${service.end_time}`);
+      }
+      
+      return {
+        service_unit: service.service_unit,
+        officer_name: service.officer_name || 'N/A',
+        start_time: startTime,
+        end_time: service.end_time,
+        waiting_minutes: Math.max(0, waitingMinutes),
+        status: service.status || 'completed',
+        notes: service.notes
+      };
+    });
+    
+    console.log('Enriched HP details:', enrichedDetails.length, 'records');
 
     res.json({
       success: true,
-      serviceDetails: serviceDetails
+      serviceDetails: enrichedDetails
     });
 
   } catch (error) {

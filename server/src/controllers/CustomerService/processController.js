@@ -5,7 +5,7 @@ const ODN = db.odn;
 
 const startProcess = async (req, res) => {
   try {
-    const { facility_id, service_point, status, userId, reporting_month } = req.body;
+    const { facility_id, service_point, status, userId, reporting_month, process_type } = req.body;
     if (!facility_id || !service_point || !status) {
       return res.status(400).send({ message: 'facility_id, service_point and status are required' });
     }
@@ -26,6 +26,7 @@ const startProcess = async (req, res) => {
       status,
       o2c_officer_id: officerId,
       reporting_month: reporting_month || null,
+      process_type: process_type || 'regular',
     });
 
     // Return the auto-incremented id as process_id and include officerName for UI

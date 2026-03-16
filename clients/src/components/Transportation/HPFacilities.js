@@ -4,8 +4,9 @@ import {
   Typography, Chip, IconButton, Box, TextField, InputAdornment, Card,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, MenuItem, 
   Container, TablePagination, FormControl, InputLabel, Select, Stack,
-  Avatar
+  Avatar, FormControlLabel, Checkbox
 } from '@mui/material';
+import VaccinesIcon from '@mui/icons-material/Vaccines';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
@@ -33,7 +34,10 @@ const HPFacilities = () => {
     id: '', 
     facility_name: '', 
     route: '', 
-    period: '' 
+    route2: '',
+    period: '',
+    is_vaccine_site: false,
+    is_hp_site: false
   });
 
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -95,23 +99,39 @@ const HPFacilities = () => {
 
   // --- EDIT LOGIC ---
   const handleEditOpen = (f) => {
+    const isHp = !!f.is_hp_site;
+    const isVaccine = !!f.is_vaccine_site;
+    // Default period to Monthly if only vaccine (no HP) and no period set
+    const period = f.period || (!isHp && isVaccine ? 'Monthly' : '');
     setSelectedFacility({
       id: f.id,
       facility_name: f.facility_name,
-      route: f.route || '', 
-      period: f.period || ''
+      route: f.route || '',
+      route2: f.route2 || '',
+      period,
+      is_vaccine_site: isVaccine,
+      is_hp_site: isHp
     });
     setOpenEdit(true);
   };
 
   const handleUpdate = async () => {
+    // Validate: HP site requires a period
+    if (selectedFacility.is_hp_site && !selectedFacility.period) {
+      await MySwal.fire({
+        title: 'Period Required',
+        text: 'Please select a period (Odd, Even, or Monthly) for HP Site facilities.',
+        icon: 'warning',
+        confirmButtonColor: '#4caf50',
+      });
+      return;
+    }
     try {
-      // Find the selected route name for display
-      const selectedRoute = routes.find(r => r.route_name === selectedFacility.route);
-      
       const res = await axios.put(`${api_url}/api/update-facilities/${selectedFacility.id}`, {
         route: selectedFacility.route,
-        period: selectedFacility.period
+        period: selectedFacility.period,
+        is_vaccine_site: selectedFacility.is_vaccine_site ? 1 : 0,
+        is_hp_site: selectedFacility.is_hp_site ? 1 : 0
       });
       
       if (res.status === 200) {
@@ -167,18 +187,14 @@ const HPFacilities = () => {
                          f.route?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesFilter = filterHP === "" || 
-                         (filterHP === "HP" && f.route && f.period) ||
-                         (filterHP === "Non-HP" && (!f.route || !f.period));
+                         (filterHP === "HP" && f.is_hp_site) ||
+                         (filterHP === "Vaccine" && f.is_vaccine_site) ||
+                         (filterHP === "None" && !f.is_hp_site && !f.is_vaccine_site);
     
     const matchesRoute = filterRoute === "" || f.route === filterRoute;
     
     return matchesSearch && matchesFilter && matchesRoute;
   });
-
-  // Check if facility is HP (has both route and period)
-  const isHPFacility = (facility) => {
-    return facility.route && facility.period;
-  };
 
   return (
     <>
@@ -276,8 +292,9 @@ const HPFacilities = () => {
                   startAdornment={<FilterListIcon sx={{ mr: 1, color: 'action.active' }} />}
                 >
                   <MenuItem value="">All Facilities</MenuItem>
-                  <MenuItem value="HP">HP Facilities Only</MenuItem>
-                  <MenuItem value="Non-HP">Non-HP Facilities</MenuItem>
+                  <MenuItem value="HP">HP Sites Only</MenuItem>
+                  <MenuItem value="Vaccine">Vaccine Sites Only</MenuItem>
+                  <MenuItem value="None">Unassigned</MenuItem>
                 </Select>
               </FormControl>
 
@@ -347,7 +364,7 @@ const HPFacilities = () => {
                       
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={1}>
-                          <LocalHospitalIcon fontSize="small" color={isHPFacility(f) ? "success" : "disabled"} />
+                          <LocalHospitalIcon fontSize="small" color={f.is_hp_site ? "success" : f.is_vaccine_site ? "secondary" : "disabled"} />
                           <Typography fontWeight="600">{f.facility_name}</Typography>
                         </Stack>
                       </TableCell>
@@ -364,9 +381,7 @@ const HPFacilities = () => {
                         {f.route ? (
                           <Stack direction="row" alignItems="center" spacing={1}>
                             <RouteIcon fontSize="small" color="primary" />
-                            <Typography variant="body2" fontWeight="bold">
-                              {f.route}
-                            </Typography>
+                            <Typography variant="body2" fontWeight="bold">{f.route}</Typography>
                           </Stack>
                         ) : (
                           <Typography variant="body2" color="text.secondary">---</Typography>
@@ -388,14 +403,29 @@ const HPFacilities = () => {
                         )}
                       </TableCell>
 
-                      {/* HP Status */}
+                      {/* Status */}
                       <TableCell>
-                        <Chip
-                          label={isHPFacility(f) ? "HP" : "Regular"}
-                          color={isHPFacility(f) ? "success" : "default"}
-                          size="small"
-                          variant={isHPFacility(f) ? "filled" : "outlined"}
-                        />
+                        <Stack direction="row" spacing={1}>
+                          {f.is_hp_site ? (
+                            <Chip
+                              icon={<LocalHospitalIcon fontSize="small" />}
+                              label="HP Site"
+                              color="success"
+                              size="small"
+                            />
+                          ) : null}
+                          {f.is_vaccine_site ? (
+                            <Chip
+                              icon={<VaccinesIcon fontSize="small" />}
+                              label="Vaccine"
+                              color="secondary"
+                              size="small"
+                            />
+                          ) : null}
+                          {!f.is_hp_site && !f.is_vaccine_site ? (
+                            <Chip label="Unassigned" color="default" size="small" variant="outlined" />
+                          ) : null}
+                        </Stack>
                       </TableCell>
 
                       <TableCell align="center">
@@ -439,14 +469,63 @@ const HPFacilities = () => {
             <Typography variant="body2" color="text.secondary">
               Editing: <strong>{selectedFacility.facility_name}</strong>
             </Typography>
-            
+
+            {/* Checkboxes on top */}
+            <Stack direction="row" spacing={3}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectedFacility.is_hp_site}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedFacility(prev => ({
+                        ...prev,
+                        is_hp_site: checked,
+                        // if only vaccine remains, force Monthly
+                        period: !checked && prev.is_vaccine_site ? 'Monthly' : prev.period
+                      }));
+                    }}
+                    color="success"
+                  />
+                }
+                label={
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <LocalHospitalIcon fontSize="small" color="success" />
+                    <Typography variant="body2" fontWeight="bold">HP Site</Typography>
+                  </Stack>
+                }
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectedFacility.is_vaccine_site}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedFacility(prev => ({
+                        ...prev,
+                        is_vaccine_site: checked,
+                        // if only vaccine selected (no HP), default period to Monthly
+                        period: checked && !prev.is_hp_site ? 'Monthly' : prev.period
+                      }));
+                    }}
+                    color="secondary"
+                  />
+                }
+                label={
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <VaccinesIcon fontSize="small" color="secondary" />
+                    <Typography variant="body2" fontWeight="bold">Vaccine Site</Typography>
+                  </Stack>
+                }
+              />
+            </Stack>
+
             <TextField
               select
               label="Route"
               fullWidth
               value={selectedFacility.route}
               onChange={(e) => setSelectedFacility({...selectedFacility, route: e.target.value})}
-              helperText="Select route to mark as HP facility"
             >
               <MenuItem value="">
                 <Typography color="text.secondary">No route selected</Typography>
@@ -461,26 +540,27 @@ const HPFacilities = () => {
               ))}
             </TextField>
 
+            {/* Period — required when HP is checked, locked to Monthly when only Vaccine */}
             <TextField
               select
               label="Period"
               fullWidth
+              required={selectedFacility.is_hp_site}
+              disabled={!selectedFacility.is_hp_site && selectedFacility.is_vaccine_site}
               value={selectedFacility.period}
               onChange={(e) => setSelectedFacility({...selectedFacility, period: e.target.value})}
-              helperText="Select period to complete HP facility setup"
+              helperText={
+                selectedFacility.is_hp_site
+                  ? 'Required for HP Site'
+                  : selectedFacility.is_vaccine_site
+                  ? 'Vaccine sites are always Monthly'
+                  : 'Select period'
+              }
             >
               <MenuItem value="Odd">Odd</MenuItem>
               <MenuItem value="Even">Even</MenuItem>
               <MenuItem value="Monthly">Monthly</MenuItem>
             </TextField>
-
-            {selectedFacility.route && selectedFacility.period && (
-              <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
-                <Typography variant="body2" color="success.dark">
-                  ✓ This facility will be marked as HP (Health Program) facility
-                </Typography>
-              </Box>
-            )}
           </DialogContent>
           <DialogActions sx={{ p: 2, borderTop: '1px solid #eee' }}>
             <Button onClick={() => setOpenEdit(false)} color="inherit">Cancel</Button>

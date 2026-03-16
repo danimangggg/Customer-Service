@@ -11,7 +11,7 @@ import {
 import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import {
   Business, Search, GetApp, Clear, FilterList, Assignment, Description,
-  LocalShipping, Receipt, ConfirmationNumber, Scale, Person, Storefront
+  LocalShipping, Receipt, ConfirmationNumber, Scale, Person, Storefront, Assessment
 } from '@mui/icons-material';
 import MUIDataTable from 'mui-datatables';
 import * as XLSX from 'xlsx';
@@ -27,6 +27,17 @@ const RDFReport = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerDetailOpen, setCustomerDetailOpen] = useState(false);
   const [customerServiceDetails, setCustomerServiceDetails] = useState([]);
+  
+  // Dashboard stats
+  const [dashboardStats, setDashboardStats] = useState({
+    totalRegistrations: 0,
+    averageWaitingTime: 0,
+    completedCount: 0,
+    inProgressCount: 0,
+    cancelledCount: 0,
+    autoCancelledCount: 0,
+    loading: true
+  });
   
   // Pagination, search, and sort states for customers
   const [page, setPage] = useState(0);
@@ -50,19 +61,58 @@ const RDFReport = () => {
   const [documentationLoading, setDocumentationLoading] = useState(false);
   const [facilities, setFacilities] = useState([]);
   
+  // Best Of states
+  const [bestOfData, setBestOfData] = useState(null);
+  const [bestOfLoading, setBestOfLoading] = useState(false);
+
+  // Default: last week
+  const getLastWeekRange = () => {
+    const today = new Date();
+    const day = today.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    const lastMonday = new Date(today);
+    lastMonday.setDate(today.getDate() - diffToMonday - 7);
+    const lastSunday = new Date(lastMonday);
+    lastSunday.setDate(lastMonday.getDate() + 6);
+    return {
+      from: lastMonday.toISOString().split('T')[0],
+      to: lastSunday.toISOString().split('T')[0],
+    };
+  };
+  const [bestOfRange, setBestOfRange] = useState(getLastWeekRange);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchCustomers();
-  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter]);
-  
-  useEffect(() => {
-    if (activeTab === 1) {
-      fetchPicklists();
+    if (activeTab === 0) {
+      fetchDashboardStats();
+    } else if (activeTab === 1) {
+      fetchCustomers();
     } else if (activeTab === 2) {
       fetchDocumentation();
+    } else if (activeTab === 3) {
+      fetchPicklists();
+    } else if (activeTab === 4) {
+      fetchBestOfWeek();
     }
-  }, [activeTab, picklistPage, picklistRowsPerPage]);
+  }, [activeTab, page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter, picklistPage, picklistRowsPerPage]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setDashboardStats(prev => ({ ...prev, loading: true }));
+      const response = await axios.get(`${API_URL}/api/rdf-dashboard-stats`);
+      
+      if (response.data.success) {
+        setDashboardStats({
+          ...response.data.stats,
+          loading: false
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard stats:', err);
+      setDashboardStats(prev => ({ ...prev, loading: false }));
+    }
+  };
 
   const fetchCustomers = async () => {
     try {
@@ -181,8 +231,94 @@ const RDFReport = () => {
     }
   };
 
+  const fetchBestOfWeek = async (range) => {
+    const { from, to } = range || bestOfRange;
+    try {
+      setBestOfLoading(true);
+      const response = await axios.get(`${API_URL}/api/best-of-week`, {
+        params: { startDate: from, endDate: to }
+      });
+      if (response.data.success) {
+        setBestOfData(response.data.data);
+      }
+    } catch (err) {
+      console.error('Error fetching best of week:', err);
+      setBestOfData(null);
+    } finally {
+      setBestOfLoading(false);
+    }
+  };
+
   // DataGrid columns for documentation
   const documentationColumns = [
+    {
+      field: 'serial',
+      headerName: '#',
+      width: 70,
+      filterable: false,
+      sortable: false,
+      renderCell: (params) => {
+        const index = documentationRecords.findIndex(row => row.id === params.row.id);
+        return (
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {index + 1}
+          </Typography>
+        );
+      }
+    },
+    {
+      field: 'exit_number',
+      headerName: 'Exit #',
+      width: 80,
+      filterable: true,
+      type: 'number',
+      renderCell: (params) => (
+        <Chip 
+          label={`#${params.value || 1}`} 
+          size="small" 
+          color="info"
+          sx={{ fontWeight: 700 }}
+        />
+      )
+    },
+    {
+      field: 'exit_type',
+      headerName: 'Type',
+      width: 110,
+      filterable: true,
+      renderCell: (params) => {
+        const isPartial = params.value?.toLowerCase() === 'partial';
+        const exitNumber = params.row.exit_number || 1;
+        
+        // If it's a full exit but not the first exit, show "Final" instead of "Full"
+        const isFinalCompletion = !isPartial && exitNumber > 1;
+        
+        let label, color, variant;
+        if (isPartial) {
+          label = 'Partial';
+          color = 'warning';
+          variant = 'outlined';
+        } else if (isFinalCompletion) {
+          label = 'Final';
+          color = 'success';
+          variant = 'filled';
+        } else {
+          label = 'Full';
+          color = 'success';
+          variant = 'filled';
+        }
+        
+        return (
+          <Chip 
+            label={label} 
+            size="small" 
+            color={color}
+            variant={variant}
+            sx={{ fontWeight: 600 }}
+          />
+        );
+      }
+    },
     {
       field: 'facility_name',
       headerName: 'Facility',
@@ -197,9 +333,41 @@ const RDFReport = () => {
       },
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Storefront sx={{ fontSize: 16, color: '#7986cb' }} />
-          <Typography variant="body2">{params.value}</Typography>
+          <Storefront sx={{ fontSize: 16, color: '#7986cb', flexShrink: 0 }} />
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              whiteSpace: 'normal', 
+              wordWrap: 'break-word',
+              lineHeight: 1.4
+            }}
+          >
+            {params.value}
+          </Typography>
         </Box>
+      )
+    },
+    {
+      field: 'store_name',
+      headerName: 'Store/Gate',
+      width: 120,
+      filterable: true,
+      renderCell: (params) => (
+        <Chip 
+          label={params.value || '—'} 
+          size="small" 
+          color="secondary"
+          sx={{ fontWeight: 600 }}
+        />
+      )
+    },
+    {
+      field: 'odn_number',
+      headerName: 'ODN',
+      width: 150,
+      filterable: true,
+      renderCell: (params) => (
+        <Typography variant="body2">{params.value || '—'}</Typography>
       )
     },
     {
@@ -227,38 +395,23 @@ const RDFReport = () => {
       )
     },
     {
-      field: 'measurement_unit',
-      headerName: 'Unit',
-      width: 100,
-      filterable: true,
-    },
-    {
-      field: 'receipt_count',
-      headerName: 'Receipts',
-      width: 100,
-      filterable: true,
-      type: 'number',
-      renderCell: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Receipt sx={{ fontSize: 16, color: '#9c27b0' }} />
-          <Typography variant="body2">{params.value || '—'}</Typography>
-        </Box>
-      )
-    },
-    {
       field: 'receipt_number',
       headerName: 'Receipt #',
-      width: 130,
+      width: 180,
       filterable: true,
       renderCell: (params) => {
-        const isCash = params.row.customer_type?.toLowerCase() === 'cash';
-        return isCash && params.value ? (
-          <Chip 
-            label={params.value} 
-            size="small" 
-            color="warning" 
-            sx={{ fontWeight: 'bold' }}
-          />
+        const isCredit = params.row.customer_type?.toLowerCase() === 'credit';
+        
+        if (isCredit) {
+          return (
+            <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+              Credit
+            </Typography>
+          );
+        }
+        
+        return params.value ? (
+          <Typography variant="body2">{params.value}</Typography>
         ) : (
           <Typography variant="body2" color="text.secondary">—</Typography>
         );
@@ -269,25 +422,14 @@ const RDFReport = () => {
       headerName: 'Security Officer',
       width: 180,
       filterable: true,
+      valueGetter: (params) => {
+        return params.row.all_gate_keepers || params.row.assigned_gate_keeper_name || 'Security';
+      },
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Person sx={{ fontSize: 16, color: '#4caf50' }} />
-          <Typography variant="body2">{params.value || 'Security'}</Typography>
+          <Typography variant="body2">{params.value}</Typography>
         </Box>
-      )
-    },
-    {
-      field: 'status',
-      headerName: 'Status',
-      width: 120,
-      filterable: true,
-      renderCell: (params) => (
-        <Chip 
-          label="Completed" 
-          color="success" 
-          size="small" 
-          sx={{ fontWeight: 'bold' }}
-        />
       )
     }
   ];
@@ -335,7 +477,9 @@ const RDFReport = () => {
         'Facility Name': customer.actual_facility_name || customer.facility_name || 'N/A',
         'Woreda': customer.woreda_name || 'N/A',
         'Total Waiting Time (min)': customer.total_waiting_time || 0,
-        'Status': customer.status === 'completed' ? 'Completed' : customer.next_service_point || 'Registered',
+        'Status': customer.status === 'completed' ? 'Completed' : 
+                  customer.status === 'Canceled' ? 'Cancelled' :
+                  customer.next_service_point || 'Registered',
         'Created At': new Date(customer.created_at).toLocaleString(),
         'Completed At': customer.completed_at ? new Date(customer.completed_at).toLocaleString() : 'N/A'
       }));
@@ -408,8 +552,18 @@ const RDFReport = () => {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab 
+            label="Dashboard" 
+            icon={<Assessment />} 
+            iconPosition="start"
+          />
+          <Tab 
             label="Customer Records" 
             icon={<Business />} 
+            iconPosition="start"
+          />
+          <Tab 
+            label="Documentation" 
+            icon={<Description />} 
             iconPosition="start"
           />
           <Tab 
@@ -418,255 +572,464 @@ const RDFReport = () => {
             iconPosition="start"
           />
           <Tab 
-            label="Documentation" 
-            icon={<Description />} 
+            label="Best Of" 
+            icon={<Person />} 
             iconPosition="start"
           />
         </Tabs>
       </Card>
 
-      {/* Customer Detail Report */}
+      {/* Dashboard Tab */}
       {activeTab === 0 && (
+        <Fade in={true}>
+          <Box>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
+              RDF Dashboard Overview
+            </Typography>
+
+            {dashboardStats.loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <Grid container spacing={3}>
+                {/* Total Registrations */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'translateY(-4px)' }
+                  }}>
+                    <CardContent>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                          <Business fontSize="large" />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" fontWeight="bold">
+                            {dashboardStats.totalRegistrations}
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            Total Registrations
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Completed */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                    color: 'white',
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'translateY(-4px)' }
+                  }}>
+                    <CardContent>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                          <ConfirmationNumber fontSize="large" />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" fontWeight="bold">
+                            {dashboardStats.completedCount}
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            Completed
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* In Progress */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                    color: 'white',
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'translateY(-4px)' }
+                  }}>
+                    <CardContent>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                          <LocalShipping fontSize="large" />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" fontWeight="bold">
+                            {dashboardStats.inProgressCount}
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            In Progress
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Average Waiting Time */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                    color: 'white',
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'translateY(-4px)' }
+                  }}>
+                    <CardContent>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                          <Scale fontSize="large" />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" fontWeight="bold">
+                            {(dashboardStats.averageWaitingTime / 60).toFixed(1)}
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            Avg. Waiting Time (hrs)
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Cancelled */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                    color: 'white',
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'translateY(-4px)' }
+                  }}>
+                    <CardContent>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                          <Clear fontSize="large" />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" fontWeight="bold">
+                            {dashboardStats.cancelledCount}
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            Canceled
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Auto-Cancelled */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
+                    color: 'white',
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'translateY(-4px)' }
+                  }}>
+                    <CardContent>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+                          <Clear fontSize="large" />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" fontWeight="bold">
+                            {dashboardStats.autoCancelledCount || 0}
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            Auto-Canceled
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Completion Rate */}
+                <Grid item xs={12} sm={6} md={4}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                    color: '#333',
+                    transition: 'transform 0.3s',
+                    '&:hover': { transform: 'translateY(-4px)' }
+                  }}>
+                    <CardContent>
+                      <Stack direction="row" alignItems="center" spacing={2}>
+                        <Avatar sx={{ bgcolor: 'rgba(0,0,0,0.1)', width: 56, height: 56 }}>
+                          <Receipt fontSize="large" />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h3" fontWeight="bold">
+                            {dashboardStats.totalRegistrations > 0 
+                              ? Math.round((dashboardStats.completedCount / dashboardStats.totalRegistrations) * 100)
+                              : 0}%
+                          </Typography>
+                          <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                            Completion Rate
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+            )}
+          </Box>
+        </Fade>
+      )}
+
+      {/* Customer Detail Report */}
+      {activeTab === 1 && (
       <Box>
         <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
           Customer Detail Report
         </Typography>
 
-        {/* Search and Export Controls */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  variant="outlined"
-                  placeholder="Search customers..."
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchTerm && (
-                      <InputAdornment position="end">
-                        <IconButton onClick={handleClearSearch} size="small">
-                          <Clear />
-                        </IconButton>
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <FormControl fullWidth variant="outlined">
-                  <InputLabel>Filter by Status</InputLabel>
-                  <Select
-                    value={statusFilter}
-                    onChange={handleStatusFilterChange}
-                    label="Filter by Status"
-                    startAdornment={
-                      <InputAdornment position="start">
-                        <FilterList />
-                      </InputAdornment>
-                    }
-                  >
-                    <MenuItem value="">All Status</MenuItem>
-                    <MenuItem value="completed">Completed</MenuItem>
-                    <MenuItem value="registration">Registration</MenuItem>
-                    <MenuItem value="o2c">O2C</MenuItem>
-                    <MenuItem value="ewm">EWM</MenuItem>
-                    <MenuItem value="dispatch">Dispatch</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={5}>
-                <Stack direction="row" spacing={2} justifyContent="flex-end">
-                  {(searchTerm || statusFilter) && (
+        {customersLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+            <CircularProgress size={60} />
+          </Box>
+        ) : error ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        ) : (
+          <Box sx={{ height: 700, width: '100%' }}>
+            <DataGrid
+              rows={customers}
+              columns={[
+                {
+                  field: 'facility_name',
+                  headerName: 'Facility Name',
+                  width: 300,
+                  flex: 1,
+                  headerClassName: 'super-app-theme--header',
+                  valueGetter: (params) => params.row.actual_facility_name || params.row.facility_name || 'N/A',
+                  renderCell: (params) => (
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        whiteSpace: 'normal', 
+                        wordWrap: 'break-word',
+                        lineHeight: 1.4,
+                        py: 1
+                      }}
+                    >
+                      {params.value}
+                    </Typography>
+                  ),
+                },
+                {
+                  field: 'customer_type',
+                  headerName: 'Payment Type',
+                  width: 130,
+                  headerClassName: 'super-app-theme--header',
+                  renderCell: (params) => {
+                    const isCash = params.value?.toLowerCase() === 'cash';
+                    return (
+                      <Chip 
+                        label={isCash ? 'Cash' : 'Credit'} 
+                        size="small" 
+                        color={isCash ? 'success' : 'primary'}
+                        variant="outlined"
+                        sx={{ fontWeight: 600 }}
+                      />
+                    );
+                  },
+                },
+                {
+                  field: 'total_waiting_time',
+                  headerName: 'Total Waiting Time',
+                  width: 180,
+                  headerClassName: 'super-app-theme--header',
+                  renderCell: (params) => (
+                    <Chip 
+                      label={`${params.value || 0} min`}
+                      color={
+                        params.value >= 1440 ? 'error' : 
+                        params.value >= 180 ? 'warning' : 
+                        'success'
+                      }
+                      size="small"
+                      sx={{ fontWeight: 'bold' }}
+                    />
+                  ),
+                },
+                {
+                  field: 'status',
+                  headerName: 'Status',
+                  width: 180,
+                  headerClassName: 'super-app-theme--header',
+                  renderCell: (params) => (
+                    <Chip 
+                      label={
+                        params.row.status === 'completed' ? 'Completed' : 
+                        params.row.status === 'Canceled' ? 'Cancelled' :
+                        params.row.next_service_point || 'Registered'
+                      } 
+                      color={
+                        params.row.status === 'completed' ? 'success' : 
+                        params.row.status === 'Canceled' ? 'error' :
+                        'primary'
+                      }
+                      size="small"
+                      sx={{ 
+                        fontWeight: params.row.status === 'Canceled' ? 'bold' : 'normal'
+                      }}
+                    />
+                  ),
+                },
+                {
+                  field: 'actions',
+                  headerName: 'Actions',
+                  width: 150,
+                  headerClassName: 'super-app-theme--header',
+                  sortable: false,
+                  filterable: false,
+                  renderCell: (params) => (
                     <Button
                       variant="outlined"
-                      startIcon={<Clear />}
-                      onClick={handleClearFilters}
-                      disabled={customersLoading}
+                      size="small"
+                      onClick={() => handleCustomerDetailOpen(params.row)}
+                      sx={{ fontSize: '0.75rem' }}
                     >
-                      Clear Filters
+                      View Details
                     </Button>
-                  )}
-                  <Button
-                    variant="contained"
-                    startIcon={<GetApp />}
-                    onClick={exportToExcel}
-                    disabled={customers.length === 0}
-                  >
-                    Export Excel
-                  </Button>
-                </Stack>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent>
-            {customersLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress />
-                <Typography sx={{ ml: 2 }}>Loading customers...</Typography>
-              </Box>
-            ) : error ? (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {error}
-              </Alert>
-            ) : (
-              <>
-                <Typography variant="h6" gutterBottom>
-                  Customer Records ({totalCount} total)
-                </Typography>
-                <TableContainer component={Paper}>
-                  <Table stickyHeader>
-                    <TableHead>
-                      <TableRow sx={{ bgcolor: '#1976d2' }}>
-                        <TableCell sx={{ 
-                          color: 'white', 
-                          fontWeight: 'bold', 
-                          minWidth: 250,
-                          fontSize: '0.9rem',
-                          bgcolor: '#1976d2 !important'
-                        }}>
-                          <TableSortLabel
-                            active={sortBy === 'facility_name'}
-                            direction={sortBy === 'facility_name' ? sortOrder.toLowerCase() : 'asc'}
-                            onClick={() => handleSort('facility_name')}
-                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
-                          >
-                            Facility Name
-                          </TableSortLabel>
-                        </TableCell>
-                        <TableCell sx={{ 
-                          color: 'white', 
-                          fontWeight: 'bold', 
-                          minWidth: 120,
-                          fontSize: '0.9rem',
-                          bgcolor: '#1976d2 !important'
-                        }}>
-                          <TableSortLabel
-                            active={sortBy === 'woreda_name'}
-                            direction={sortBy === 'woreda_name' ? sortOrder.toLowerCase() : 'asc'}
-                            onClick={() => handleSort('woreda_name')}
-                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
-                          >
-                            Woreda
-                          </TableSortLabel>
-                        </TableCell>
-                        <TableCell sx={{ 
-                          color: 'white', 
-                          fontWeight: 'bold', 
-                          minWidth: 120,
-                          fontSize: '0.9rem',
-                          bgcolor: '#1976d2 !important'
-                        }}>
-                          Total Waiting Time
-                        </TableCell>
-                        <TableCell sx={{ 
-                          color: 'white', 
-                          fontWeight: 'bold', 
-                          minWidth: 120,
-                          fontSize: '0.9rem',
-                          bgcolor: '#1976d2 !important'
-                        }}>
-                          <TableSortLabel
-                            active={sortBy === 'status'}
-                            direction={sortBy === 'status' ? sortOrder.toLowerCase() : 'asc'}
-                            onClick={() => handleSort('status')}
-                            sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
-                          >
-                            Status
-                          </TableSortLabel>
-                        </TableCell>
-                        <TableCell sx={{ 
-                          color: 'white', 
-                          fontWeight: 'bold', 
-                          minWidth: 120,
-                          fontSize: '0.9rem',
-                          bgcolor: '#1976d2 !important'
-                        }}>
-                          Actions
-                        </TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {customers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                            <Typography color="text.secondary">
-                              {searchTerm ? 'No customers found matching your search.' : 'No customers found. Make sure customers are registered in the system.'}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        customers.map((customer) => (
-                          <TableRow key={customer.id} hover sx={{ '&:nth-of-type(odd)': { bgcolor: '#f9f9f9' } }}>
-                            <TableCell sx={{ fontSize: '0.9rem', maxWidth: 200 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {customer.actual_facility_name || customer.facility_name || 'N/A'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell sx={{ fontSize: '0.9rem' }}>{customer.woreda_name || 'N/A'}</TableCell>
-                            <TableCell sx={{ fontSize: '0.9rem' }}>
-                              <Chip 
-                                label={`${customer.total_waiting_time || 0} min`}
-                                color={customer.total_waiting_time > 60 ? 'error' : customer.total_waiting_time > 30 ? 'warning' : 'success'}
-                                size="small"
-                                sx={{ fontWeight: 'bold' }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={customer.status === 'completed' ? 'Completed' : customer.next_service_point || 'Registered'} 
-                                color={customer.status === 'completed' ? 'success' : 'primary'}
-                                size="small"
-                                sx={{ fontSize: '0.75rem' }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() => handleCustomerDetailOpen(customer)}
-                                sx={{ fontSize: '0.75rem' }}
-                              >
-                                View Details
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-                
-                {/* Pagination */}
-                <TablePagination
-                  component="div"
-                  count={totalCount}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  rowsPerPage={rowsPerPage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                  rowsPerPageOptions={[10, 25, 50, 100]}
-                  showFirstButton
-                  showLastButton
-                />
-              </>
-            )}
-          </CardContent>
-        </Card>
+                  ),
+                },
+              ]}
+              pageSize={rowsPerPage}
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              checkboxSelection={false}
+              disableSelectionOnClick
+              getRowHeight={() => 'auto'}
+              components={{
+                Toolbar: GridToolbar,
+              }}
+              componentsProps={{
+                toolbar: {
+                  showQuickFilter: true,
+                  quickFilterProps: { debounceMs: 500 },
+                  csvOptions: { 
+                    fileName: `RDF_Customer_Report_${new Date().toISOString().split('T')[0]}`,
+                    utf8WithBom: true,
+                  },
+                  printOptions: { disableToolbarButton: false },
+                },
+              }}
+              sx={{
+                bgcolor: 'white',
+                borderRadius: 3,
+                boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                '& .MuiDataGrid-cell': {
+                  borderBottom: '1px solid #f0f0f0',
+                  whiteSpace: 'normal !important',
+                  wordWrap: 'break-word',
+                },
+                '& .super-app-theme--header': {
+                  bgcolor: '#1976d2',
+                  color: 'white',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                },
+                '& .MuiDataGrid-columnHeaders': {
+                  borderBottom: '2px solid #1976d2',
+                },
+                '& .MuiDataGrid-row:hover': {
+                  bgcolor: '#f5f7ff',
+                },
+                '& .MuiDataGrid-toolbarContainer': {
+                  padding: 2,
+                  gap: 2,
+                  bgcolor: '#f8f9fa',
+                  borderBottom: '1px solid #e0e0e0',
+                },
+                '& .MuiButton-root': {
+                  color: '#1976d2',
+                },
+              }}
+            />
+          </Box>
+        )}
       </Box>
       )}
 
+      {/* Documentation Tab */}
+      {activeTab === 2 && (
+        <Box>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
+            Completed Process Documentation
+          </Typography>
+
+          {documentationLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+              <CircularProgress size={60} />
+            </Box>
+          ) : (
+            <Box sx={{ height: 700, width: '100%' }}>
+              <DataGrid
+                rows={documentationRecords}
+                columns={documentationColumns}
+                pageSize={25}
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                checkboxSelection={false}
+                disableSelectionOnClick
+                loading={documentationLoading}
+                getRowHeight={() => 'auto'}
+                components={{
+                  Toolbar: GridToolbar,
+                }}
+                componentsProps={{
+                  toolbar: {
+                    showQuickFilter: true,
+                    quickFilterProps: { debounceMs: 500 },
+                  },
+                }}
+                sx={{
+                  bgcolor: 'white',
+                  borderRadius: 3,
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
+                  '& .MuiDataGrid-cell': {
+                    borderBottom: '1px solid #f0f0f0',
+                    whiteSpace: 'normal !important',
+                    wordWrap: 'break-word',
+                    lineHeight: '1.5 !important',
+                    display: 'flex',
+                    alignItems: 'center',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
+                  },
+                  '& .MuiDataGrid-row': {
+                    minHeight: '52px !important',
+                    maxHeight: 'none !important',
+                  },
+                  '& .MuiDataGrid-columnHeaders': {
+                    bgcolor: '#f8f9fa',
+                    color: '#5c6bc0',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    borderBottom: '2px solid #e0e0e0',
+                  },
+                  '& .MuiDataGrid-row:hover': {
+                    bgcolor: '#f5f7ff',
+                  },
+                  '& .MuiDataGrid-toolbarContainer': {
+                    padding: 2,
+                    gap: 2,
+                  },
+                }}
+              />
+            </Box>
+          )}
+        </Box>
+      )}
+
       {/* Picklists Tab */}
-      {activeTab === 1 && (
+      {activeTab === 3 && (
         <Container maxWidth="xl">
           {picklistsLoading ? (
             <Fade in={picklistsLoading}>
@@ -846,6 +1209,393 @@ const RDFReport = () => {
         </Container>
       )}
 
+      {/* Best Of Tab */}
+      {activeTab === 4 && (
+        <Container maxWidth="xl">
+          {/* Date Range Controls */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+            <TextField
+              label="From"
+              type="date"
+              size="small"
+              value={bestOfRange.from}
+              onChange={e => setBestOfRange(r => ({ ...r, from: e.target.value }))}
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="To"
+              type="date"
+              size="small"
+              value={bestOfRange.to}
+              onChange={e => setBestOfRange(r => ({ ...r, to: e.target.value }))}
+              InputLabelProps={{ shrink: true }}
+            />
+            <Button variant="contained" size="small" onClick={() => fetchBestOfWeek(bestOfRange)}>
+              Apply
+            </Button>
+            {/* Quick presets */}
+            {[
+              { label: 'This Week', fn: () => {
+                const today = new Date();
+                const day = today.getDay();
+                const diff = day === 0 ? 6 : day - 1;
+                const mon = new Date(today); mon.setDate(today.getDate() - diff);
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+                return { from: mon.toISOString().split('T')[0], to: sun.toISOString().split('T')[0] };
+              }},
+              { label: 'Last Week', fn: getLastWeekRange },
+              { label: 'This Month', fn: () => {
+                const today = new Date();
+                const from = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+                const to = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+                return { from, to };
+              }},
+              { label: 'This Year', fn: () => {
+                const y = new Date().getFullYear();
+                return { from: `${y}-01-01`, to: `${y}-12-31` };
+              }},
+            ].map(({ label, fn }) => (
+              <Button key={label} variant="outlined" size="small" onClick={() => {
+                const range = fn();
+                setBestOfRange(range);
+                fetchBestOfWeek(range);
+              }}>
+                {label}
+              </Button>
+            ))}
+          </Box>
+
+          {bestOfLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+              <CircularProgress size={60} />
+            </Box>
+          ) : bestOfData ? (
+            <Box>
+              {/* Header with Date Range */}
+              <Card sx={{ 
+                mb: 4, 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white'
+              }}>
+                <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="h3" fontWeight="bold" gutterBottom>
+                    🏆 Best Performers 🏆
+                  </Typography>
+                  <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                    {new Date(bestOfData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    {' — '}
+                    {new Date(bestOfData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </Typography>
+                </CardContent>
+              </Card>
+
+              {/* Employee Cards Grid */}
+              <Grid container spacing={4}>
+                {/* O2C Officer */}
+                {bestOfData.employees.o2c && (
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                      color: 'white',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': { 
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.3)'
+                      }
+                    }}>
+                      <CardContent sx={{ p: 4 }}>
+                        <Stack spacing={3} alignItems="center">
+                          <Avatar sx={{ 
+                            width: 100, 
+                            height: 100, 
+                            bgcolor: 'rgba(255,255,255,0.3)',
+                            fontSize: '3rem'
+                          }}>
+                            👤
+                          </Avatar>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="overline" sx={{ opacity: 0.9, fontSize: '0.9rem' }}>
+                              O2C Officer
+                            </Typography>
+                            <Typography variant="h4" fontWeight="bold" gutterBottom>
+                              {bestOfData.employees.o2c.full_name}
+                            </Typography>
+                            <Chip 
+                              label={`${bestOfData.employees.o2c.process_count} Processes Completed`}
+                              sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.3)',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                px: 2,
+                                py: 3
+                              }}
+                            />
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+
+                {/* EWM Officer */}
+                {bestOfData.employees.ewm && (
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                      color: 'white',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': { 
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.3)'
+                      }
+                    }}>
+                      <CardContent sx={{ p: 4 }}>
+                        <Stack spacing={3} alignItems="center">
+                          <Avatar sx={{ 
+                            width: 100, 
+                            height: 100, 
+                            bgcolor: 'rgba(255,255,255,0.3)',
+                            fontSize: '3rem'
+                          }}>
+                            👤
+                          </Avatar>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="overline" sx={{ opacity: 0.9, fontSize: '0.9rem' }}>
+                              EWM Officer
+                            </Typography>
+                            <Typography variant="h4" fontWeight="bold" gutterBottom>
+                              {bestOfData.employees.ewm.full_name}
+                            </Typography>
+                            <Chip 
+                              label={`${bestOfData.employees.ewm.process_count} Processes Completed`}
+                              sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.3)',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                px: 2,
+                                py: 3
+                              }}
+                            />
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+
+                {/* WIM Operator */}
+                {bestOfData.employees.wim && (
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                      color: '#333',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': { 
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.3)'
+                      }
+                    }}>
+                      <CardContent sx={{ p: 4 }}>
+                        <Stack spacing={3} alignItems="center">
+                          <Avatar sx={{ 
+                            width: 100, 
+                            height: 100, 
+                            bgcolor: 'rgba(0,0,0,0.1)',
+                            fontSize: '3rem'
+                          }}>
+                            👤
+                          </Avatar>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="overline" sx={{ opacity: 0.7, fontSize: '0.9rem' }}>
+                              WIM Operator
+                            </Typography>
+                            <Typography variant="h4" fontWeight="bold" gutterBottom>
+                              {bestOfData.employees.wim.full_name}
+                            </Typography>
+                            <Chip 
+                              label={`${bestOfData.employees.wim.process_count} Picklists Created`}
+                              sx={{ 
+                                bgcolor: 'rgba(0,0,0,0.1)',
+                                color: '#333',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                px: 2,
+                                py: 3
+                              }}
+                            />
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+
+                {/* Dispatcher */}
+                {bestOfData.employees.dispatch && (
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                      color: 'white',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': { 
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.3)'
+                      }
+                    }}>
+                      <CardContent sx={{ p: 4 }}>
+                        <Stack spacing={3} alignItems="center">
+                          <Avatar sx={{ 
+                            width: 100, 
+                            height: 100, 
+                            bgcolor: 'rgba(255,255,255,0.3)',
+                            fontSize: '3rem'
+                          }}>
+                            👤
+                          </Avatar>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="overline" sx={{ opacity: 0.9, fontSize: '0.9rem' }}>
+                              Dispatcher
+                            </Typography>
+                            <Typography variant="h4" fontWeight="bold" gutterBottom>
+                              {bestOfData.employees.dispatch.full_name}
+                            </Typography>
+                            <Chip 
+                              label={`${bestOfData.employees.dispatch.process_count} Dispatches Completed`}
+                              sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.3)',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                px: 2,
+                                py: 3
+                              }}
+                            />
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+
+                {/* Documentation Officer */}
+                {bestOfData.employees.documentation && (
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+                      color: 'white',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': { 
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.3)'
+                      }
+                    }}>
+                      <CardContent sx={{ p: 4 }}>
+                        <Stack spacing={3} alignItems="center">
+                          <Avatar sx={{ 
+                            width: 100, 
+                            height: 100, 
+                            bgcolor: 'rgba(255,255,255,0.3)',
+                            fontSize: '3rem'
+                          }}>
+                            👤
+                          </Avatar>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="overline" sx={{ opacity: 0.9, fontSize: '0.9rem' }}>
+                              Documentation Officer
+                            </Typography>
+                            <Typography variant="h4" fontWeight="bold" gutterBottom>
+                              {bestOfData.employees.documentation.full_name}
+                            </Typography>
+                            <Chip 
+                              label={`${bestOfData.employees.documentation.process_count} Documents Processed`}
+                              sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.3)',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                px: 2,
+                                py: 3
+                              }}
+                            />
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+
+                {/* Security Officer */}
+                {bestOfData.employees.security && (
+                  <Grid item xs={12} md={6}>
+                    <Card sx={{ 
+                      height: '100%',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: 'white',
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      '&:hover': { 
+                        transform: 'translateY(-8px)',
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.3)'
+                      }
+                    }}>
+                      <CardContent sx={{ p: 4 }}>
+                        <Stack spacing={3} alignItems="center">
+                          <Avatar sx={{ 
+                            width: 100, 
+                            height: 100, 
+                            bgcolor: 'rgba(255,255,255,0.3)',
+                            fontSize: '3rem'
+                          }}>
+                            👤
+                          </Avatar>
+                          <Box sx={{ textAlign: 'center' }}>
+                            <Typography variant="overline" sx={{ opacity: 0.9, fontSize: '0.9rem' }}>
+                              Security Officer
+                            </Typography>
+                            <Typography variant="h4" fontWeight="bold" gutterBottom>
+                              {bestOfData.employees.security.full_name}
+                            </Typography>
+                            <Chip 
+                              label={`${bestOfData.employees.security.process_count} Vehicles Cleared`}
+                              sx={{ 
+                                bgcolor: 'rgba(255,255,255,0.3)',
+                                color: 'white',
+                                fontWeight: 'bold',
+                                fontSize: '1rem',
+                                px: 2,
+                                py: 3
+                              }}
+                            />
+                          </Box>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+              </Grid>
+
+              {/* No data message */}
+              {!bestOfData.employees.o2c && !bestOfData.employees.ewm && !bestOfData.employees.wim && 
+               !bestOfData.employees.dispatch && !bestOfData.employees.documentation && !bestOfData.employees.security && (
+                <Alert severity="info" sx={{ mt: 4 }}>
+                  No employee performance data available for last week.
+                </Alert>
+              )}
+            </Box>
+          ) : (
+            <Alert severity="warning">
+              Unable to load Best of Week data. Please try again later.
+            </Alert>
+          )}
+        </Container>
+      )}
+
       {/* Customer Detail Dialog */}
       <Dialog 
         open={customerDetailOpen} 
@@ -916,7 +1666,11 @@ const RDFReport = () => {
                 <Typography variant="subtitle2" color="text.secondary">Total Waiting Time</Typography>
                 <Chip 
                   label={`${selectedCustomer.total_waiting_time || 0} minutes`}
-                  color={selectedCustomer.total_waiting_time > 60 ? 'error' : selectedCustomer.total_waiting_time > 30 ? 'warning' : 'success'}
+                  color={
+                    selectedCustomer.total_waiting_time >= 1440 ? 'error' : // 24 hours = 1440 minutes - RED
+                    selectedCustomer.total_waiting_time >= 180 ? 'warning' : // 3 hours = 180 minutes - YELLOW
+                    'success' // GREEN
+                  }
                   sx={{ mb: 2, fontWeight: 'bold', fontSize: '1rem' }}
                 />
               </Grid>
@@ -1055,69 +1809,51 @@ const RDFReport = () => {
               )}
             </Grid>
           )}
+
+          {/* Cancellation Information - Show if status is Canceled */}
+          {selectedCustomer && selectedCustomer.status === 'Canceled' && (
+            <Box sx={{ mt: 3, p: 2, bgcolor: '#ffebee', borderRadius: 2, border: '2px solid #f44336' }}>
+              <Typography variant="h6" gutterBottom sx={{ 
+                fontWeight: 700,
+                color: '#c62828',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <Clear /> Cancellation Information
+              </Typography>
+              <Grid container spacing={2} sx={{ mt: 1 }}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary">Cancelled By</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#d32f2f' }}>
+                    {selectedCustomer.cancelled_by_name || 'N/A'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" color="text.secondary">Cancelled At</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#d32f2f' }}>
+                    {selectedCustomer.cancelled_at 
+                      ? new Date(selectedCustomer.cancelled_at).toLocaleString() 
+                      : 'N/A'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" color="text.secondary">Cancellation Reason</Typography>
+                  <Paper sx={{ p: 2, mt: 1, bgcolor: 'white', border: '1px solid #ef5350' }}>
+                    <Typography variant="body1" sx={{ color: '#c62828' }}>
+                      {selectedCustomer.cancellation_reason || 'No reason provided'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCustomerDetailOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Documentation Tab */}
-      {activeTab === 2 && (
-        <Box>
-          <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
-            Completed Process Documentation
-          </Typography>
-
-          {documentationLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
-              <CircularProgress size={60} />
-            </Box>
-          ) : (
-            <Box sx={{ height: 700, width: '100%' }}>
-              <DataGrid
-                rows={documentationRecords}
-                columns={documentationColumns}
-                pageSize={25}
-                rowsPerPageOptions={[10, 25, 50, 100]}
-                checkboxSelection={false}
-                disableSelectionOnClick
-                loading={documentationLoading}
-                components={{
-                  Toolbar: GridToolbar,
-                }}
-                componentsProps={{
-                  toolbar: {
-                    showQuickFilter: true,
-                    quickFilterProps: { debounceMs: 500 },
-                  },
-                }}
-                sx={{
-                  bgcolor: 'white',
-                  borderRadius: 3,
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
-                  '& .MuiDataGrid-cell': {
-                    borderBottom: '1px solid #f0f0f0',
-                  },
-                  '& .MuiDataGrid-columnHeaders': {
-                    bgcolor: '#f8f9fa',
-                    color: '#5c6bc0',
-                    fontWeight: 700,
-                    fontSize: '0.9rem',
-                    borderBottom: '2px solid #e0e0e0',
-                  },
-                  '& .MuiDataGrid-row:hover': {
-                    bgcolor: '#f5f7ff',
-                  },
-                  '& .MuiDataGrid-toolbarContainer': {
-                    padding: 2,
-                    gap: 2,
-                  },
-                }}
-              />
-            </Box>
-          )}
-        </Box>
-      )}
     </Container>
   );
 };

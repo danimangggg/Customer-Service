@@ -156,6 +156,8 @@ const createRouteAssignment = async (req, res) => {
       assigned_by
     } = req.body;
 
+    console.log('=== CREATE ROUTE ASSIGNMENT ===');
+    console.log('Raw request body:', req.body);
     console.log('Creating route assignment with data:', {
       route_id,
       vehicle_id,
@@ -170,46 +172,65 @@ const createRouteAssignment = async (req, res) => {
       assigned_by
     });
 
+    // Convert string IDs to integers
+    const routeId = parseInt(route_id);
+    const vehicleId = parseInt(vehicle_id);
+    const driverId = parseInt(driver_id);
+    const delivererId = deliverer_id ? parseInt(deliverer_id) : null;
+    const assignedById = parseInt(assigned_by);
+    const departureKm = departure_kilometer ? parseFloat(departure_kilometer) : null;
+
+    console.log('After conversion:', {
+      routeId,
+      vehicleId,
+      driverId,
+      delivererId,
+      departureKm,
+      assignedById
+    });
+
     // Validation
-    if (!route_id || !vehicle_id || !driver_id || !ethiopian_month || !assigned_by) {
+    if (!routeId || !vehicleId || !driverId || !ethiopian_month || !assignedById) {
       return res.status(400).json({ 
         error: 'Route, vehicle, driver, Ethiopian month, and assigned_by are required' 
       });
     }
 
     // Check if route exists
-    const route = await Route.findByPk(route_id);
+    const route = await Route.findByPk(routeId);
     if (!route) {
       return res.status(400).json({ error: 'Selected route is not available' });
     }
 
     // Check if vehicle is available
-    const vehicle = await Vehicle.findByPk(vehicle_id);
+    const vehicle = await Vehicle.findByPk(vehicleId);
     if (!vehicle || vehicle.status !== 'Active') {
       return res.status(400).json({ error: 'Selected vehicle is not available' });
     }
 
     // Check if driver is available
-    const driver = await Employee.findByPk(driver_id);
+    const driver = await Employee.findByPk(driverId);
     if (!driver || driver.jobTitle !== 'Driver') {
       return res.status(400).json({ error: 'Selected driver is not available' });
     }
 
     // Check if deliverer is available (if provided)
-    if (deliverer_id) {
-      const deliverer = await Employee.findByPk(deliverer_id);
+    if (delivererId) {
+      const deliverer = await Employee.findByPk(delivererId);
       if (!deliverer || deliverer.jobTitle !== 'Deliverer') {
         return res.status(400).json({ error: 'Selected deliverer is not available' });
       }
     }
 
+    console.log('All validations passed, creating assignment...');
+
     const routeAssignment = await RouteAssignment.create({
-      route_id,
-      vehicle_id,
-      driver_id,
-      deliverer_id: deliverer_id || null,
-      departure_kilometer: departure_kilometer || null,
-      assigned_by,
+      route_id: routeId,
+      vehicle_id: vehicleId,
+      driver_id: driverId,
+      deliverer_id: delivererId,
+      departure_kilometer: departureKm,
+      assigned_by: assignedById,
       scheduled_date: scheduled_date || null,
       ethiopian_month: ethiopian_month, // Use the provided month
       priority: priority || 'Medium',
@@ -391,8 +412,14 @@ const updateRouteAssignment = async (req, res) => {
       notes
     } = req.body;
 
+    // Convert string IDs to integers
+    const routeId = parseInt(route_id);
+    const vehicleId = parseInt(vehicle_id);
+    const driverId = parseInt(driver_id);
+    const delivererId = deliverer_id ? parseInt(deliverer_id) : null;
+
     // Validation
-    if (!route_id || !vehicle_id || !driver_id || !ethiopian_month) {
+    if (!routeId || !vehicleId || !driverId || !ethiopian_month) {
       return res.status(400).json({ 
         error: 'Route, vehicle, driver, and Ethiopian month are required' 
       });
@@ -404,36 +431,36 @@ const updateRouteAssignment = async (req, res) => {
     }
 
     // Check if route exists
-    const route = await Route.findByPk(route_id);
+    const route = await Route.findByPk(routeId);
     if (!route) {
       return res.status(400).json({ error: 'Selected route is not available' });
     }
 
     // Check if vehicle is available
-    const vehicle = await Vehicle.findByPk(vehicle_id);
+    const vehicle = await Vehicle.findByPk(vehicleId);
     if (!vehicle || vehicle.status !== 'Active') {
       return res.status(400).json({ error: 'Selected vehicle is not available' });
     }
 
     // Check if driver is available
-    const driver = await Employee.findByPk(driver_id);
+    const driver = await Employee.findByPk(driverId);
     if (!driver || driver.jobTitle !== 'Driver') {
       return res.status(400).json({ error: 'Selected driver is not available' });
     }
 
     // Check if deliverer is available (if provided)
-    if (deliverer_id) {
-      const deliverer = await Employee.findByPk(deliverer_id);
+    if (delivererId) {
+      const deliverer = await Employee.findByPk(delivererId);
       if (!deliverer || deliverer.jobTitle !== 'Deliverer') {
         return res.status(400).json({ error: 'Selected deliverer is not available' });
       }
     }
 
     await assignment.update({
-      route_id,
-      vehicle_id,
-      driver_id,
-      deliverer_id: deliverer_id || null,
+      route_id: routeId,
+      vehicle_id: vehicleId,
+      driver_id: driverId,
+      deliverer_id: delivererId,
       ethiopian_month,
       priority: priority || 'Medium',
       notes: notes?.trim() || null
@@ -632,8 +659,24 @@ const getReadyRoutes = async (req, res) => {
     // Build the reporting month string
     const reportingMonth = `${month} ${year}`;
     console.log('Looking for reporting month:', reportingMonth);
+    console.log('Looking for HP processes with status: vehicle_requested (ready for driver/deliverer assignment)');
 
-    // Query to find routes that are ready for transportation assignment (vehicle requested)
+    // First, let's check what processes exist with this reporting month
+    const debugQuery = `
+      SELECT DISTINCT p.status, COUNT(*) as count
+      FROM processes p
+      WHERE p.reporting_month = ?
+      GROUP BY p.status
+    `;
+    
+    const statusCounts = await db.sequelize.query(debugQuery, {
+      replacements: [reportingMonth],
+      type: db.sequelize.QueryTypes.SELECT
+    });
+    
+    console.log('Process status distribution for', reportingMonth, ':', statusCounts);
+
+    // Query to find routes that are ready for driver/deliverer assignment (vehicle_requested status)
     const query = `
       SELECT DISTINCT 
         r.id,
@@ -641,21 +684,21 @@ const getReadyRoutes = async (req, res) => {
         COUNT(DISTINCT f.id) as total_facilities,
         COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as completed_facilities,
         ra.id as assignment_id,
-        ra.vehicle_id as assigned_vehicle_id,
+        p.vehicle_id as assigned_vehicle_id,
+        p.vehicle_name,
+        v.plate_number,
         ra.driver_id as assigned_driver_id,
         ra.deliverer_id as assigned_deliverer_id,
         ra.departure_kilometer,
         ra.notes,
         ra.status as assignment_status,
-        v.vehicle_name,
-        v.plate_number,
         d.full_name as driver_name,
         del.full_name as deliverer_name
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
       INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
       LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      LEFT JOIN vehicles v ON ra.vehicle_id = v.id
+      LEFT JOIN vehicles v ON p.vehicle_id = v.id
       LEFT JOIN employees d ON ra.driver_id = d.id
       LEFT JOIN employees del ON ra.deliverer_id = del.id
       WHERE f.route IS NOT NULL 
@@ -664,7 +707,7 @@ const getReadyRoutes = async (req, res) => {
         ${search ? 'AND f.facility_name LIKE ?' : ''}
         ${status === 'Assigned' ? 'AND ra.status IS NOT NULL' : ''}
         ${status === 'Not Assigned' ? 'AND ra.status IS NULL' : ''}
-      GROUP BY r.id, r.route_name, ra.id, ra.vehicle_id, ra.driver_id, ra.deliverer_id, ra.departure_kilometer, ra.notes, ra.status, v.vehicle_name, v.plate_number, d.full_name, del.full_name
+      GROUP BY r.id, r.route_name, ra.id, p.vehicle_id, p.vehicle_name, v.plate_number, ra.driver_id, ra.deliverer_id, ra.departure_kilometer, ra.notes, ra.status, d.full_name, del.full_name
       HAVING total_facilities > 0 AND total_facilities = completed_facilities
       ORDER BY r.route_name
       LIMIT ? OFFSET ?

@@ -67,7 +67,6 @@ const TvCustomer = () => {
   const activeOrders = useMemo(() => {
     return customers
       .filter(cust => {
-        const globalStatus = (cust.status || '').toLowerCase();
         const storeDetails = cust.store_details || {};
         const storeInfo = storeDetails[dynamicStoreKey];
         
@@ -76,8 +75,9 @@ const TvCustomer = () => {
         const ewmStatus = (storeInfo.ewm_status || '').toLowerCase();
         const dispatchStatus = (storeInfo.dispatch_status || '').toLowerCase();
         
-        return globalStatus === 'ewm_completed' && 
-               (dispatchStatus === 'notifying' || dispatchStatus === 'started' || ewmStatus === 'completed');
+        // Show customers where EWM is completed and dispatch is pending, notifying, or started
+        return ewmStatus === 'completed' && 
+               (dispatchStatus === 'pending' || dispatchStatus === 'notifying' || dispatchStatus === 'started');
       })
       .map((cust, index) => {
         const storeInfo = cust.store_details[dynamicStoreKey];

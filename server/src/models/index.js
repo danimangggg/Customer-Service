@@ -44,6 +44,12 @@ db.region = require("./CustomerService/region.js")(sequelize, Sequelize);
 db.zone = require("./CustomerService/zone.js")(sequelize, Sequelize);
 db.woreda = require("./CustomerService/woreda.js")(sequelize, Sequelize);
 
+// Gate Keeper Session model
+db.GateKeeperSession = require("./GateKeeperSession.js")(sequelize, Sequelize);
+
+// Exit History model
+db.exitHistory = require("./ExitHistory.js")(sequelize, Sequelize);
+
 // Settings models (includes vehicle)
 db.vehicle = require("./Settings/vehicle.js")(sequelize, Sequelize);
 db.store = require("./Settings/store.js")(sequelize, Sequelize);
@@ -156,6 +162,28 @@ db.employee.belongsTo(db.store, {
 db.store.hasMany(db.employee, {
   foreignKey: 'store_id',
   as: 'employees'
+});
+
+// Gate Keeper Session and Employee associations
+db.GateKeeperSession.belongsTo(db.employee, {
+  foreignKey: 'user_id',
+  as: 'employee'
+});
+
+db.employee.hasMany(db.GateKeeperSession, {
+  foreignKey: 'user_id',
+  as: 'gateKeeperSessions'
+});
+
+// Exit History and Customer Queue associations
+db.exitHistory.belongsTo(db.customerService, {
+  foreignKey: 'process_id',
+  as: 'customerQueue'
+});
+
+db.customerService.hasMany(db.exitHistory, {
+  foreignKey: 'process_id',
+  as: 'exitHistories'
 });
 
 module.exports = db;

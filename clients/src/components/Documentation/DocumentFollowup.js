@@ -1,66 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Typography, Card, CardContent, CardHeader, Button, Container, 
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Typography, Card, CardHeader, Button, Container, 
   TablePagination, Stack, Box, Chip, Avatar, Divider, Grid, LinearProgress, Alert,
-  Checkbox, FormControl, InputLabel, Select, MenuItem, InputAdornment, TextField
+  Checkbox, FormControl, InputLabel, Select, MenuItem, InputAdornment, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions, List, ListItem, ListItemText
 } from '@mui/material';
 import {
   Assignment as DocumentIcon,
   Description as ODNIcon,
   Business as FacilityIcon,
   CheckCircle as CompletedIcon,
-  Pending as PendingIcon,
-  CalendarToday as CalendarTodayIcon,
   Search as SearchIcon,
   Route as RouteIcon,
-  Edit as SignatureIcon,
-  Share as HandoverIcon
+  Edit as EditIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
-const DocumentFollowupCheckbox = ({ odn, field, pendingUpdates, onFollowupChange }) => {
-  const getFollowupStatus = () => {
-    const pendingUpdate = pendingUpdates[odn.odn_id];
-    if (pendingUpdate !== undefined && pendingUpdate[field] !== undefined) {
-      return Boolean(pendingUpdate[field]);
-    }
-    return Boolean(Number(odn[field]));
-  };
-
-  const handleChange = (e) => {
-    onFollowupChange(odn.odn_id, field, e.target.checked);
-  };
-
-  const isChecked = getFollowupStatus();
-
-  return (
-    <Box textAlign="center">
-      <Checkbox
-        checked={isChecked}
-        onChange={handleChange}
-        color="success"
-        size="medium"
-        inputProps={{ 'aria-label': `${field} for ODN ${odn.odn_number}` }}
-      />
-      <Typography variant="caption" display="block" sx={{ 
-        mt: 0.5,
-        color: isChecked ? 'success.main' : 'warning.main',
-        fontWeight: 'bold'
-      }}>
-        {isChecked ? '✓ Done' : '⚠ Pending'}
-      </Typography>
-    </Box>
-  );
-};
-
 const DocumentFollowup = () => {
-  const [odnData, setODNData] = useState([]);
+  const [facilityData, setFacilityData] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -69,61 +32,44 @@ const DocumentFollowup = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
-  const [pendingUpdates, setPendingUpdates] = useState({});
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState(null);
+  const [odnUpdates, setOdnUpdates] = useState({});
   const [autoSaving, setAutoSaving] = useState(false);
 
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
-  const isDocumentFollower = userJobTitle === 'Documentation Follower';
+  const isDocumentationOfficer = userJobTitle === 'Documentation Officer - HP';
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   const ethiopianMonths = [
     'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
   ];
 
-  // Ethiopian calendar function
   const getCurrentEthiopianMonth = () => {
+    const ethiopianMonths = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
     const gDate = new Date();
     const gy = gDate.getFullYear();
     const gm = gDate.getMonth();
     const gd = gDate.getDate();
-    
     const isLeap = (gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0);
     const newYearDay = isLeap ? 12 : 11;
-    
     let ethYear, ethMonthIndex;
-    
     if (gm > 8 || (gm === 8 && gd >= newYearDay)) {
       ethYear = gy - 7;
       const newYearDate = new Date(gy, 8, newYearDay);
       const diffDays = Math.floor((gDate - newYearDate) / (24 * 60 * 60 * 1000));
-      
-      if (diffDays < 360) {
-        ethMonthIndex = Math.floor(diffDays / 30);
-      } else {
-        ethMonthIndex = 12;
-      }
+      ethMonthIndex = diffDays < 360 ? Math.floor(diffDays / 30) : 12;
     } else {
       ethYear = gy - 8;
       const prevIsLeap = ((gy - 1) % 4 === 0 && (gy - 1) % 100 !== 0) || ((gy - 1) % 400 === 0);
       const prevNewYearDay = prevIsLeap ? 12 : 11;
       const prevNewYearDate = new Date(gy - 1, 8, prevNewYearDay);
       const diffDays = Math.floor((gDate - prevNewYearDate) / (24 * 60 * 60 * 1000));
-      
-      if (diffDays < 360) {
-        ethMonthIndex = Math.floor(diffDays / 30);
-      } else {
-        ethMonthIndex = 12;
-      }
+      ethMonthIndex = diffDays < 360 ? Math.floor(diffDays / 30) : 12;
     }
-    
     ethMonthIndex = Math.max(0, Math.min(ethMonthIndex, 12));
-    
-    return {
-      month: ethiopianMonths[ethMonthIndex],
-      year: ethYear,
-      monthIndex: ethMonthIndex
-    };
+    return { month: ethiopianMonths[ethMonthIndex], year: ethYear };
   };
 
   const currentEthiopian = getCurrentEthiopianMonth();
@@ -135,12 +81,12 @@ const DocumentFollowup = () => {
 
   useEffect(() => {
     if (selectedMonth && selectedYear) {
-      fetchFollowupODNs();
+      fetchFollowupFacilities();
       fetchStats();
     }
-  }, [selectedMonth, selectedYear, searchTerm, page, rowsPerPage]);
+  }, [selectedMonth, selectedYear, searchTerm]);
 
-  const fetchFollowupODNs = async () => {
+  const fetchFollowupFacilities = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -149,16 +95,39 @@ const DocumentFollowup = () => {
         params: {
           month: selectedMonth,
           year: selectedYear,
-          page: page + 1,
-          limit: rowsPerPage,
           search: searchTerm
         }
       });
       
-      setODNData(response.data.odns || []);
+      const odns = response.data.odns || [];
+      
+      // Group ODNs by facility
+      const facilityMap = {};
+      odns.forEach(odn => {
+        const key = odn.facility_id;
+        if (!facilityMap[key]) {
+          facilityMap[key] = {
+            facility_id: odn.facility_id,
+            facility_name: odn.facility_name,
+            region_name: odn.region_name,
+            route_name: odn.route_name,
+            pod_number: odn.pod_number,
+            odns: [],
+            total_odns: 0,
+            signed_count: 0,
+            handover_count: 0
+          };
+        }
+        facilityMap[key].odns.push(odn);
+        facilityMap[key].total_odns++;
+        if (odn.documents_signed) facilityMap[key].signed_count++;
+        if (odn.documents_handover) facilityMap[key].handover_count++;
+      });
+      
+      setFacilityData(Object.values(facilityMap));
     } catch (err) {
       console.error("Fetch error:", err);
-      setError("Failed to load ODNs for follow-up. Please try again.");
+      setError("Failed to load facilities. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -167,10 +136,7 @@ const DocumentFollowup = () => {
   const fetchStats = async () => {
     try {
       const response = await axios.get(`${api_url}/api/followup/stats`, {
-        params: {
-          month: selectedMonth,
-          year: selectedYear
-        }
+        params: { month: selectedMonth, year: selectedYear }
       });
       setStats(response.data);
     } catch (err) {
@@ -178,510 +144,256 @@ const DocumentFollowup = () => {
     }
   };
 
-  const handleFollowupChange = async (odnId, field, checked) => {
-    // Update UI immediately
-    setPendingUpdates(prev => {
-      const newState = {
-        ...prev,
-        [odnId]: {
-          ...prev[odnId],
-          [field]: Boolean(checked)
-        }
+  const handleEditFacility = (facility) => {
+    setSelectedFacility(facility);
+    const updates = {};
+    facility.odns.forEach(odn => {
+      updates[odn.odn_id] = {
+        documents_signed: Boolean(odn.documents_signed),
+        documents_handover: Boolean(odn.documents_handover)
       };
-      return newState;
     });
+    setOdnUpdates(updates);
+    setOpenEditDialog(true);
+  };
 
-    // Update ODN data for consistent UI
-    setODNData(prevData => 
-      prevData.map(odn => 
-        odn.odn_id === odnId 
-          ? { ...odn, [field]: checked ? 1 : 0 }
-          : odn
-      )
-    );
+  const handleCheckboxChange = (odnId, field, checked) => {
+    setOdnUpdates(prev => ({
+      ...prev,
+      [odnId]: {
+        ...prev[odnId],
+        [field]: checked
+      }
+    }));
+  };
 
-    // Save to database immediately
+  const handleSaveFollowup = async () => {
     try {
       setAutoSaving(true);
-      const currentData = odnData.find(odn => odn.odn_id === odnId);
-      const update = {
+      
+      const updates = Object.keys(odnUpdates).map(odnId => ({
         odn_id: parseInt(odnId),
-        documents_signed: field === 'documents_signed' ? checked : Boolean(Number(currentData.documents_signed)),
-        documents_handover: field === 'documents_handover' ? checked : Boolean(Number(currentData.documents_handover))
-      };
+        documents_signed: odnUpdates[odnId].documents_signed,
+        documents_handover: odnUpdates[odnId].documents_handover
+      }));
 
       await axios.put(`${api_url}/api/odns/bulk-followup`, {
-        updates: [update],
+        updates,
         completed_by: loggedInUserId
       });
 
-      // Record service time for Documentation Follower when both documents are completed
-      if (update.documents_signed && update.documents_handover) {
-        try {
-          const followupEndTime = formatTimestamp();
-          
-          // Get process_id from ODN
-          const currentData = odnData.find(odn => odn.odn_id === odnId);
-          if (currentData && currentData.process_id) {
-            // Calculate waiting time: current time - Documentation Officer end time
-            let waitingMinutes = 0;
-            try {
-              const docResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
-                params: {
-                  process_id: currentData.process_id,
-                  service_unit: 'Documentation Officer'
-                }
-              });
-              
-              if (docResponse.data.end_time) {
-                const prevTime = new Date(docResponse.data.end_time);
-                const currTime = new Date(followupEndTime);
-                const diffMs = currTime - prevTime;
-                waitingMinutes = Math.floor(diffMs / 60000);
-                waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
-              }
-            } catch (err) {
-              console.error('Failed to get Documentation Officer end time:', err);
-            }
-            
-            await axios.post(`${api_url}/api/service-time-hp`, {
-              process_id: currentData.process_id,
-              service_unit: 'Documentation Follower',
-              start_time: followupEndTime,
-              end_time: followupEndTime,
-              waiting_minutes: waitingMinutes,
-              officer_id: loggedInUserId,
-              officer_name: localStorage.getItem('FullName'),
-              status: 'completed',
-              notes: `Document follow-up completed - signed and handover done`
-            });
-            
-            console.log(`✅ Documentation Follower service time recorded for process ${currentData.process_id}: ${waitingMinutes} minutes`);
-          }
-        } catch (err) {
-          console.error('❌ Failed to record Documentation Follower service time:', err);
-          // Don't fail the update if service time recording fails
-        }
-      }
-
-      // Remove from pending updates since it's saved
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        if (newState[odnId]) {
-          delete newState[odnId][field];
-          if (Object.keys(newState[odnId]).length === 0) {
-            delete newState[odnId];
-          }
-        }
-        return newState;
-      });
-
-      // Update stats
-      fetchStats();
-
-      // Show brief success message
       MySwal.fire({
         icon: 'success',
         title: 'Saved!',
-        text: `${field === 'documents_signed' ? 'Documents signed' : 'Documents handover'} updated`,
-        timer: 1500,
-        showConfirmButton: false,
-        toast: true,
-        position: 'top-end'
+        text: 'Document follow-up updated successfully',
+        timer: 2000,
+        showConfirmButton: false
       });
-      
+
+      setOpenEditDialog(false);
+      fetchFollowupFacilities();
+      fetchStats();
     } catch (err) {
       console.error('Save error:', err);
-      // Revert UI changes if save failed
-      setODNData(prevData => 
-        prevData.map(odn => 
-          odn.odn_id === odnId 
-            ? { ...odn, [field]: !checked ? 1 : 0 }
-            : odn
-        )
-      );
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        if (newState[odnId]) {
-          delete newState[odnId][field];
-          if (Object.keys(newState[odnId]).length === 0) {
-            delete newState[odnId];
-          }
-        }
-        return newState;
-      });
-      MySwal.fire('Error', 'Failed to save document follow-up status.', 'error');
+      MySwal.fire('Error', 'Failed to save document follow-up.', 'error');
     } finally {
       setAutoSaving(false);
     }
   };
 
-  // Access control
-  if (!isDocumentFollower) {
+  if (!isDocumentationOfficer) {
     return (
       <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>Access Denied</Typography>
-          <Typography>
-            This page is restricted to Documentation Follower role only.
-          </Typography>
-          <Typography sx={{ mt: 2 }}>
-            <strong>Current JobTitle:</strong> "{userJobTitle}"
-          </Typography>
+        <Alert severity="error">
+          <Typography variant="h6">Access Denied</Typography>
+          <Typography>This page is restricted to Documentation Officer - HP role only.</Typography>
         </Alert>
       </Container>
     );
   }
 
   return (
-    <>
-      <style>
-        {`
-          .followup-card {
-            transition: all 0.3s ease;
-            border-left: 4px solid transparent;
-          }
-          .followup-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border-left-color: #2196f3;
-          }
-          .stats-card {
-            background: linear-gradient(135deg, #2196f3 0%, #64b5f6 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .stats-card-2 {
-            background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .stats-card-3 {
-            background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .stats-card-4 {
-            background: linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .header-gradient {
-            background: linear-gradient(135deg, #2196f3 0%, #64b5f6 100%);
-            color: white;
-            padding: 24px;
-            border-radius: 16px 16px 0 0;
-          }
-        `}
-      </style>
-      
-      <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
-        {/* Header Section */}
-        <Card sx={{ mb: 3, overflow: 'hidden' }}>
-          <Box className="header-gradient">
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                <DocumentIcon fontSize="large" />
-              </Avatar>
-              <Box>
-                <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ mb: 0 }}>
-                  Document Follow-up Management
-                </Typography>
-                <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Track document signing and handover for confirmed POD deliveries
-                </Typography>
-              </Box>
-            </Stack>
-          </Box>
-        </Card>
+    <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
+      {/* Header */}
+      <Card sx={{ mb: 3, overflow: 'hidden' }}>
+        <Box sx={{ background: 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)', color: 'white', p: 3 }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
+              <DocumentIcon fontSize="large" />
+            </Avatar>
+            <Box>
+              <Typography variant="h4" fontWeight="bold">Document Follow-up</Typography>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                Track document signing and handover by facility (POD-based)
+              </Typography>
+            </Box>
+          </Stack>
+        </Box>
+      </Card>
 
-        {/* Filters */}
-        <Card sx={{ mb: 3, p: 3 }}>
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Ethiopian Month</InputLabel>
-                <Select
-                  value={selectedMonth}
-                  label="Ethiopian Month"
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                >
-                  {ethiopianMonths.map((month) => (
-                    <MenuItem key={month} value={month}>{month}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <TextField
-                fullWidth
-                label="Year"
-                type="number"
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
-                inputProps={{ min: 2010, max: 2030 }}
-              />
-            </Grid>
-            <Grid item xs={12} md={7}>
-              <TextField
-                fullWidth
-                placeholder="Search by ODN number or facility name..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-          </Grid>
-        </Card>
-
-        {/* Statistics Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
+      {/* Filters */}
+      <Card sx={{ mb: 3, p: 3 }}>
+        <Grid container spacing={3}>
           <Grid item xs={12} md={3}>
-            <Card className="stats-card" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <ODNIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.totalConfirmed || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Confirmed PODs
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
+            <FormControl fullWidth>
+              <InputLabel>Month</InputLabel>
+              <Select value={selectedMonth} label="Month" onChange={(e) => setSelectedMonth(e.target.value)}>
+                {ethiopianMonths.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              </Select>
+            </FormControl>
           </Grid>
-          <Grid item xs={12} md={3}>
-            <Card className="stats-card-2" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <SignatureIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.documentsSigned || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Documents Signed
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
+          <Grid item xs={12} md={2}>
+            <TextField fullWidth label="Year" type="number" value={selectedYear} 
+              onChange={(e) => setSelectedYear(e.target.value)} />
           </Grid>
-          <Grid item xs={12} md={3}>
-            <Card className="stats-card-3" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <HandoverIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.documentsHandover || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Documents Handover
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={3}>
-            <Card className="stats-card-4" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <CompletedIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.completedFollowup || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Completed Follow-up
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
+          <Grid item xs={12} md={7}>
+            <TextField fullWidth placeholder="Search by facility..." value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }} />
           </Grid>
         </Grid>
+      </Card>
 
-        {/* Auto-save indicator */}
-        {autoSaving && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <LinearProgress sx={{ width: 100 }} />
-              <Typography variant="body2">Auto-saving...</Typography>
-            </Stack>
-          </Alert>
-        )}
+      {/* Stats */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 3, background: 'linear-gradient(135deg, #2196f3 0%, #64b5f6 100%)', color: 'white' }}>
+            <Typography variant="h4" fontWeight="bold">{stats.totalConfirmed || 0}</Typography>
+            <Typography>Total PODs</Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 3, background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)', color: 'white' }}>
+            <Typography variant="h4" fontWeight="bold">{stats.documentsSigned || 0}</Typography>
+            <Typography>Documents Signed</Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 3, background: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)', color: 'white' }}>
+            <Typography variant="h4" fontWeight="bold">{stats.documentsHandover || 0}</Typography>
+            <Typography>Documents Handover</Typography>
+          </Card>
+        </Grid>
+      </Grid>
 
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
+      {autoSaving && <Alert severity="info" sx={{ mb: 2 }}>Saving...</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>}
+      {loading && <LinearProgress sx={{ mb: 2 }} />}
 
-        {/* Loading Progress */}
-        {loading && <LinearProgress sx={{ mb: 2 }} />}
-
-        {/* ODNs Table */}
-        <Card className="followup-card">
-          <CardHeader 
-            title={
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <ODNIcon color="primary" />
-                <Typography variant="h6">Document Follow-up Tracking</Typography>
-                <Chip 
-                  label={`${odnData.length} ODNs`} 
-                  size="small" 
-                  color="primary" 
-                  variant="outlined" 
-                />
-              </Stack>
-            }
-          />
-          <Divider />
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <ODNIcon fontSize="small" />
-                      <span>ODN Number</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <FacilityIcon fontSize="small" />
-                      <span>Facility</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <RouteIcon fontSize="small" />
-                      <span>Route</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
-                      <SignatureIcon fontSize="small" />
-                      <span>Documents Signed</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
-                      <HandoverIcon fontSize="small" />
-                      <span>Documents Handover</span>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn, index) => {
-                  // Check if this ODN has passed document follow-up stage (both documents signed and handover completed)
-                  const isInactive = Boolean(Number(odn.documents_signed)) && Boolean(Number(odn.documents_handover));
-                  
-                  return (
-                  <TableRow 
-                    key={`${odn.odn_id}-${odn.documents_signed}-${odn.documents_handover}-${pendingUpdates[odn.odn_id]?.documents_signed || 'none'}-${pendingUpdates[odn.odn_id]?.documents_handover || 'none'}`}
-                    hover 
-                    sx={{ 
-                      '&:hover': { bgcolor: 'grey.50' },
-                      bgcolor: isInactive ? 'grey.100' : (pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit'),
-                      opacity: isInactive ? 0.6 : 1,
-                      borderLeft: pendingUpdates[odn.odn_id] ? '3px solid orange' : 'none'
-                    }}
-                  >
+      {/* Facilities Table */}
+      <Card>
+        <CardHeader title={
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <FacilityIcon color="primary" />
+            <Typography variant="h6">Facilities - Document Follow-up</Typography>
+            <Chip label={`${facilityData.length} facilities`} size="small" color="primary" variant="outlined" />
+          </Stack>
+        } />
+        <Divider />
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>Facility</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Route</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>POD Number</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>ODNs</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Progress</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {facilityData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((facility) => {
+                const isComplete = facility.signed_count === facility.total_odns && facility.handover_count === facility.total_odns;
+                return (
+                  <TableRow key={facility.facility_id} hover>
                     <TableCell>
-                      <Typography variant="body2" fontWeight="bold" color="primary">
-                        {odn.odn_number}
-                      </Typography>
+                      <Typography variant="body2" fontWeight="bold">{facility.facility_name}</Typography>
+                      <Typography variant="caption" color="text.secondary">{facility.region_name}</Typography>
+                    </TableCell>
+                    <TableCell>{facility.route_name}</TableCell>
+                    <TableCell>
+                      <Chip label={facility.pod_number || 'N/A'} size="small" color="info" variant="outlined" />
                     </TableCell>
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {odn.facility_name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {odn.region_name} • {odn.zone_name} • {odn.woreda_name}
-                        </Typography>
-                      </Box>
+                      <Chip label={`${facility.total_odns} ODNs`} size="small" color="primary" variant="outlined" />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">
-                        {odn.route_name}
-                      </Typography>
+                      <Stack spacing={0.5}>
+                        <Typography variant="caption">
+                          Signed: {facility.signed_count}/{facility.total_odns}
+                        </Typography>
+                        <Typography variant="caption">
+                          Handover: {facility.handover_count}/{facility.total_odns}
+                        </Typography>
+                      </Stack>
                     </TableCell>
                     <TableCell align="center">
-                      {isInactive ? (
-                        <Chip 
-                          label="✓ Done" 
-                          color="success" 
-                          size="small" 
-                          variant="outlined"
-                        />
+                      {isComplete ? (
+                        <Chip icon={<CompletedIcon />} label="Completed" color="success" size="small" />
                       ) : (
-                        <DocumentFollowupCheckbox 
-                          odn={odn}
-                          field="documents_signed"
-                          pendingUpdates={pendingUpdates}
-                          onFollowupChange={handleFollowupChange}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      {isInactive ? (
-                        <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                          <Chip 
-                            label="✓ Done" 
-                            color="success" 
-                            size="small" 
-                            variant="outlined"
-                          />
-                          <Chip 
-                            label="Passed to Quality" 
-                            color="info" 
-                            size="small" 
-                            variant="outlined"
-                          />
-                        </Stack>
-                      ) : (
-                        <DocumentFollowupCheckbox 
-                          odn={odn}
-                          field="documents_handover"
-                          pendingUpdates={pendingUpdates}
-                          onFollowupChange={handleFollowupChange}
-                        />
+                        <Button variant="contained" size="small" startIcon={<EditIcon />}
+                          onClick={() => handleEditFacility(facility)}>
+                          Edit
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <TablePagination 
-              component="div" 
-              count={odnData.length} 
-              rowsPerPage={rowsPerPage} 
-              page={page}
-              onPageChange={(_, p) => setPage(p)}
-              onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              sx={{ borderTop: 1, borderColor: 'divider' }}
-            />
-          </TableContainer>
-        </Card>
-      </Container>
-    </>
+                );
+              })}
+            </TableBody>
+          </Table>
+          <TablePagination component="div" count={facilityData.length} rowsPerPage={rowsPerPage} page={page}
+            onPageChange={(_, p) => setPage(p)} onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
+            rowsPerPageOptions={[5, 10, 25, 50]} />
+        </TableContainer>
+      </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Typography variant="h6">Edit Document Follow-up</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {selectedFacility?.facility_name} - POD: {selectedFacility?.pod_number}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <List>
+            {selectedFacility?.odns.map((odn) => (
+              <ListItem key={odn.odn_id} sx={{ border: '1px solid #e0e0e0', mb: 1, borderRadius: 1 }}>
+                <ListItemText 
+                  primary={<Typography fontWeight="bold">{odn.odn_number}</Typography>}
+                  secondary={
+                    <Stack direction="row" spacing={3} sx={{ mt: 1 }}>
+                      <Box>
+                        <Checkbox 
+                          checked={odnUpdates[odn.odn_id]?.documents_signed || false}
+                          onChange={(e) => handleCheckboxChange(odn.odn_id, 'documents_signed', e.target.checked)}
+                        />
+                        <Typography variant="caption">Documents Signed</Typography>
+                      </Box>
+                      <Box>
+                        <Checkbox 
+                          checked={odnUpdates[odn.odn_id]?.documents_handover || false}
+                          onChange={(e) => handleCheckboxChange(odn.odn_id, 'documents_handover', e.target.checked)}
+                        />
+                        <Typography variant="caption">Documents Handover</Typography>
+                      </Box>
+                    </Stack>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
+          <Button variant="contained" startIcon={<SaveIcon />} onClick={handleSaveFollowup} disabled={autoSaving}>
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
   );
 };
 

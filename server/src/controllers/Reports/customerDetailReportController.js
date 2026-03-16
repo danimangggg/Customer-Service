@@ -92,7 +92,11 @@ const getCustomersDetailReport = async (req, res) => {
         COALESCE(f.region_name, 'Unknown') as region_name,
         COALESCE(f.zone_name, 'Unknown') as zone_name,
         COALESCE(f.woreda_name, 'Unknown') as woreda_name,
-        TIMESTAMPDIFF(MINUTE, cq.started_at, COALESCE(cq.completed_at, NOW())) as total_waiting_time
+        TIMESTAMPDIFF(MINUTE, cq.started_at, COALESCE(cq.completed_at, NOW())) as total_waiting_time,
+        cq.cancellation_reason,
+        cq.cancelled_by_id,
+        cq.cancelled_by_name,
+        cq.cancelled_at
       FROM customer_queue cq
       LEFT JOIN facilities f ON cq.facility_id = f.id
       WHERE 1=1

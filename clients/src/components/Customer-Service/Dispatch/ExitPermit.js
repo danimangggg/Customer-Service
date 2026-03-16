@@ -128,25 +128,22 @@ const ExitPermit = () => {
       console.log('Total records:', serviceRes.data.length);
       console.log('Filtered records for exit permit:', activeRows.length);
       
-      // Get ALL Gate Keepers (Security Officers) - not store-specific
-      const userData = Array.isArray(usersRes.data) ? usersRes.data : [];
+      // Get Gate Keepers (Security Officers) for THIS store only from active sessions
+      console.log('Current store:', userStore);
       
-      console.log('All users fetched:', userData.length);
-      
-      // Get all Gate Keepers regardless of store
-      const gateKeeperUsers = userData.filter(user => {
-        return user.JobTitle === 'Gate Keeper';
-      }).map(user => ({
-        id: user.id,
-        name: user.FullName,
-        label: user.FullName,
-        store: user.store || 'All Stores'
-      }));
-      
-      console.log('Available Security Officers (Gate Keepers):', gateKeeperUsers.length);
-      if (gateKeeperUsers.length === 0) {
-        console.warn('⚠️ No Security Officers found in the system');
-        console.warn('Please add Security Officers in user management');
+      try {
+        const gateKeepersResponse = await axios.get(`${API_URL}/api/gate-keepers-by-store/${userStore}`);
+        const gateKeeperUsers = gateKeepersResponse.data.gateKeepers || [];
+        
+        console.log(`Available Security Officers (Gate Keepers) for ${userStore}:`, gateKeeperUsers.length);
+        if (gateKeeperUsers.length === 0) {
+          console.log(`ℹ️ No Security Officers currently assigned to ${userStore} (Gate Keepers must log in and select this store)`);
+        }
+        
+        setGateKeepers(gateKeeperUsers);
+      } catch (error) {
+        console.error('Error fetching Gate Keepers:', error);
+        setGateKeepers([]);
       }
       
       // Handle facilities data
@@ -154,7 +151,6 @@ const ExitPermit = () => {
       
       setRecords(activeRows);
       setFacilities(facilityData);
-      setGateKeepers(gateKeeperUsers);
       
       setError(null);
     } catch (error) {
@@ -166,7 +162,7 @@ const ExitPermit = () => {
     } finally {
       setLoading(false);
     }
-  }, [getStoreKeys]);
+  }, [getStoreKeys, userStore]);
 
   // Fetch history data - get total count first
   const fetchHistoryData = useCallback(async (page = 1) => {
@@ -509,7 +505,7 @@ const ExitPermit = () => {
     setFormValues(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
   };
 
-  const handleSubmit = async (record) => {
+  const handleSubmit = async (record, isPartial = false) => {
     const data = formValues[record.id] || {};
     const isCash = record.customer_type?.toLowerCase() === 'cash';
 
@@ -518,7 +514,11 @@ const ExitPermit = () => {
         setSnackbar({ open: true, message: "Receipt number required for Cash customers.", severity: "error" });
         return;
     }
-    if (!data.receiptCount || !data.plateNumber || !data.amount || !data.measurement) {
+    if (isCash && !data.receiptCount) {
+      setSnackbar({ open: true, message: "Receipt count required for Cash customers.", severity: "warning" });
+      return;
+    }
+    if (!data.plateNumber || !data.amount || !data.measurement) {
       setSnackbar({ open: true, message: "Please fill all required fields.", severity: "warning" });
       return;
     }
@@ -529,7 +529,7 @@ const ExitPermit = () => {
 
     try {
       const exitPermitData = {
-        receipt_count: data.receiptCount,
+        receipt_count: isCash ? data.receiptCount : null,
         vehicle_plate: data.plateNumber,
         receipt_number: data.receiptNumber || null,
         total_amount: data.amount,
@@ -538,23 +538,41 @@ const ExitPermit = () => {
       
       console.log('=== EXIT PERMIT SUBMISSION ===');
       console.log('Record ID:', record.id);
+      console.log('Is Partial:', isPartial);
       console.log('Exit Permit Data:', exitPermitData);
       console.log('Selected Gate Keeper:', data.selectedGateKeeper);
       
       const storeKeys = getStoreKeys();
       
       // Update ODN exit permit status FIRST
-      try {
-        await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
-          process_id: record.id,
-          store: storeKeys.storeId,
-          exit_permit_status: 'completed',
-          officer_id: localStorage.getItem('EmployeeID'),
-          officer_name: localStorage.getItem('FullName')
-        });
-        console.log('✅ ODN exit permit status updated');
-      } catch (err) {
-        console.error('❌ Failed to update ODN exit permit status:', err);
+      if (!isPartial) {
+        // Full completion - set status to completed
+        try {
+          await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
+            process_id: record.id,
+            store: storeKeys.storeId,
+            exit_permit_status: 'completed',
+            officer_id: localStorage.getItem('EmployeeID'),
+            officer_name: localStorage.getItem('FullName')
+          });
+          console.log('✅ ODN exit permit status updated to completed');
+        } catch (err) {
+          console.error('❌ Failed to update ODN exit permit status:', err);
+        }
+      } else {
+        // Partial completion - set status to partial (so it shows in Gate Keeper but stays in Exit Permit list)
+        try {
+          await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
+            process_id: record.id,
+            store: storeKeys.storeId,
+            exit_permit_status: 'partial',
+            officer_id: localStorage.getItem('EmployeeID'),
+            officer_name: localStorage.getItem('FullName')
+          });
+          console.log('✅ ODN exit permit status updated to partial');
+        } catch (err) {
+          console.error('❌ Failed to update ODN exit permit status:', err);
+        }
       }
       
       // Record service time IMMEDIATELY (before checking other stores or updating customer_queue)
@@ -568,7 +586,7 @@ const ExitPermit = () => {
           officer_id: localStorage.getItem('EmployeeID'),
           officer_name: localStorage.getItem('FullName'),
           status: 'completed',
-          notes: `Exit permit finalized - Receipt: ${data.receiptNumber || 'N/A'}, Plate: ${data.plateNumber}`
+          notes: `Exit permit ${isPartial ? 'partially' : 'fully'} finalized - Receipt: ${data.receiptNumber || 'N/A'}, Plate: ${data.plateNumber}`
         });
         
         console.log(`✅ Dispatch-Documentation service time recorded`);
@@ -584,12 +602,13 @@ const ExitPermit = () => {
         const allOdns = odnResponse.data.odns || [];
         allExitPermitCompleted = allOdns.every(odn => odn.exit_permit_status === 'completed');
         
-        if (allExitPermitCompleted) {
+        // Only set to archived if it's full completion AND all stores completed
+        if (!isPartial && allExitPermitCompleted) {
           exitPermitData.status = 'archived';
           // DON'T set completed_at here - only Gate Keeper sets it when allowing exit
           console.log('✅ All stores completed exit permit, setting status to archived');
         } else {
-          console.log('⏳ Some stores still need to complete exit permit');
+          console.log(isPartial ? '⏳ Partial completion - keeping in list' : '⏳ Some stores still need to complete exit permit');
         }
       } catch (err) {
         console.error('❌ Failed to check all ODN statuses:', err);
@@ -610,7 +629,9 @@ const ExitPermit = () => {
       
       setSnackbar({ 
         open: true, 
-        message: `Exit Permit sent to ${data.selectedGateKeeper.name}!`, 
+        message: isPartial 
+          ? `Partial exit permit sent to ${data.selectedGateKeeper.name}. Customer can return for more.`
+          : `Exit Permit sent to ${data.selectedGateKeeper.name}!`, 
         severity: "success" 
       });
       
@@ -805,7 +826,7 @@ const ExitPermit = () => {
                           )}
                         </TableCell>
 
-                        {/* Plate & Receipts */}
+                        {/* Plate, Receipts & Security Selection */}
                         <TableCell sx={{ verticalAlign: 'top', py: 3 }}>
                           {isFinalized ? (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -813,48 +834,19 @@ const ExitPermit = () => {
                                 <LocalShipping sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
                                 {row.vehicle_plate}
                               </Typography>
-                              <Typography variant="body2">
-                                <Receipt sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                                {row.receipt_count} Receipts
-                              </Typography>
+                              {isCash && (
+                                <Typography variant="body2">
+                                  <Receipt sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
+                                  {row.receipt_count} Receipts
+                                </Typography>
+                              )}
                               {isCash && row.receipt_number && (
                                 <Typography variant="body2" sx={{ color: '#f57c00' }}>
                                   <ConfirmationNumber sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
                                   {row.receipt_number}
                                 </Typography>
                               )}
-                            </Box>
-                          ) : (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                              <TextField 
-                                label="Plate Number" size="small"
-                                InputProps={{ startAdornment: <InputAdornment position="start"><LocalShipping fontSize="small"/></InputAdornment> }}
-                                value={val.plateNumber || ''}
-                                onChange={(e) => handleInputChange(row.id, 'plateNumber', e.target.value)}
-                              />
-                              <TextField 
-                                label="Receipts Count" size="small" type="number"
-                                InputProps={{ startAdornment: <InputAdornment position="start"><Receipt fontSize="small"/></InputAdornment> }}
-                                value={val.receiptCount || ''}
-                                onChange={(e) => handleInputChange(row.id, 'receiptCount', e.target.value)}
-                              />
-                              {isCash && (
-                                <TextField 
-                                  label="Cash Receipt Number" size="small" color="warning" focused
-                                  InputProps={{ startAdornment: <InputAdornment position="start"><ConfirmationNumber fontSize="small"/></InputAdornment> }}
-                                  value={val.receiptNumber || ''}
-                                  onChange={(e) => handleInputChange(row.id, 'receiptNumber', e.target.value)}
-                                />
-                              )}
-                            </Box>
-                          )}
-                        </TableCell>
-
-                        {/* Security Selection */}
-                        <TableCell sx={{ verticalAlign: 'top', py: 3 }}>
-                          {isFinalized ? (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, mt: 1 }}>
                                 <Person sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
                                 {row.assigned_gate_keeper_name || 'Security'}
                               </Typography>
@@ -866,32 +858,56 @@ const ExitPermit = () => {
                               />
                             </Box>
                           ) : (
-                            <Autocomplete
-                              size="small"
-                              options={gateKeepers}
-                              getOptionLabel={(option) => option.label}
-                              value={val.selectedGateKeeper || null}
-                              onChange={(event, newValue) => {
-                                handleInputChange(row.id, 'selectedGateKeeper', newValue);
-                              }}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  label="Select Security Officer"
-                                  variant="filled"
-                                  required
-                                  InputProps={{
-                                    ...params.InputProps,
-                                    startAdornment: (
-                                      <InputAdornment position="start">
-                                        <Person fontSize="small" />
-                                      </InputAdornment>
-                                    )
-                                  }}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              <TextField 
+                                label="Plate Number" size="small"
+                                InputProps={{ startAdornment: <InputAdornment position="start"><LocalShipping fontSize="small"/></InputAdornment> }}
+                                value={val.plateNumber || ''}
+                                onChange={(e) => handleInputChange(row.id, 'plateNumber', e.target.value)}
+                              />
+                              {isCash && (
+                                <TextField 
+                                  label="Receipts Count" size="small" type="number"
+                                  InputProps={{ startAdornment: <InputAdornment position="start"><Receipt fontSize="small"/></InputAdornment> }}
+                                  value={val.receiptCount || ''}
+                                  onChange={(e) => handleInputChange(row.id, 'receiptCount', e.target.value)}
                                 />
                               )}
-                              sx={{ minWidth: 200 }}
-                            />
+                              {isCash && (
+                                <TextField 
+                                  label="Cash Receipt Number" size="small" color="warning" focused
+                                  InputProps={{ startAdornment: <InputAdornment position="start"><ConfirmationNumber fontSize="small"/></InputAdornment> }}
+                                  value={val.receiptNumber || ''}
+                                  onChange={(e) => handleInputChange(row.id, 'receiptNumber', e.target.value)}
+                                />
+                              )}
+                              <Autocomplete
+                                size="small"
+                                options={gateKeepers}
+                                getOptionLabel={(option) => option.label}
+                                value={val.selectedGateKeeper || null}
+                                onChange={(event, newValue) => {
+                                  handleInputChange(row.id, 'selectedGateKeeper', newValue);
+                                }}
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    label="Select Security Officer"
+                                    variant="filled"
+                                    required
+                                    InputProps={{
+                                      ...params.InputProps,
+                                      startAdornment: (
+                                        <InputAdornment position="start">
+                                          <Person fontSize="small" />
+                                        </InputAdornment>
+                                      )
+                                    }}
+                                  />
+                                )}
+                                sx={{ minWidth: 200 }}
+                              />
+                            </Box>
                           )}
                         </TableCell>
 
@@ -905,17 +921,30 @@ const ExitPermit = () => {
                               sx={{ fontWeight: 'bold' }}
                             />
                           ) : (
-                            <Button 
-                              variant="contained" 
-                              onClick={() => handleSubmit(row)} 
-                              sx={{ 
-                                borderRadius: '10px', px: 3, fontWeight: 'bold', textTransform: 'none',
-                                background: 'linear-gradient(45deg, #2e3b8b 30%, #5c6bc0 90%)'
-                              }}
-                              endIcon={<Send />}
-                            >
-                              Finalize
-                            </Button>
+                            <Stack direction="column" spacing={1}>
+                              <Button 
+                                variant="contained" 
+                                onClick={() => handleSubmit(row, false)} 
+                                sx={{ 
+                                  borderRadius: '10px', px: 3, fontWeight: 'bold', textTransform: 'none',
+                                  background: 'linear-gradient(45deg, #2e3b8b 30%, #5c6bc0 90%)'
+                                }}
+                                endIcon={<Send />}
+                              >
+                                Full Completion
+                              </Button>
+                              <Button 
+                                variant="outlined" 
+                                color="primary"
+                                onClick={() => handleSubmit(row, true)} 
+                                sx={{ 
+                                  borderRadius: '10px', px: 3, fontWeight: 'bold', textTransform: 'none'
+                                }}
+                                endIcon={<Send />}
+                              >
+                                Partial Completion
+                              </Button>
+                            </Stack>
                           )}
                         </TableCell>
                       </TableRow>

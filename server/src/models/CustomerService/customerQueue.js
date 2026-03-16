@@ -89,6 +89,22 @@ gate_processed_by: {
   type: DataTypes.STRING(255),
   allowNull: true,
 },
+cancellation_reason: {
+  type: DataTypes.TEXT,
+  allowNull: true,
+},
+cancelled_by_id: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+},
+cancelled_by_name: {
+  type: DataTypes.STRING(255),
+  allowNull: true,
+},
+cancelled_at: {
+  type: DataTypes.DATE,
+  allowNull: true,
+},
   }, {
     tableName: 'customer_queue',
     timestamps: false,

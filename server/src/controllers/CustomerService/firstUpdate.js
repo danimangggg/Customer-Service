@@ -11,6 +11,10 @@ const updateQueue = async (req, res) => {
     if (req.body.status !== undefined) updateData.status = req.body.status;
     if (req.body.completed_at !== undefined) updateData.completed_at = req.body.completed_at;
     if (req.body.started_at !== undefined) updateData.started_at = req.body.started_at;
+    if (req.body.cancellation_reason !== undefined) updateData.cancellation_reason = req.body.cancellation_reason;
+    if (req.body.cancelled_by_id !== undefined) updateData.cancelled_by_id = req.body.cancelled_by_id;
+    if (req.body.cancelled_by_name !== undefined) updateData.cancelled_by_name = req.body.cancelled_by_name;
+    if (req.body.cancelled_at !== undefined) updateData.cancelled_at = req.body.cancelled_at;
     
     // Add O2C tracking fields if provided
     if (req.body.o2c_started_at !== undefined) updateData.o2c_started_at = req.body.o2c_started_at;

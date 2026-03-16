@@ -4,7 +4,8 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Typography, TextField, Card, CardContent, CardHeader,
   Button, MenuItem, Container, TablePagination, Stack, Box, Chip, Avatar,
-  Tooltip, IconButton, Divider, Grid, Badge, LinearProgress, Alert
+  Tooltip, IconButton, Divider, Grid, Badge, LinearProgress, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -21,6 +22,9 @@ import PersonIcon from '@mui/icons-material/Person';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import ReplyIcon from '@mui/icons-material/Reply';
+import InfoIcon from '@mui/icons-material/Info';
+import CloseIcon from '@mui/icons-material/Close';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -40,6 +44,11 @@ const HpFacilities = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Process Details Dialog States
+  const [processDetailOpen, setProcessDetailOpen] = useState(false);
+  const [selectedProcess, setSelectedProcess] = useState(null);
+  const [processServiceDetails, setProcessServiceDetails] = useState([]);
   
   // Filtering States
   const [filterType, setFilterType] = useState("Regular");
@@ -202,23 +211,26 @@ const HpFacilities = () => {
   // --- START PROCESS ---
   const handleStartProcess = async (facilityId) => {
     try {
-      const reportingMonthStr = `${currentEthiopianMonth} ${currentEthiopianYear}`;
+      const isSpecialType = filterType === "Emergency" || filterType === "Breakdown";
+      const reportingMonthStr = isSpecialType ? null : `${currentEthiopianMonth} ${currentEthiopianYear}`;
       const payload = {
         facility_id: facilityId,
         service_point: "o2c",
         status: "o2c_started",
         userId: loggedInUserId ? parseInt(loggedInUserId, 10) : undefined,
         reporting_month: reportingMonthStr,
+        process_type: filterType.toLowerCase(),
       };
       const res = await axios.post(`${api_url}/api/start-process`, payload);
       if (res.status === 201 || res.status === 200) {
         setActiveProcesses(prev => [...prev, { 
           id: res.data.process_id, 
           facility_id: facilityId, 
-          status: "o2c_started", // Add the missing status field
+          status: "o2c_started",
           o2c_officer_name: res.data.officerName, 
           o2c_officer_id: loggedInUserId, 
-          reporting_month: reportingMonthStr 
+          reporting_month: reportingMonthStr,
+          process_type: filterType.toLowerCase()
         }]);
         // Initialize ODN count for new process
         setProcessODNCounts(prev => ({
@@ -437,60 +449,53 @@ const HpFacilities = () => {
     const odnCount = processODNCounts[processId] || 0;
     
     if (odnCount === 0) {
-      // No ODNs added - show alert with options
+      if (filterType !== "Regular" && filterType !== "Vaccine") {
+        Swal.fire({
+          title: 'Cannot Complete',
+          text: 'You must add at least one ODN number before completing the process.',
+          icon: 'error',
+          confirmButtonText: 'OK'
+        });
+        return;
+      }
+
+      // Regular type: offer RRF Not Sent option; Vaccine: offer VRF Not Sent option
+      const isVaccine = filterType === "Vaccine";
       const result = await Swal.fire({
         title: 'No ODN Numbers Added',
-        text: 'This process has no ODN numbers. How would you like to proceed?',
+        text: `This process has no ODN numbers. How would you like to proceed?`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: 'RRF Not Sent',
+        confirmButtonText: isVaccine ? 'VRF Not Sent' : 'RRF Not Sent',
         cancelButtonText: 'Cancel',
         confirmButtonColor: '#ff9800',
         cancelButtonColor: '#6c757d'
       });
 
-      if (result.isDismissed || !result.isConfirmed) {
-        // User cancelled - do nothing
-        return;
-      }
+      if (!result.isConfirmed) return;
 
-      if (result.isConfirmed) {
-        // User selected "RRF Not Sent" - add this as ODN and complete
-        try {
-          // First add "RRF not sent" as ODN
-          await axios.post(`${api_url}/api/save-odn`, { 
-            process_id: processId, 
-            odn_number: 'RRF not sent'
-          });
-          
-          // Update ODN count for this process
-          setProcessODNCounts(prev => ({
-            ...prev,
-            [processId]: 1
-          }));
-          
-          // Then complete the process
-          await axios.post(`${api_url}/api/complete-process`, { 
-            process_id: processId
-          });
-          
-          // Update the process status in local state
-          setActiveProcesses(prev => 
-            prev.map(p => 
-              p.id === processId 
-                ? { ...p, status: 'o2c_completed' }
-                : p
-            )
-          );
-          
-          Swal.fire('Completed!', 'Process completed with "RRF not sent" status.', 'success');
-          
-        } catch (err) {
-          console.error('Complete process with RRF error:', err);
-          Swal.fire('Error', 'Failed to complete process.', 'error');
-        }
+      try {
+        const process = activeProcesses.find(p => p.id === processId);
+        const facilityName = process?.facility?.facility_name || 'Unknown';
+        const notSentLabel = isVaccine
+          ? `VRF not sent - ${facilityName} - Process ${processId}`
+          : `RRF not sent - ${facilityName} - Process ${processId}`;
+        await axios.post(`${api_url}/api/save-odn`, {
+          process_id: processId,
+          odn_number: notSentLabel
+        });
+        setProcessODNCounts(prev => ({ ...prev, [processId]: 1 }));
+        await axios.post(`${api_url}/api/complete-process`, { process_id: processId });
+        setActiveProcesses(prev =>
+          prev.map(p => p.id === processId ? { ...p, status: 'o2c_completed' } : p)
+        );
+        Swal.fire('Completed!', `Process completed with "${isVaccine ? 'VRF' : 'RRF'} not sent" status.`, 'success');
+      } catch (err) {
+        console.error('Complete process error:', err);
+        Swal.fire('Error', 'Failed to complete process.', 'error');
       }
-    } else {
+      return;
+    }
       // Normal completion flow - has ODNs
       const result = await Swal.fire({
         title: 'Complete Process?',
@@ -521,7 +526,7 @@ const HpFacilities = () => {
               start_time: o2cEndTime,
               end_time: o2cEndTime,
               waiting_minutes: waitingMinutes,
-              officer_id: localStorage.getItem('EmployeeID'),
+              officer_id: loggedInUserId,
               officer_name: localStorage.getItem('FullName'),
               status: 'completed',
               notes: `O2C process completed with ${odnCount} ODN(s)`
@@ -549,7 +554,6 @@ const HpFacilities = () => {
           Swal.fire('Error', 'Failed to complete process.', 'error');
         }
       }
-    }
   };
 
   // --- EWM COMPLETE PROCESS ---
@@ -642,7 +646,7 @@ const HpFacilities = () => {
             start_time: ewmEndTime,
             end_time: ewmEndTime,
             waiting_minutes: waitingMinutes,
-            officer_id: localStorage.getItem('EmployeeID'),
+            officer_id: loggedInUserId,
             officer_name: localStorage.getItem('FullName'),
             status: 'completed',
             notes: `EWM ODN completed: ${odnId}`
@@ -760,6 +764,24 @@ const HpFacilities = () => {
     }
   };
 
+  // --- FETCH PROCESS SERVICE DETAILS ---
+  const fetchProcessServiceDetails = async (processId) => {
+    try {
+      const response = await axios.get(`${api_url}/api/hp-customers/${processId}/service-details`);
+      setProcessServiceDetails(response.data.serviceDetails || []);
+    } catch (err) {
+      console.error('Error fetching HP process service details:', err);
+      setProcessServiceDetails([]);
+    }
+  };
+
+  // --- VIEW PROCESS DETAILS ---
+  const handleViewProcessDetails = async (process, facility) => {
+    setSelectedProcess({ ...process, facility });
+    setProcessDetailOpen(true);
+    await fetchProcessServiceDetails(process.id);
+  };
+
   // --- FILTERING LOGIC ---
   // Helper function to determine if current month is even or odd
   const getCurrentPeriod = () => {
@@ -786,38 +808,18 @@ const HpFacilities = () => {
       filterType: filterType
     });
 
-    if (filterType === "Emergency") {
-      // Emergency: show only HP facilities regardless of period
+    if (filterType === "Emergency" || filterType === "Breakdown") {
+      // Emergency/Breakdown: show all HP facilities regardless of route/period
       return isHPFacility(facility);
     }
     
-    // Regular: apply period-based filtering AND require route assignment
-    if (!facility.route || facility.route.toString().trim().length === 0) {
-      return false; // Regular mode requires route assignment
+    // Vaccine: show only facilities marked as vaccine sites
+    if (filterType === "Vaccine") {
+      return !!facility.is_vaccine_site;
     }
     
-    if (!facility.period) {
-      return false; // Don't show facilities without period set
-    }
-    
-    const facilityPeriod = facility.period.toLowerCase();
-    
-    // Monthly facilities are always shown
-    if (facilityPeriod === 'monthly') {
-      return true;
-    }
-    
-    // Show even period facilities only in even months (Tikimt=2, Tahsas=4, etc.)
-    if (facilityPeriod === 'even' && currentPeriod === 'even') {
-      return true;
-    }
-    
-    // Show odd period facilities only in odd months (Meskerem=1, Hidar=3, etc.)
-    if (facilityPeriod === 'odd' && currentPeriod === 'odd') {
-      return true;
-    }
-    
-    return false;
+    // Regular: show only facilities marked as HP sites
+    return !!facility.is_hp_site;
   };
 
   // For EWM Officers: Create rows for each ODN instead of each facility
@@ -832,36 +834,47 @@ const HpFacilities = () => {
   });
   
   if (isEWMOfficer) {
+    const isSpecialType = filterType === "Emergency" || filterType === "Breakdown";
     // Create a row for each ODN
     facilities.forEach(f => {
       const matchesSearch = (f.facility_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (f.route || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRoute = filterRoute === "All" || f.route === filterRoute;
+      const matchesRoute = isSpecialType || filterRoute === "All" || f.route === filterRoute || f.route2 === filterRoute;
       const shouldShow = shouldShowFacility(f);
       
       if (matchesSearch && matchesRoute && shouldShow) {
-        // EWM officers should only see processes that have completed O2C stage
-        const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
-        const proc = activeProcesses.find(a => 
-          a.facility_id === f.id && 
-          a.reporting_month === selReporting &&
-          (a.status === 'o2c_completed' || a.status === 'ewm_completed' || 
-           a.status === 'vehicle_requested' || a.status === 'vehicle_assigned' || 
-           a.status === 'dispatched') // Only show if O2C is completed or beyond
-        );
+        const validStatuses = ['o2c_completed', 'ewm_completed', 'vehicle_requested', 'vehicle_assigned', 'dispatched'];
+        let proc;
+        if (isSpecialType) {
+          // Emergency/Breakdown: match by process_type, no reporting_month filter
+          proc = activeProcesses.find(a =>
+            a.facility_id === f.id &&
+            a.process_type === filterType.toLowerCase() &&
+            validStatuses.includes(a.status)
+          );
+        } else {
+          const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
+          proc = activeProcesses.find(a => 
+            a.facility_id === f.id && 
+            a.reporting_month === selReporting &&
+            a.process_type === filterType.toLowerCase() &&
+            validStatuses.includes(a.status)
+          );
+        }
         
         if (proc) {
           const odnList = processODNData[proc.id] || [];
           if (odnList.length > 0) {
-            // Create a row for each ODN
-            odnList.forEach(odn => {
-              filteredData.push({
-                ...f,
-                process: proc,
-                odn: odn,
-                uniqueId: `${f.id}-${odn.id}` // Unique identifier for React keys
+            odnList
+              .filter(odn => odn.status !== 'ewm_completed')
+              .forEach(odn => {
+                filteredData.push({
+                  ...f,
+                  process: proc,
+                  odn: odn,
+                  uniqueId: `${f.id}-${odn.id}`
+                });
               });
-            });
           }
         }
       }
@@ -877,21 +890,38 @@ const HpFacilities = () => {
     console.log('Filter Type:', filterType);
   } else {
     // O2C Officers: Original facility-based filtering
+    const isSpecialType = filterType === "Emergency" || filterType === "Breakdown";
     filteredData = facilities.filter(f => {
       const matchesSearch = (f.facility_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (f.route || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRoute = filterRoute === "All" || f.route === filterRoute;
+      const matchesRoute = isSpecialType || filterRoute === "All" || f.route === filterRoute || f.route2 === filterRoute;
       const shouldShow = shouldShowFacility(f);
       
+      if (isSpecialType) {
+        // Emergency/Breakdown: always show facility, multiple concurrent processes allowed
+        return matchesSearch && shouldShow;
+      }
+
       const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
-      const proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
       
-      // O2C Officer should see:
-      // 1. Facilities with no process (can start new), OR
-      // 2. Facilities with any process status (active or passed)
-      const shouldShowForO2C = true; // Show all that match other filters
+      // Vaccine: hide if a vaccine process already exists this month (once per month rule)
+      if (filterType === "Vaccine") {
+        const vaccineProc = activeProcesses.find(a =>
+          a.facility_id === f.id &&
+          a.process_type === 'vaccine' &&
+          a.reporting_month === selReporting
+        );
+        const vaccineDone = vaccineProc && vaccineProc.status !== 'o2c_started' && vaccineProc.status !== 'completed';
+        return matchesSearch && matchesRoute && shouldShow && !vaccineDone;
+      }
+
+      const proc = activeProcesses.find(a =>
+        a.facility_id === f.id && a.reporting_month === selReporting && a.process_type !== 'vaccine'
+      );
+      // Hide if process is already past O2C stage
+      const alreadyDone = proc && proc.status !== 'o2c_started' && proc.status !== 'completed';
       
-      return matchesSearch && matchesRoute && shouldShow && shouldShowForO2C;
+      return matchesSearch && matchesRoute && shouldShow && !alreadyDone;
     });
     
     console.log('O2C Debug Info:', {
@@ -1052,7 +1082,7 @@ const HpFacilities = () => {
                   fullWidth 
                   value={filterRoute} 
                   onChange={(e) => setFilterRoute(e.target.value)}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, display: (filterType === 'Emergency' || filterType === 'Breakdown' || filterType === 'Vaccine') ? 'none' : undefined }}
                 >
                   {routes.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
                 </TextField>
@@ -1067,8 +1097,10 @@ const HpFacilities = () => {
                   onChange={(e) => setFilterType(e.target.value)}
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 >
-                  <MenuItem value="Regular">Regular</MenuItem>
+                  <MenuItem value="Regular">HP Regular</MenuItem>
                   <MenuItem value="Emergency">Emergency</MenuItem>
+                  <MenuItem value="Breakdown">Breakdown</MenuItem>
+                  <MenuItem value="Vaccine">Vaccine</MenuItem>
                 </TextField>
               </Grid>
               <Grid item xs={12} md={2}>
@@ -1133,7 +1165,7 @@ const HpFacilities = () => {
                       <span>Facility Details</span>
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary', display: (filterType === 'Emergency' || filterType === 'Breakdown') ? 'none' : undefined }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <RouteIcon fontSize="small" />
                       <span>Route</span>
@@ -1198,7 +1230,7 @@ const HpFacilities = () => {
                             </Typography>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ display: (filterType === 'Emergency' || filterType === 'Breakdown') ? 'none' : undefined }}>
                           <Chip 
                             icon={<RouteIcon />}
                             label={f.route} 
@@ -1274,7 +1306,7 @@ const HpFacilities = () => {
                             )}
                             {isInactive && (
                               <Chip 
-                                label={`Passed to ${proc.status === 'ewm_completed' ? 'PI' : 
+                                label={`Passed to ${proc.status === 'ewm_completed' ? 'TM Manager' : 
                                        proc.status === 'vehicle_requested' ? 'Dispatch' : 
                                        'Next Stage'}`}
                                 size="small" 
@@ -1293,16 +1325,25 @@ const HpFacilities = () => {
                   } else {
                     // O2C Officer: Each row is a facility (original logic)
                     const f = item;
-                    const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
-                    const proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
+                    const isSpecialTypeRow = filterType === "Emergency" || filterType === "Breakdown";
+                    let proc;
+                    if (isSpecialTypeRow) {
+                      // Emergency/Breakdown: only show active O2C processes (not completed ones)
+                      proc = activeProcesses.find(a =>
+                        a.facility_id === f.id &&
+                        a.process_type === filterType.toLowerCase() &&
+                        (a.status === 'o2c_started' || a.status === 'completed')
+                      );
+                    } else {
+                      const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
+                      proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
+                    }
                     const isOwner = proc && String(proc.o2c_officer_id) === String(loggedInUserId);
                     const hasODNs = proc && (processODNCounts[proc.id] || 0) > 0;
                     const odnCount = proc ? (processODNCounts[proc.id] || 0) : 0;
                     
-                    // Process is inactive if it has passed O2C stage
-                    // O2C stage statuses: 'o2c_started', 'completed'
-                    // Passed O2C: 'o2c_completed', 'ewm_completed', 'vehicle_requested', 'vehicle_assigned', 'dispatched', etc.
-                    const hasPassedO2C = proc && !['o2c_started', 'completed'].includes(proc.status);
+                    // For emergency/breakdown: never inactive — always allow new process
+                    const hasPassedO2C = !isSpecialTypeRow && proc && !['o2c_started', 'completed'].includes(proc.status);
                     const isInactive = hasPassedO2C;
 
                     return (
@@ -1333,7 +1374,7 @@ const HpFacilities = () => {
                             </Typography>
                           </Box>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ display: (filterType === 'Emergency' || filterType === 'Breakdown') ? 'none' : undefined }}>
                           <Chip 
                             icon={<RouteIcon />}
                             label={f.route} 
@@ -1465,6 +1506,252 @@ const HpFacilities = () => {
             />
           </TableContainer>
         </Card>
+
+        {/* Process Details Dialog */}
+        <Dialog 
+          open={processDetailOpen} 
+          onClose={() => setProcessDetailOpen(false)}
+          maxWidth="lg"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 3,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}>
+                <InfoIcon />
+              </Avatar>
+              <Box>
+                <Typography variant="h6" fontWeight="bold">
+                  HP Process Details
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                  {selectedProcess?.facility?.facility_name || 'N/A'}
+                </Typography>
+              </Box>
+            </Stack>
+            <IconButton 
+              onClick={() => setProcessDetailOpen(false)}
+              sx={{ color: 'white' }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+
+          <DialogContent sx={{ mt: 3 }}>
+            {selectedProcess && (
+              <Grid container spacing={3}>
+                {/* Process Information */}
+                <Grid item xs={12}>
+                  <Card sx={{ 
+                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                    border: '1px solid rgba(102, 126, 234, 0.2)',
+                    borderRadius: 2
+                  }}>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom sx={{ 
+                        fontWeight: 700,
+                        color: '#667eea',
+                        mb: 2
+                      }}>
+                        Process Information
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={6}>
+                          <Stack spacing={1}>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">Process ID</Typography>
+                              <Typography variant="body1" fontWeight="bold">{selectedProcess.id}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">Reporting Month</Typography>
+                              <Typography variant="body1" fontWeight="bold">{selectedProcess.reporting_month || 'N/A'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">Status</Typography>
+                              <Chip 
+                                label={selectedProcess.status?.toUpperCase() || 'N/A'} 
+                                color={
+                                  selectedProcess.status === 'o2c_completed' ? 'success' :
+                                  selectedProcess.status === 'ewm_completed' ? 'info' :
+                                  selectedProcess.status === 'dispatched' ? 'primary' :
+                                  'default'
+                                }
+                                size="small"
+                                sx={{ mt: 0.5 }}
+                              />
+                            </Box>
+                          </Stack>
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                          <Stack spacing={1}>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">Facility</Typography>
+                              <Typography variant="body1" fontWeight="bold">
+                                {selectedProcess.facility?.facility_name || 'N/A'}
+                              </Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">Region</Typography>
+                              <Typography variant="body1">{selectedProcess.facility?.region_name || 'N/A'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="caption" color="text.secondary">Route</Typography>
+                              <Chip 
+                                icon={<RouteIcon />}
+                                label={selectedProcess.facility?.route || 'N/A'} 
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                                sx={{ mt: 0.5 }}
+                              />
+                            </Box>
+                          </Stack>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Service Time Details */}
+                <Grid item xs={12}>
+                  <Typography variant="h6" gutterBottom sx={{ 
+                    fontWeight: 700,
+                    color: '#667eea',
+                    borderBottom: '2px solid #667eea',
+                    pb: 1,
+                    mb: 2
+                  }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <AccessTimeIcon />
+                      <span>Service Time Tracking</span>
+                    </Stack>
+                  </Typography>
+                  {processServiceDetails.length > 0 ? (
+                    <TableContainer component={Paper} sx={{ 
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      borderRadius: 2
+                    }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                            <TableCell sx={{ fontWeight: 700 }}>Service Unit</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Officer</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Start Time</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>End Time</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Duration</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {processServiceDetails.map((service, index) => (
+                            <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight="bold">
+                                  {service.service_unit}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Stack direction="row" alignItems="center" spacing={1}>
+                                  <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main' }}>
+                                    <PersonIcon fontSize="small" />
+                                  </Avatar>
+                                  <Typography variant="body2">{service.officer_name || 'N/A'}</Typography>
+                                </Stack>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">
+                                  {service.start_time ? new Date(service.start_time).toLocaleString() : 'N/A'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2">
+                                  {service.end_time ? new Date(service.end_time).toLocaleString() : 'N/A'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell>
+                                <Chip 
+                                  label={`${service.waiting_minutes || 0} min`}
+                                  size="small"
+                                  color="info"
+                                  variant="outlined"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Chip 
+                                  label={service.status || 'N/A'} 
+                                  color={service.status === 'completed' ? 'success' : 'default'}
+                                  size="small"
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Alert severity="info" sx={{ borderRadius: 2 }}>
+                      No service time records found for this process.
+                    </Alert>
+                  )}
+                </Grid>
+
+                {/* ODN Information */}
+                <Grid item xs={12}>
+                  <Typography variant="h6" gutterBottom sx={{ 
+                    fontWeight: 700,
+                    color: '#667eea',
+                    borderBottom: '2px solid #667eea',
+                    pb: 1,
+                    mb: 2
+                  }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <AssignmentIcon />
+                      <span>ODN Numbers</span>
+                    </Stack>
+                  </Typography>
+                  {processODNData[selectedProcess.id] && processODNData[selectedProcess.id].length > 0 ? (
+                    <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+                      {processODNData[selectedProcess.id].map((odn, index) => (
+                        <Chip
+                          key={index}
+                          label={odn.odn_number}
+                          color={odn.status === 'ewm_completed' ? 'success' : 'primary'}
+                          variant="outlined"
+                          icon={odn.status === 'ewm_completed' ? <CheckCircleIcon /> : <AssignmentIcon />}
+                        />
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Alert severity="info" sx={{ borderRadius: 2 }}>
+                      No ODN numbers added yet.
+                    </Alert>
+                  )}
+                </Grid>
+              </Grid>
+            )}
+          </DialogContent>
+
+          <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+            <Button 
+              onClick={() => setProcessDetailOpen(false)}
+              variant="contained"
+              sx={{ borderRadius: 2 }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </>
   );

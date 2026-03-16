@@ -22,6 +22,7 @@ const DispatcherAccount = () => {
     const [error, setError] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
     const [customerOdns, setCustomerOdns] = useState({}); // Store ODNs by customer ID
+    const [notifyingTimers, setNotifyingTimers] = useState({}); // Track notification timers
     
     // --- STATE for Store Info ---
     const [store, setStore] = useState(null);
@@ -132,9 +133,9 @@ const DispatcherAccount = () => {
                 
                 // Show if:
                 // 1. EWM is completed and dispatch not completed yet
-                // 2. Dispatch is in progress (started or notifying)
+                // 2. Dispatch is in progress (started, notifying, or continuing)
                 const isReadyToStart = ewmStatus === 'completed' && dispatchStatus === 'pending';
-                const isInProgress = ['started', 'notifying'].includes(dispatchStatus);
+                const isInProgress = ['started', 'notifying', 'continuing'].includes(dispatchStatus);
                 const isNotDone = dispatchStatus !== 'completed';
                 
                 return isNotDone && (isReadyToStart || isInProgress);
@@ -175,7 +176,11 @@ const DispatcherAccount = () => {
         if (Object.keys(facilitiesMap).length > 0 && store) {
             fetchDispatchList();
             const interval = setInterval(fetchDispatchList, 10000);
-            return () => clearInterval(interval);
+            return () => {
+                clearInterval(interval);
+                // Clear all notification timers on unmount
+                Object.values(notifyingTimers).forEach(timer => clearTimeout(timer));
+            };
         } else {
             // Set a timeout to prevent infinite loading
             const timeout = setTimeout(() => {
@@ -193,7 +198,7 @@ const DispatcherAccount = () => {
             
             return () => clearTimeout(timeout);
         }
-    }, [fetchDispatchList, facilitiesMap, store, loading]);
+    }, [fetchDispatchList, facilitiesMap, store, loading, notifyingTimers]);
 
     // Helper function to get ODNs for a customer
     const getCustomerOdns = (customerId) => {
@@ -213,10 +218,20 @@ const DispatcherAccount = () => {
             setLoading(true);
             
             const isFinalStep = newStatus === 'completed';
+            const isNotifying = newStatus === 'notifying';
+            const isContinuing = newStatus === 'continuing';
             
             // Update ODN dispatch status
-            const dispatchStatusValue = isFinalStep ? 'completed' : 
-                                       newStatus === 'notifying' ? 'notifying' : 'started';
+            let dispatchStatusValue;
+            if (isFinalStep) {
+                dispatchStatusValue = 'completed';
+            } else if (isNotifying) {
+                dispatchStatusValue = 'notifying';
+            } else if (isContinuing) {
+                dispatchStatusValue = 'continuing';
+            } else {
+                dispatchStatusValue = 'started';
+            }
             
             try {
                 // Update ODN dispatch status
@@ -238,13 +253,71 @@ const DispatcherAccount = () => {
                 return;
             }
             
+            // Handle notification timer
+            if (isNotifying) {
+                // Clear any existing timer for this item
+                if (notifyingTimers[item.id]) {
+                    clearTimeout(notifyingTimers[item.id]);
+                }
+                
+                // Set 1-minute auto-stop timer
+                const timer = setTimeout(async () => {
+                    console.log(`Auto-stopping notification for item ${item.id} after 1 minute`);
+                    try {
+                        // Automatically go back to started status
+                        await axios.put(`${API_URL}/api/odns-rdf/update-dispatch-status`, {
+                            process_id: item.id,
+                            store: store,
+                            dispatch_status: 'started',
+                            dispatcher_id: localStorage.getItem('EmployeeID'),
+                            dispatcher_name: localStorage.getItem('FullName')
+                        });
+                        
+                        setSnackbar({ 
+                            open: true, 
+                            message: "Notification stopped automatically after 1 minute", 
+                            severity: 'info' 
+                        });
+                        
+                        fetchDispatchList();
+                    } catch (error) {
+                        console.error('Error auto-stopping notification:', error);
+                    }
+                    
+                    // Remove timer from state
+                    setNotifyingTimers(prev => {
+                        const newTimers = { ...prev };
+                        delete newTimers[item.id];
+                        return newTimers;
+                    });
+                }, 60000); // 60 seconds = 1 minute
+                
+                // Store timer
+                setNotifyingTimers(prev => ({
+                    ...prev,
+                    [item.id]: timer
+                }));
+            } else {
+                // Clear timer if stopping, continuing, or completing
+                if (notifyingTimers[item.id]) {
+                    clearTimeout(notifyingTimers[item.id]);
+                    setNotifyingTimers(prev => {
+                        const newTimers = { ...prev };
+                        delete newTimers[item.id];
+                        return newTimers;
+                    });
+                }
+            }
+            
             // If completing, update customer_queue to move to Exit Permit
             if (isFinalStep) {
                 try {
                     // Check if all stores have completed dispatch
                     const odnResponse = await axios.get(`${API_URL}/api/rdf-odns/${item.id}`);
                     const allOdns = odnResponse.data.odns || [];
-                    const allDispatchCompleted = allOdns.every(odn => odn.dispatch_status === 'completed');
+                    const allDispatchCompleted = allOdns.every(odn => 
+                        odn.dispatch_status === 'completed'
+                    );
                     
                     if (allDispatchCompleted) {
                         // All stores completed, move to Exit Permit
@@ -293,9 +366,20 @@ const DispatcherAccount = () => {
                 }
             }
             
+            let message = '';
+            if (isFinalStep) {
+                message = "Order sent to Exit Permit registry";
+            } else if (isNotifying) {
+                message = "Notifying delegate (will auto-stop in 1 minute)";
+            } else if (isContinuing) {
+                message = "Notification stopped - ready to complete";
+            } else {
+                message = `Process: ${newStatus}`;
+            }
+            
             setSnackbar({ 
                 open: true, 
-                message: isFinalStep ? "Order sent to Exit Permit registry" : `Process: ${newStatus}`, 
+                message, 
                 severity: 'success' 
             });
 
@@ -535,14 +619,25 @@ const DispatcherAccount = () => {
                                                                     <Button 
                                                                         size="small" 
                                                                         variant="contained" 
-                                                                        color="success" 
-                                                                        onClick={() => handleStatusUpdate(item, 'completed')}
-                                                                        startIcon={<CheckCircleIcon />}
+                                                                        color="primary" 
+                                                                        onClick={() => handleStatusUpdate(item, 'continuing')}
+                                                                        startIcon={<PlayArrowIcon />}
                                                                         className="action-button"
                                                                     >
-                                                                        Complete
+                                                                        Continue
                                                                     </Button>
                                                                 </>
+                                                            ) : dispatchStatus === 'continuing' ? (
+                                                                <Button 
+                                                                    size="small" 
+                                                                    variant="contained" 
+                                                                    color="success" 
+                                                                    onClick={() => handleStatusUpdate(item, 'completed')}
+                                                                    startIcon={<CheckCircleIcon />}
+                                                                    className="action-button"
+                                                                >
+                                                                    Complete
+                                                                </Button>
                                                             ) : dispatchStatus === 'started' ? (
                                                                 <Button 
                                                                     size="small" 

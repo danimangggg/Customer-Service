@@ -233,7 +233,7 @@ const deleteODN = async (req, res) => {
 
 const completeProcess = async (req, res) => {
   try {
-    const { process_id } = req.body;
+    const { process_id, o2c_officer_id, o2c_officer_name } = req.body;
     
     if (!process_id) {
       return res.status(400).send({ 
@@ -292,6 +292,78 @@ const ewmCompleteProcess = async (req, res) => {
 
     // Update process status to EWM completed
     await process.update({ status: 'ewm_completed' });
+
+    // Record service time for EWM Phase - Passed to TM Manager
+    try {
+      const ewmOfficerId = process.dataValues.o2c_officer_id;
+      
+      // Get officer name from users table
+      let ewmOfficerName = 'EWM Officer';
+      if (ewmOfficerId) {
+        try {
+          const userQuery = `SELECT CONCAT(first_name, ' ', last_name) as full_name FROM users WHERE id = ?`;
+          const [user] = await db.sequelize.query(userQuery, {
+            replacements: [ewmOfficerId],
+            type: db.sequelize.QueryTypes.SELECT
+          });
+          if (user?.full_name) {
+            ewmOfficerName = user.full_name;
+          }
+        } catch (err) {
+          console.error('Failed to fetch EWM officer name:', err);
+        }
+      }
+      
+      // Calculate waiting time from O2C completion
+      let waitingMinutes = 0;
+      try {
+        const lastServiceQuery = `
+          SELECT end_time 
+          FROM service_time_hp
+          WHERE process_id = ? AND service_unit LIKE '%O2C%'
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `;
+        
+        const [lastService] = await db.sequelize.query(lastServiceQuery, {
+          replacements: [process_id],
+          type: db.sequelize.QueryTypes.SELECT
+        });
+        
+        if (lastService && lastService.end_time) {
+          const prevTime = new Date(lastService.end_time);
+          const currTime = new Date();
+          const diffMs = currTime - prevTime;
+          waitingMinutes = Math.floor(diffMs / 60000);
+          waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+        }
+      } catch (err) {
+        console.error('Failed to calculate EWM waiting time:', err);
+      }
+      
+      const insertQuery = `
+        INSERT INTO service_time_hp 
+        (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
+        VALUES (?, ?, NOW(), ?, ?, ?, ?)
+      `;
+      
+      await db.sequelize.query(insertQuery, {
+        replacements: [
+          process_id,
+          'EWM - Passed to TM Manager',
+          ewmOfficerId,
+          ewmOfficerName,
+          'completed',
+          `EWM Phase completed, waiting time: ${waitingMinutes} minutes`
+        ],
+        type: db.sequelize.QueryTypes.INSERT
+      });
+      
+      console.log(`✅ EWM Phase service time recorded: ${waitingMinutes} minutes`);
+    } catch (err) {
+      console.error('❌ Failed to record EWM Phase service time:', err);
+      // Don't fail the completion if service time recording fails
+    }
 
     return res.status(200).send({ 
       message: 'EWM Process completed successfully',

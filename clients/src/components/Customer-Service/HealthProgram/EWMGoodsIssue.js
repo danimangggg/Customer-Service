@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Typography, Card, CardHeader, Button, Container, 
-  TablePagination, Stack, Box, Chip, Avatar, Divider, LinearProgress, Alert
+  TablePagination, Stack, Box, Chip, Avatar, Divider, LinearProgress, Alert, TextField, MenuItem
 } from '@mui/material';
 import {
   Inventory as InventoryIcon,
@@ -20,6 +20,7 @@ const EWMGoodsIssue = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [processType, setProcessType] = useState('regular');
 
   const loggedInUserId = localStorage.getItem('UserId');
   const loggedInUserName = localStorage.getItem('FullName');
@@ -79,23 +80,20 @@ const EWMGoodsIssue = () => {
 
   useEffect(() => {
     fetchProcesses();
-  }, []);
+  }, [processType]);
 
   const fetchProcesses = async () => {
     try {
       setLoading(true);
       setError(null);
-      
       const response = await axios.get(`${api_url}/api/ewm-goods-issue-processes`, {
         params: {
           month: currentEthiopian.month,
-          year: currentEthiopian.year
+          year: currentEthiopian.year,
+          process_type: processType
         }
       });
-      
-      // Filter out processes without facility data
-      const validProcesses = (response.data.processes || []).filter(p => p.facility);
-      setProcesses(validProcesses);
+      setProcesses(response.data.processes || []);
     } catch (err) {
       console.error("Fetch error:", err);
       setError("Failed to load processes. Please try again.");
@@ -109,7 +107,6 @@ const EWMGoodsIssue = () => {
       title: 'Issue Goods?',
       html: `
         <p>Issue goods for <strong>${process.facility?.facility_name}</strong></p>
-        <p>Freight Order: <strong>${process.freight_order_number}</strong></p>
       `,
       icon: 'question',
       showCancelButton: true,
@@ -163,7 +160,7 @@ const EWMGoodsIssue = () => {
                   EWM - Goods Issue
                 </Typography>
                 <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Issue goods after receiving freight order from TM
+                  Issue goods after TM confirmation
                 </Typography>
               </Box>
             </Stack>
@@ -178,13 +175,26 @@ const EWMGoodsIssue = () => {
 
         {loading && <LinearProgress sx={{ mb: 2 }} />}
 
+        {/* Type Filter */}
+        <Card sx={{ mb: 2, p: 2 }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography variant="body2" color="text.secondary">Process Type:</Typography>
+            <TextField select size="small" value={processType} onChange={e => setProcessType(e.target.value)} sx={{ minWidth: 140 }}>
+              <MenuItem value="regular">HP Regular</MenuItem>
+              <MenuItem value="emergency">Emergency</MenuItem>
+              <MenuItem value="breakdown">Breakdown</MenuItem>
+              <MenuItem value="vaccine">Vaccine</MenuItem>
+            </TextField>
+          </Stack>
+        </Card>
+
         {/* Processes Table */}
         <Card>
           <CardHeader 
             title={
               <Stack direction="row" alignItems="center" spacing={1}>
                 <AssignmentIcon color="primary" />
-                <Typography variant="h6">Freight Orders Ready for Goods Issue</Typography>
+                <Typography variant="h6">Processes Ready for Goods Issue</Typography>
                 <Chip 
                   label={`${processes.length} processes`} 
                   size="small" 
@@ -202,7 +212,6 @@ const EWMGoodsIssue = () => {
                   <TableCell sx={{ fontWeight: 'bold' }}>#</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Facility</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Route</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Freight Order</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>TM Officer</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
@@ -233,14 +242,6 @@ const EWMGoodsIssue = () => {
                         size="small" 
                         color="secondary" 
                         variant="outlined" 
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={process.freight_order_number}
-                        size="small"
-                        color="info"
-                        variant="filled"
                       />
                     </TableCell>
                     <TableCell>

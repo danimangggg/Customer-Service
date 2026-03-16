@@ -23,59 +23,20 @@ import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
 
-const PODCheckbox = ({ odn, pendingUpdates, onPODChange }) => {
-  const getPODStatus = () => {
-    // Check pending updates first
-    const pendingUpdate = pendingUpdates[odn.odn_id];
-    if (pendingUpdate !== undefined) {
-      return Boolean(pendingUpdate.pod_confirmed);
-    }
-    // Use database value
-    return Boolean(Number(odn.pod_confirmed));
-  };
-
-  const handleChange = (e) => {
-    onPODChange(odn.odn_id, e.target.checked);
-  };
-
-  const isChecked = getPODStatus();
-
-  return (
-    <Box textAlign="center">
-      <Checkbox
-        checked={isChecked}
-        onChange={handleChange}
-        color="success"
-        size="medium"
-        inputProps={{ 'aria-label': `POD confirmation for ODN ${odn.odn_number}` }}
-      />
-      <Typography variant="caption" display="block" sx={{ 
-        mt: 0.5,
-        color: isChecked ? 'success.main' : 'warning.main',
-        fontWeight: 'bold'
-      }}>
-        {isChecked ? '✓ Confirmed' : '⚠ Pending'}
-      </Typography>
-    </Box>
-  );
-};
-
 const DocumentationManagement = () => {
-  const [odnData, setODNData] = useState([]);
+  const [facilityData, setFacilityData] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
-  const [pendingUpdates, setPendingUpdates] = useState({});
   const [autoSaving, setAutoSaving] = useState(false);
 
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
-  const isDocumentationOfficer = userJobTitle === 'Documentation Officer';
+  const isDocumentationOfficer = userJobTitle === 'Documentation Officer - HP';
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   const ethiopianMonths = [
@@ -137,32 +98,22 @@ const DocumentationManagement = () => {
 
   useEffect(() => {
     if (selectedMonth && selectedYear) {
-      fetchDispatchedODNs();
-      fetchStats();
+      fetchDispatchedFacilities();
     }
   }, [selectedMonth, selectedYear, searchTerm, page, rowsPerPage]);
 
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      Object.values(reasonTimeouts.current).forEach(timeout => {
-        clearTimeout(timeout);
-      });
-    };
-  }, []);
-
-  const fetchDispatchedODNs = async () => {
+  const fetchDispatchedFacilities = async () => {
     try {
       setLoading(true);
       setError(null);
       
       // Validate required parameters
       if (!selectedMonth || !selectedYear) {
-        setError("Please select both month and year to load ODNs.");
+        setError("Please select both month and year to load facilities.");
         return;
       }
       
-      console.log('Fetching ODNs with params:', {
+      console.log('Fetching facilities with params:', {
         month: selectedMonth,
         year: selectedYear,
         page: page + 1,
@@ -182,25 +133,24 @@ const DocumentationManagement = () => {
       
       console.log('API Response:', response.data);
       
-      if (response.data.odns) {
-        setODNData(response.data.odns);
+      if (response.data.facilities) {
+        setFacilityData(response.data.facilities);
         
-        // Show informative message if no ODNs found
-        if (response.data.odns.length === 0) {
-          setError(`No ODNs found for the selected period.`);
+        // Show informative message if no facilities found
+        if (response.data.facilities.length === 0) {
+          setError(`No facilities found for the selected period.`);
         }
       } else {
-        setODNData([]);
-        setError("No ODN data received from server.");
+        setFacilityData([]);
+        setError("No facility data received from server.");
       }
       
     } catch (err) {
       console.error("Fetch error:", err);
       
-      let errorMessage = "Failed to load dispatched ODNs. ";
+      let errorMessage = "Failed to load dispatched facilities. ";
       
       if (err.response) {
-        // Server responded with error status
         const status = err.response.status;
         const data = err.response.data;
         
@@ -212,690 +162,234 @@ const DocumentationManagement = () => {
           errorMessage += `HTTP ${status}: ${data.error || 'Please try again.'}`;
         }
       } else if (err.request) {
-        // Network error
         errorMessage += "Network error. Please check your connection and try again.";
       } else {
-        // Other error
         errorMessage += err.message || "Please try again.";
       }
       
       setError(errorMessage);
-      setODNData([]);
+      setFacilityData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      if (!selectedMonth || !selectedYear) {
-        return; // Don't fetch stats without valid parameters
-      }
-      
-      const response = await axios.get(`${api_url}/api/documentation/stats`, {
-        params: {
-          month: selectedMonth,
-          year: selectedYear
-        }
-      });
-      
-      console.log('Stats response:', response.data);
-      setStats(response.data);
-    } catch (err) {
-      console.error("Stats fetch error:", err);
-      // Don't show error for stats, just log it
-      setStats({
-        totalDispatched: 0,
-        confirmedPODs: 0,
-        pendingPODs: 0
-      });
-    }
-  };
-
-  const handlePODConfirmationChange = async (odnId, confirmed) => {
-    // Get current reason from ODN data or pending updates
-    const currentODN = odnData.find(odn => odn.odn_id === odnId);
-    const currentReason = pendingUpdates[odnId]?.pod_reason || currentODN?.pod_reason || '';
-
-    // If confirming POD, collect POD number and check if arrival kilometer is already set for this route
-    if (confirmed) {
-      // Find all ODNs on the same route
-      const sameRouteODNs = odnData.filter(odn => 
-        odn.route_name === currentODN?.route_name && 
-        odn.route_assignment_id === currentODN?.route_assignment_id
-      );
-      
-      // Check if arrival kilometer is already set for this route
-      const existingArrivalKm = sameRouteODNs.find(odn => 
-        odn.arrival_kilometer || pendingUpdates[odn.odn_id]?.arrival_kilometer
-      )?.arrival_kilometer || pendingUpdates[sameRouteODNs.find(odn => 
-        pendingUpdates[odn.odn_id]?.arrival_kilometer
-      )?.odn_id]?.arrival_kilometer;
-
-      const { value: formValues } = await MySwal.fire({
-        title: 'POD Confirmation Details',
-        html: `
-          <div style="text-align: left; margin: 20px 0;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">POD Number:</label>
-            <input id="pod-number" class="swal2-input" placeholder="Enter POD number..." value="${currentODN?.pod_number || ''}" style="margin-bottom: 15px;">
-            
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Destination Kilometer (for entire route):</label>
-            <input id="arrival-km" class="swal2-input" type="number" step="0.01" min="0" placeholder="Enter destination kilometer..." value="${existingArrivalKm || currentODN?.arrival_kilometer || ''}" style="margin-bottom: 15px;">
-            
-            <div style="background: #f0f8ff; padding: 10px; border-radius: 5px; margin-top: 10px;">
-              <small style="color: #666;">
-                <strong>Route:</strong> ${currentODN?.route_name || 'Unknown'}<br>
-                <strong>Facility:</strong> ${currentODN?.facility_name || 'Unknown'}<br>
-                ${existingArrivalKm ? `<strong>Note:</strong> This route already has destination kilometer: ${existingArrivalKm} km` : ''}
-                ${sameRouteODNs.length > 1 ? `<br><strong>Info:</strong> This will apply to all ${sameRouteODNs.length} ODNs on this route` : ''}
-              </small>
-            </div>
-          </div>
-        `,
-        focusConfirm: false,
-        showCancelButton: true,
-        confirmButtonText: 'Confirm POD',
-        cancelButtonText: 'Cancel',
-        preConfirm: () => {
-          const podNumber = document.getElementById('pod-number').value;
-          const arrivalKm = document.getElementById('arrival-km').value;
-          
-          if (!podNumber.trim()) {
-            MySwal.showValidationMessage('POD number is required');
-            return false;
-          }
-          
-          if (!arrivalKm || parseFloat(arrivalKm) < 0) {
-            MySwal.showValidationMessage('Valid destination kilometer is required');
-            return false;
-          }
-          
-          return {
-            podNumber: podNumber.trim(),
-            arrivalKm: parseFloat(arrivalKm)
-          };
-        }
-      });
-
-      if (formValues) {
-        // Update UI immediately for instant feedback
-        setPendingUpdates(prev => ({
-          ...prev,
-          [odnId]: {
-            ...prev[odnId],
-            pod_confirmed: true,
-            pod_reason: '',
-            pod_number: formValues.podNumber,
-            arrival_kilometer: formValues.arrivalKm
-          }
-        }));
-
-        // Update ODN data for consistent UI
-        setODNData(prevData => 
-          prevData.map(odn => 
-            odn.odn_id === odnId 
-              ? { 
-                  ...odn, 
-                  pod_confirmed: 1,
-                  pod_number: formValues.podNumber,
-                  arrival_kilometer: formValues.arrivalKm
-                }
-              : odn
-          )
-        );
-
-        // Save to database
-        try {
-          setAutoSaving(true);
-          const update = {
-            odn_id: parseInt(odnId),
-            pod_confirmed: true,
-            pod_reason: '',
-            pod_number: formValues.podNumber,
-            arrival_kilometer: formValues.arrivalKm,
-            route_assignment_id: currentODN?.route_assignment_id
-          };
-
-          await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-            updates: [update],
-            confirmed_by: loggedInUserId
-          });
-
-          // Record service time for Documentation Officer
-          try {
-            const docEndTime = formatTimestamp();
-            
-            // Get process_id from ODN
-            if (currentODN && currentODN.process_id) {
-              // Calculate waiting time: current time - Dispatcher end time
-              let waitingMinutes = 0;
-              try {
-                const dispatchResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
-                  params: {
-                    process_id: currentODN.process_id,
-                    service_unit: 'Dispatcher - HP'
-                  }
-                });
-                
-                if (dispatchResponse.data.end_time) {
-                  const prevTime = new Date(dispatchResponse.data.end_time);
-                  const currTime = new Date(docEndTime);
-                  const diffMs = currTime - prevTime;
-                  waitingMinutes = Math.floor(diffMs / 60000);
-                  waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
-                }
-              } catch (err) {
-                console.error('Failed to get Dispatcher end time:', err);
-              }
-              
-              await axios.post(`${api_url}/api/service-time-hp`, {
-                process_id: currentODN.process_id,
-                service_unit: 'Documentation Officer',
-                start_time: docEndTime,
-                end_time: docEndTime,
-                waiting_minutes: waitingMinutes,
-                officer_id: loggedInUserId,
-                officer_name: localStorage.getItem('FullName'),
-                status: 'completed',
-                notes: `POD confirmed - POD #: ${formValues.podNumber}`
-              });
-              
-              console.log(`✅ Documentation Officer service time recorded for process ${currentODN.process_id}: ${waitingMinutes} minutes`);
-            }
-          } catch (err) {
-            console.error('❌ Failed to record Documentation service time:', err);
-            // Don't fail the confirmation if service time recording fails
-          }
-
-          // Remove from pending updates since it's saved
-          setPendingUpdates(prev => {
-            const newState = { ...prev };
-            delete newState[odnId];
-            return newState;
-          });
-
-          // Update stats
-          fetchStats();
-
-          MySwal.fire({
-            icon: 'success',
-            title: 'Success!',
-            text: 'POD confirmed with details',
-            timer: 2000,
-            showConfirmButton: false,
-            toast: true,
-            position: 'top-end'
-          });
-
-        } catch (err) {
-          console.error('Save error:', err);
-          // Revert UI changes if save failed
-          setODNData(prevData => 
-            prevData.map(odn => 
-              odn.odn_id === odnId 
-                ? { ...odn, pod_confirmed: 0 }
-                : odn
-            )
-          );
-          setPendingUpdates(prev => {
-            const newState = { ...prev };
-            delete newState[odnId];
-            return newState;
-          });
-          MySwal.fire('Error', 'Failed to save POD confirmation.', 'error');
-        } finally {
-          setAutoSaving(false);
-        }
-      }
-      return;
-    }
-
-    // Update UI immediately for instant feedback
-    setPendingUpdates(prev => {
-      const newState = {
-        ...prev,
-        [odnId]: {
-          ...prev[odnId],
-          pod_confirmed: Boolean(confirmed),
-          pod_reason: confirmed ? '' : currentReason
-        }
-      };
-      return newState;
-    });
-
-    // Update ODN data for consistent UI
-    setODNData(prevData => 
-      prevData.map(odn => 
-        odn.odn_id === odnId 
-          ? { ...odn, pod_confirmed: confirmed ? 1 : 0 }
-          : odn
+  const handlePODNumberChange = (facilityId, value) => {
+    setFacilityData(prevData =>
+      prevData.map(facility =>
+        facility.facility_id === facilityId
+          ? { ...facility, pod_numbers: value }
+          : facility
       )
     );
+  };
 
-    // For unchecked items, require a reason before saving
-    if (!confirmed && !currentReason.trim()) {
-      // Show a prompt to enter reason
-      const { value: reason } = await MySwal.fire({
-        title: 'Reason Required',
-        text: 'Please provide a reason why POD is not confirmed:',
-        input: 'textarea',
-        inputPlaceholder: 'Enter reason here...',
-        showCancelButton: true,
-        confirmButtonText: 'Save',
-        cancelButtonText: 'Cancel',
-        inputValidator: (value) => {
-          if (!value || !value.trim()) {
-            return 'Reason is required when POD is not confirmed';
-          }
-        }
+  const handleArrivalKmChange = (facilityId, value) => {
+    setFacilityData(prevData =>
+      prevData.map(facility =>
+        facility.facility_id === facilityId
+          ? { ...facility, arrival_kilometer: value }
+          : facility
+      )
+    );
+  };
+
+  const handleSavePODDetails = async (facility) => {
+    const reportingMonth = `${selectedMonth} ${selectedYear}`;
+    
+    // Validate inputs
+    if (!facility.pod_numbers || !facility.pod_numbers.trim()) {
+      MySwal.fire({
+        icon: 'warning',
+        title: 'POD Number Required',
+        text: 'Please enter at least one POD number before saving.',
       });
-
-      if (reason) {
-        // Update the reason in pending updates and ODN data
-        setPendingUpdates(prev => ({
-          ...prev,
-          [odnId]: {
-            ...prev[odnId],
-            pod_confirmed: false,
-            pod_reason: reason.trim()
-          }
-        }));
-
-        // Save with the provided reason
-        try {
-          setAutoSaving(true);
-          const update = {
-            odn_id: parseInt(odnId),
-            pod_confirmed: false,
-            pod_reason: reason.trim(),
-            pod_number: currentODN?.pod_number || '',
-            arrival_kilometer: currentODN?.arrival_kilometer || null,
-            route_assignment_id: currentODN?.route_assignment_id
-          };
-
-          await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-            updates: [update],
-            confirmed_by: loggedInUserId
-          });
-
-          // Remove from pending updates since it's saved
-          setPendingUpdates(prev => {
-            const newState = { ...prev };
-            delete newState[odnId];
-            return newState;
-          });
-
-          // Update ODN data
-          setODNData(prevData => 
-            prevData.map(odn => 
-              odn.odn_id === odnId 
-                ? { ...odn, pod_confirmed: 0, pod_reason: reason.trim() }
-                : odn
-            )
-          );
-
-          // Update stats
-          fetchStats();
-
-          MySwal.fire({
-            icon: 'success',
-            title: 'Saved!',
-            text: 'POD marked as not confirmed with reason',
-            timer: 1500,
-            showConfirmButton: false,
-            toast: true,
-            position: 'top-end'
-          });
-
-        } catch (err) {
-          console.error('Save error:', err);
-          MySwal.fire('Error', 'Failed to save POD confirmation.', 'error');
-          // Revert checkbox state
-          setODNData(prevData => 
-            prevData.map(odn => 
-              odn.odn_id === odnId 
-                ? { ...odn, pod_confirmed: 1 }
-                : odn
-            )
-          );
-        } finally {
-          setAutoSaving(false);
-        }
-      } else {
-        // User cancelled, revert the checkbox
-        setODNData(prevData => 
-          prevData.map(odn => 
-            odn.odn_id === odnId 
-              ? { ...odn, pod_confirmed: 1 }
-              : odn
-          )
-        );
-        setPendingUpdates(prev => {
-          const newState = { ...prev };
-          delete newState[odnId];
-          return newState;
-        });
-      }
       return;
     }
 
-    // Save to database immediately
+    if (!facility.arrival_kilometer || parseFloat(facility.arrival_kilometer) < 0) {
+      MySwal.fire({
+        icon: 'warning',
+        title: 'Destination Kilometer Required',
+        text: 'Please enter a valid destination kilometer before saving.',
+      });
+      return;
+    }
+
     try {
       setAutoSaving(true);
-      const update = {
-        odn_id: parseInt(odnId),
-        pod_confirmed: confirmed,
-        pod_reason: confirmed ? '' : currentReason,
-        pod_number: currentODN?.pod_number || '',
-        arrival_kilometer: currentODN?.arrival_kilometer || null,
-        route_assignment_id: currentODN?.route_assignment_id
-      };
 
-      await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-        updates: [update],
+      // Update facility POD details
+      await axios.put(`${api_url}/api/documentation/facility-pod-confirmation`, {
+        facility_id: facility.facility_id,
+        reporting_month: reportingMonth,
+        pod_numbers: facility.pod_numbers.trim(),
+        arrival_kilometer: parseFloat(facility.arrival_kilometer),
+        route_assignment_id: facility.route_assignment_id,
         confirmed_by: loggedInUserId
       });
 
-      // Remove from pending updates since it's saved
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        delete newState[odnId];
-        return newState;
-      });
+      // Refresh data
+      fetchDispatchedFacilities();
 
-      // Update stats
-      fetchStats();
-
-      // Show brief success message
       MySwal.fire({
         icon: 'success',
         title: 'Saved!',
-        text: confirmed ? 'POD confirmed' : 'POD marked as not confirmed',
-        timer: 1500,
-        showConfirmButton: false,
-        toast: true,
-        position: 'top-end'
+        text: 'POD details saved successfully.',
+        timer: 2000,
+        showConfirmButton: false
       });
-      
+
     } catch (err) {
       console.error('Save error:', err);
-      // Revert UI changes if save failed
-      setODNData(prevData => 
-        prevData.map(odn => 
-          odn.odn_id === odnId 
-            ? { ...odn, pod_confirmed: !confirmed ? 1 : 0 }
-            : odn
-        )
-      );
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        delete newState[odnId];
-        return newState;
-      });
-      MySwal.fire('Error', 'Failed to save POD confirmation.', 'error');
+      MySwal.fire('Error', 'Failed to save POD details.', 'error');
     } finally {
       setAutoSaving(false);
     }
   };
 
-  const autoSavePODChange = async (odnId, confirmed) => {
-    try {
-      setAutoSaving(true);
-      const update = {
-        odn_id: parseInt(odnId),
-        pod_confirmed: confirmed,
-        pod_reason: confirmed ? '' : (pendingUpdates[odnId]?.pod_reason || '')
-      };
-
-      await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-        updates: [update],
-        confirmed_by: loggedInUserId
-      });
-
-      // Remove from pending updates since it's now saved
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        delete newState[odnId];
-        return newState;
-      });
-
-      // Only refresh stats, not the full data to avoid conflicts
-      fetchStats();
-      
-    } catch (err) {
-      console.error('Auto-save error:', err);
-      // Revert the local changes if save failed
-      setODNData(prevData => 
-        prevData.map(odn => 
-          odn.odn_id === odnId 
-            ? { ...odn, pod_confirmed: !confirmed ? 1 : 0 }
-            : odn
-        )
-      );
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        delete newState[odnId];
-        return newState;
-      });
-      MySwal.fire('Error', 'Failed to save POD confirmation. Change reverted.', 'error');
-    } finally {
-      setAutoSaving(false);
-    }
-  };
-
-  const handleReasonChange = (odnId, reason) => {
-    setPendingUpdates(prev => ({
-      ...prev,
-      [odnId]: {
-        ...prev[odnId],
-        pod_reason: reason
-      }
-    }));
-
-    // Auto-save reason after 2 seconds of no typing
-    clearTimeout(reasonTimeouts.current[odnId]);
-    reasonTimeouts.current[odnId] = setTimeout(async () => {
-      try {
-        setAutoSaving(true);
-        const currentPODStatus = pendingUpdates[odnId]?.pod_confirmed !== undefined 
-          ? pendingUpdates[odnId].pod_confirmed 
-          : Boolean(Number(odnData.find(odn => odn.odn_id === odnId)?.pod_confirmed));
-
-        const update = {
-          odn_id: parseInt(odnId),
-          pod_confirmed: currentPODStatus,
-          pod_reason: reason,
-          pod_number: pendingUpdates[odnId]?.pod_number || odnData.find(odn => odn.odn_id === odnId)?.pod_number || '',
-          arrival_kilometer: pendingUpdates[odnId]?.arrival_kilometer || odnData.find(odn => odn.odn_id === odnId)?.arrival_kilometer || null,
-          route_assignment_id: odnData.find(odn => odn.odn_id === odnId)?.route_assignment_id
-        };
-
-        await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-          updates: [update],
-          confirmed_by: loggedInUserId
-        });
-
-        // Remove from pending updates
-        setPendingUpdates(prev => {
-          const newState = { ...prev };
-          if (newState[odnId]) {
-            delete newState[odnId].pod_reason;
-            if (Object.keys(newState[odnId]).length === 0) {
-              delete newState[odnId];
-            }
-          }
-          return newState;
-        });
-
-        // Show brief success message
-        MySwal.fire({
-          icon: 'success',
-          title: 'Saved!',
-          text: 'Reason updated',
-          timer: 1500,
-          showConfirmButton: false,
-          toast: true,
-          position: 'top-end'
-        });
-
-        // If this was an unchecked item that now has a reason, 
-        // save the complete POD status
-        if (!currentPODStatus && reason.trim()) {
-          // Clear the timeout and save immediately
-          clearTimeout(reasonTimeouts.current[odnId]);
-          await saveUnconfirmedPOD(odnId, reason);
-          return; // Exit early since saveUnconfirmedPOD handles everything
-        }
-        
-      } catch (err) {
-        console.error('Reason save error:', err);
-      } finally {
-        setAutoSaving(false);
-      }
-    }, 2000);
-  };
-
-  const reasonTimeouts = React.useRef({});
-
-  // Helper function to save unchecked POD with reason
-  const saveUnconfirmedPOD = async (odnId, reason) => {
-    try {
-      setAutoSaving(true);
-      const currentODN = odnData.find(odn => odn.odn_id === odnId);
-      const update = {
-        odn_id: parseInt(odnId),
-        pod_confirmed: false,
-        pod_reason: reason,
-        pod_number: currentODN?.pod_number || '',
-        arrival_kilometer: currentODN?.arrival_kilometer || null,
-        route_assignment_id: currentODN?.route_assignment_id
-      };
-
-      await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-        updates: [update],
-        confirmed_by: loggedInUserId
-      });
-
-      // Update ODN data
-      setODNData(prevData => 
-        prevData.map(odn => 
-          odn.odn_id === odnId 
-            ? { ...odn, pod_confirmed: 0, pod_reason: reason }
-            : odn
-        )
-      );
-
-      // Remove from pending updates
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        delete newState[odnId];
-        return newState;
-      });
-
-      // Update stats
-      fetchStats();
-
+  const handlePassToQualityEvaluator = async (facility) => {
+    const reportingMonth = `${selectedMonth} ${selectedYear}`;
+    
+    // Check if POD details are filled
+    if (!facility.pod_numbers || !facility.pod_numbers.trim()) {
       MySwal.fire({
-        icon: 'success',
-        title: 'Saved!',
-        text: 'POD marked as not confirmed with reason',
-        timer: 1500,
-        showConfirmButton: false,
-        toast: true,
-        position: 'top-end'
+        icon: 'warning',
+        title: 'POD Number Required',
+        text: 'Please enter POD number(s) before passing to Quality Evaluator.',
       });
-
-    } catch (err) {
-      console.error('Save unconfirmed POD error:', err);
-      MySwal.fire('Error', 'Failed to save POD status.', 'error');
-    } finally {
-      setAutoSaving(false);
+      return;
     }
-  };
 
-  const reasonSaveTimeouts = React.useRef({});
-
-  const autoSaveReasonChange = async (odnId, reason) => {
-    try {
-      const currentPODStatus = pendingUpdates[odnId]?.pod_confirmed !== undefined 
-        ? pendingUpdates[odnId].pod_confirmed 
-        : Boolean(Number(odnData.find(odn => odn.odn_id === odnId)?.pod_confirmed));
-
-      const update = {
-        odn_id: parseInt(odnId),
-        pod_confirmed: currentPODStatus,
-        pod_reason: reason,
-        pod_number: pendingUpdates[odnId]?.pod_number || odnData.find(odn => odn.odn_id === odnId)?.pod_number || '',
-        arrival_kilometer: pendingUpdates[odnId]?.arrival_kilometer || odnData.find(odn => odn.odn_id === odnId)?.arrival_kilometer || null,
-        route_assignment_id: odnData.find(odn => odn.odn_id === odnId)?.route_assignment_id
-      };
-
-      await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-        updates: [update],
-        confirmed_by: loggedInUserId
+    if (!facility.arrival_kilometer || parseFloat(facility.arrival_kilometer) < 0) {
+      MySwal.fire({
+        icon: 'warning',
+        title: 'Destination Kilometer Required',
+        text: 'Please enter destination kilometer before passing to Quality Evaluator.',
       });
-
-      // Remove from pending updates since it's now saved
-      setPendingUpdates(prev => {
-        const newState = { ...prev };
-        if (newState[odnId]) {
-          delete newState[odnId].pod_reason;
-          if (Object.keys(newState[odnId]).length === 0) {
-            delete newState[odnId];
-          }
-        }
-        return newState;
-      });
-      
-    } catch (err) {
-      console.error('Auto-save reason error:', err);
+      return;
     }
-  };
 
-  const handleSaveUpdates = async () => {
-    const updates = Object.entries(pendingUpdates).map(([odn_id, data]) => {
-      const currentODN = odnData.find(odn => odn.odn_id === parseInt(odn_id));
-      return {
-        odn_id: parseInt(odn_id),
-        pod_confirmed: data.pod_confirmed,
-        pod_reason: data.pod_reason,
-        pod_number: data.pod_number,
-        arrival_kilometer: data.arrival_kilometer,
-        route_assignment_id: currentODN?.route_assignment_id
-      };
+    // Confirm action
+    const result = await MySwal.fire({
+      title: 'Pass to Quality Evaluator?',
+      html: `
+        <div style="text-align: left; margin: 20px 0;">
+          <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+            <strong>Facility:</strong> ${facility.facility_name}<br>
+            <strong>Route:</strong> ${facility.route_name}<br>
+            <strong>Total ODNs:</strong> ${facility.total_odns}<br>
+            <strong>POD Numbers:</strong> ${facility.pod_numbers}<br>
+            <strong>Destination KM:</strong> ${facility.arrival_kilometer}
+          </div>
+          <div style="background: #fff3cd; padding: 10px; border-radius: 5px;">
+            <small style="color: #856404;">
+              <strong>Note:</strong> This will mark POD as confirmed and pass all ${facility.total_odns} ODNs to Quality Evaluator.
+            </small>
+          </div>
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Pass to Quality Evaluator',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#4caf50',
+      width: '600px'
     });
 
-    if (updates.length === 0) {
-      MySwal.fire('Info', 'No changes to save.', 'info');
+    if (!result.isConfirmed) {
       return;
     }
 
     try {
       setAutoSaving(true);
-      await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
-        updates,
+
+      // Update facility POD confirmation
+      await axios.put(`${api_url}/api/documentation/facility-pod-confirmation`, {
+        facility_id: facility.facility_id,
+        reporting_month: reportingMonth,
+        pod_numbers: facility.pod_numbers.trim(),
+        arrival_kilometer: parseFloat(facility.arrival_kilometer),
+        route_assignment_id: facility.route_assignment_id,
         confirmed_by: loggedInUserId
       });
-      
-      MySwal.fire('Success!', 'POD confirmations updated successfully.', 'success');
-      setPendingUpdates({});
-      fetchDispatchedODNs();
-      fetchStats();
-      
+
+      // Record service time for Documentation Officer
+      try {
+        const docEndTime = formatTimestamp();
+        
+        // Get all process IDs for this facility
+        const odnIds = facility.odn_ids.split(',');
+        
+        for (const odnId of odnIds) {
+          // Get process_id from ODN
+          const odnResponse = await axios.get(`${api_url}/api/odns/${odnId}`);
+          const processId = odnResponse.data?.process_id;
+          
+          if (processId) {
+            // Calculate waiting time: current time - Dispatcher end time
+            let waitingMinutes = 0;
+            try {
+              const dispatchResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+                params: {
+                  process_id: processId,
+                  service_unit: 'Dispatcher - HP'
+                }
+              });
+              
+              if (dispatchResponse.data.end_time) {
+                const prevTime = new Date(dispatchResponse.data.end_time);
+                const currTime = new Date(docEndTime);
+                const diffMs = currTime - prevTime;
+                waitingMinutes = Math.floor(diffMs / 60000);
+                waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+              }
+            } catch (err) {
+              console.error('Failed to get Dispatcher end time:', err);
+            }
+            
+            await axios.post(`${api_url}/api/service-time-hp`, {
+              process_id: processId,
+              service_unit: 'Documentation Officer - HP',
+              start_time: docEndTime,
+              end_time: docEndTime,
+              waiting_minutes: waitingMinutes,
+              officer_id: loggedInUserId,
+              officer_name: localStorage.getItem('FullName'),
+              status: 'completed',
+              notes: `POD confirmed - POD #: ${facility.pod_numbers.trim()}`
+            });
+            
+            console.log(`✅ Documentation Officer service time recorded for process ${processId}`);
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to record Documentation service time:', err);
+      }
+
+      // Refresh data
+      fetchDispatchedFacilities();
+
+      MySwal.fire({
+        icon: 'success',
+        title: 'Success!',
+        html: `
+          <div style="text-align: center;">
+            <p>POD confirmed for <strong>${facility.facility_name}</strong></p>
+            <p><strong>${facility.total_odns}</strong> ODNs passed to Quality Evaluator</p>
+            <p>POD Numbers: <strong>${facility.pod_numbers.trim()}</strong></p>
+          </div>
+        `,
+        timer: 3000,
+        showConfirmButton: false
+      });
+
     } catch (err) {
-      console.error('Save updates error:', err);
-      MySwal.fire('Error', 'Failed to save POD confirmations.', 'error');
+      console.error('Save error:', err);
+      MySwal.fire('Error', 'Failed to pass to Quality Evaluator.', 'error');
     } finally {
       setAutoSaving(false);
     }
-  };
-
-  const getPODReason = (odn) => {
-    const pendingUpdate = pendingUpdates[odn.odn_id];
-    if (pendingUpdate !== undefined) {
-      return pendingUpdate.pod_reason || '';
-    }
-    return odn.pod_reason || '';
   };
 
   // Access control
@@ -905,7 +399,7 @@ const DocumentationManagement = () => {
         <Alert severity="error" sx={{ mb: 3 }}>
           <Typography variant="h6" gutterBottom>Access Denied</Typography>
           <Typography>
-            This page is restricted to Documentation Officer role only.
+            This page is restricted to Documentation Officer - HP role only.
           </Typography>
           <Typography sx={{ mt: 2 }}>
             <strong>Current JobTitle:</strong> "{userJobTitle}"
@@ -949,6 +443,17 @@ const DocumentationManagement = () => {
             padding: 24px;
             border-radius: 16px 16px 0 0;
           }
+          .facility-row {
+            transition: all 0.2s ease;
+          }
+          .facility-row:hover {
+            background-color: #f5f5f5;
+            transform: translateX(4px);
+          }
+          .confirmed-row {
+            background-color: #e8f5e9;
+            opacity: 0.8;
+          }
         `}
       </style>
       
@@ -965,7 +470,7 @@ const DocumentationManagement = () => {
                   Documentation Management
                 </Typography>
                 <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Confirm Proof of Delivery (POD) for dispatched ODNs
+                  Confirm Proof of Delivery (POD) for dispatched facilities
                 </Typography>
               </Box>
             </Stack>
@@ -1002,7 +507,7 @@ const DocumentationManagement = () => {
             <Grid item xs={12} md={5}>
               <TextField
                 fullWidth
-                placeholder="Search by ODN number or facility name..."
+                placeholder="Search by facility name or route..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
@@ -1017,67 +522,12 @@ const DocumentationManagement = () => {
           </Grid>
         </Card>
 
-        {/* Statistics Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <ODNIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.totalDispatched || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Total Dispatched
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-2" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <ConfirmedIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.confirmedPODs || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    POD Confirmed
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-3" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <NotConfirmedIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.pendingPODs || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Pending POD
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-        </Grid>
-
         {/* Auto-save indicator */}
         {autoSaving && (
           <Alert severity="info" sx={{ mb: 2 }}>
             <Stack direction="row" alignItems="center" spacing={1}>
               <LinearProgress sx={{ width: 100 }} />
-              <Typography variant="body2">Auto-saving...</Typography>
+              <Typography variant="body2">Saving...</Typography>
             </Stack>
           </Alert>
         )}
@@ -1094,15 +544,15 @@ const DocumentationManagement = () => {
         {/* Loading Progress */}
         {loading && <LinearProgress sx={{ mb: 2 }} />}
 
-        {/* ODNs Table */}
+        {/* Facilities Table */}
         <Card className="doc-card">
           <CardHeader 
             title={
               <Stack direction="row" alignItems="center" spacing={1}>
-                <ODNIcon color="primary" />
-                <Typography variant="h6">Dispatched ODNs - POD Confirmation</Typography>
+                <FacilityIcon color="primary" />
+                <Typography variant="h6">Dispatched Facilities - POD Confirmation</Typography>
                 <Chip 
-                  label={`${odnData.length} ODNs`} 
+                  label={`${facilityData.length} Facilities`} 
                   size="small" 
                   color="primary" 
                   variant="outlined" 
@@ -1117,12 +567,6 @@ const DocumentationManagement = () => {
                 <TableRow sx={{ bgcolor: 'grey.50' }}>
                   <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
-                      <ODNIcon fontSize="small" />
-                      <span>ODN Number</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
                       <FacilityIcon fontSize="small" />
                       <span>Facility</span>
                     </Stack>
@@ -1133,10 +577,10 @@ const DocumentationManagement = () => {
                       <span>Route</span>
                     </Stack>
                   </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
-                      <ConfirmedIcon fontSize="small" />
-                      <span>POD Confirmed</span>
+                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <ODNIcon fontSize="small" />
+                      <span>ODNs</span>
                     </Stack>
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
@@ -1145,168 +589,132 @@ const DocumentationManagement = () => {
                       <span>POD Details</span>
                     </Stack>
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <NotConfirmedIcon fontSize="small" />
-                      <span>Reason (if not confirmed)</span>
-                    </Stack>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                    Actions
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((odn, index) => {
-                  // Check if this ODN has passed documentation stage (POD confirmed)
-                  const isInactive = Boolean(Number(odn.pod_confirmed));
-                  
-                  // Check if this is the first ODN of a new route
-                  const prevODN = index > 0 ? odnData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)[index - 1] : null;
-                  const isNewRoute = !prevODN || prevODN.route_name !== odn.route_name || prevODN.route_assignment_id !== odn.route_assignment_id;
-                  
-                  // Count ODNs on same route
-                  const sameRouteODNs = odnData.filter(o => 
-                    o.route_name === odn.route_name && 
-                    o.route_assignment_id === odn.route_assignment_id
-                  );
-                  
-                  return (
-                  <React.Fragment key={`${odn.odn_id}-${odn.pod_confirmed}-${pendingUpdates[odn.odn_id]?.pod_confirmed || 'none'}`}>
-                    {/* ODN data row */}
-                    <TableRow 
-                      hover 
-                      sx={{ 
-                        '&:hover': { bgcolor: 'grey.50' },
-                        bgcolor: isInactive ? 'grey.100' : (pendingUpdates[odn.odn_id] ? 'warning.50' : 'inherit'),
-                        opacity: isInactive ? 0.6 : 1,
-                        borderLeft: pendingUpdates[odn.odn_id] ? '3px solid orange' : (sameRouteODNs.length > 1 ? '3px solid #e3f2fd' : 'none')
-                      }}
-                    >
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="bold" color="primary">
-                          {odn.odn_number}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2" fontWeight="bold">
-                            {odn.facility_name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {odn.region_name} • {odn.zone_name} • {odn.woreda_name}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={1}>
+                {facilityData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">
+                        No facilities found for the selected period.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  facilityData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((facility) => {
+                    const isFullyConfirmed = facility.confirmed_pods === facility.total_odns;
+                    
+                    return (
+                      <TableRow 
+                        key={facility.facility_id}
+                        className={`facility-row ${isFullyConfirmed ? 'confirmed-row' : ''}`}
+                        hover
+                      >
+                        <TableCell>
+                          <Box>
+                            <Typography variant="body2" fontWeight="bold">
+                              {facility.facility_name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {facility.region_name} • {facility.zone_name} • {facility.woreda_name}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
                           <Typography variant="body2">
-                            {odn.route_name}
+                            {facility.route_name}
                           </Typography>
-                          {sameRouteODNs.length > 1 && (
+                        </TableCell>
+                        <TableCell>
+                          <Stack spacing={0.5}>
                             <Chip 
-                              label={`${sameRouteODNs.length} ODNs`} 
+                              label={`${facility.total_odns} ODNs`} 
                               size="small" 
-                              variant="outlined" 
                               color="primary"
-                              sx={{ fontSize: '0.7rem', height: '20px' }}
-                            />
-                          )}
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="center">
-                        {isInactive ? (
-                          <Stack direction="row" spacing={1} justifyContent="center" alignItems="center">
-                            <Chip 
-                              label="✓ Confirmed" 
-                              color="success" 
-                              size="small" 
                               variant="outlined"
                             />
-                            <Chip 
-                              label="Passed to Follow-up" 
-                              color="info" 
-                              size="small" 
-                              variant="outlined"
-                            />
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                              {facility.odn_numbers}
+                            </Typography>
                           </Stack>
-                        ) : (
-                          <PODCheckbox 
-                            odn={odn}
-                            pendingUpdates={pendingUpdates}
-                            onPODChange={handlePODConfirmationChange}
-                          />
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          {(odn.pod_number || pendingUpdates[odn.odn_id]?.pod_number) && (
-                            <Typography variant="body2" sx={{ mb: 0.5 }}>
-                              <strong>POD #:</strong> {pendingUpdates[odn.odn_id]?.pod_number || odn.pod_number}
-                            </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            <TextField
+                              fullWidth
+                              size="small"
+                              placeholder="e.g., POD001, POD002, POD003"
+                              value={facility.pod_numbers || ''}
+                              onChange={(e) => handlePODNumberChange(facility.facility_id, e.target.value)}
+                              disabled={isFullyConfirmed}
+                              label="POD Numbers"
+                              sx={{ mb: 1 }}
+                            />
+                            <TextField
+                              fullWidth
+                              size="small"
+                              type="number"
+                              placeholder="Destination kilometer"
+                              value={facility.arrival_kilometer || ''}
+                              onChange={(e) => handleArrivalKmChange(facility.facility_id, e.target.value)}
+                              disabled={isFullyConfirmed}
+                              label="Destination KM"
+                              inputProps={{ step: 0.01, min: 0 }}
+                            />
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          {isFullyConfirmed ? (
+                            <Chip 
+                              icon={<ConfirmedIcon />}
+                              label="Confirmed" 
+                              color="success" 
+                              size="small"
+                            />
+                          ) : (
+                            <Stack spacing={1}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                color="primary"
+                                onClick={() => handleSavePODDetails(facility)}
+                                startIcon={<SaveIcon />}
+                                disabled={!facility.pod_numbers || !facility.arrival_kilometer}
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                color="success"
+                                onClick={() => handlePassToQualityEvaluator(facility)}
+                                startIcon={<ConfirmedIcon />}
+                                disabled={!facility.pod_numbers || !facility.arrival_kilometer}
+                              >
+                                Pass to QE
+                              </Button>
+                            </Stack>
                           )}
-                          {(odn.arrival_kilometer || pendingUpdates[odn.odn_id]?.arrival_kilometer) && (
-                            <Typography variant="body2" color="text.secondary">
-                              <strong>Destination KM:</strong> {pendingUpdates[odn.odn_id]?.arrival_kilometer || odn.arrival_kilometer}
-                              <Chip 
-                                label="Route-wide" 
-                                size="small" 
-                                variant="outlined" 
-                                color="info"
-                                sx={{ ml: 1, fontSize: '0.7rem', height: '18px' }}
-                              />
-                            </Typography>
-                          )}
-                          {!odn.pod_number && !pendingUpdates[odn.odn_id]?.pod_number && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                              No POD details yet
-                            </Typography>
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {isInactive ? (
-                          <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                            POD confirmed - no reason needed
-                          </Typography>
-                        ) : (
-                          <TextField
-                            fullWidth
-                            size="small"
-                            placeholder="Enter reason if POD not confirmed..."
-                            value={getPODReason(odn)}
-                            onChange={(e) => handleReasonChange(odn.odn_id, e.target.value)}
-                            disabled={pendingUpdates[odn.odn_id]?.pod_confirmed || Boolean(Number(odn.pod_confirmed))}
-                            multiline
-                            rows={2}
-                            required={!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed}
-                            error={
-                              (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
-                              !getPODReason(odn).trim()
-                            }
-                            helperText={
-                              (!Boolean(Number(odn.pod_confirmed)) && !pendingUpdates[odn.odn_id]?.pod_confirmed) && 
-                              !getPODReason(odn).trim() ? 
-                              'Reason required when POD not confirmed' : ''
-                            }
-                            sx={{ 
-                              '& .MuiInputBase-input': { 
-                                fontSize: '0.875rem' 
-                              } 
-                            }}
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  </React.Fragment>
-                  );
-                })}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
             <TablePagination 
               component="div" 
-              count={odnData.length} 
+              count={facilityData.length} 
               rowsPerPage={rowsPerPage} 
               page={page}
               onPageChange={(_, p) => setPage(p)}
-              onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
               rowsPerPageOptions={[5, 10, 25, 50]}
               sx={{ borderTop: 1, borderColor: 'divider' }}
             />

@@ -26,18 +26,19 @@ import TvRealEntertainmentPage from './pages/Customer-Service/TvRealEntertainmen
 import ExitPermit from './pages/Customer-Service/Dispatch/ExitPermitPage';
 import GateKeeperPage from './pages/Customer-Service/Dispatch/GateKeeperPage';
 import ServiceDebug from './components/Debug/ServiceDebug';
-import facilityManager from './pages/Customer-Service/HealthProgram/FacilityManagerPage';
+import FacilityManager from './pages/Customer-Service/HealthProgram/FacilityManagerPage';
 import EmployeeManager from './pages/Customer-Service/HealthProgram/EmployeeManagerPage';
 import HPFacilitiesCS from './components/Customer-Service/HealthProgram/HP-Facilities';
 import PIVehicleRequests from './components/Customer-Service/HealthProgram/PIVehicleRequests';
 import TMManager from './components/Customer-Service/HealthProgram/TMManager';
+import HPDriverAssignment from './components/Transportation/HPDriverAssignment';
 import EWMGoodsIssue from './components/Customer-Service/HealthProgram/EWMGoodsIssue';
+import EWMOutstanding from './components/Customer-Service/HealthProgram/EWMOutstanding';
 import Biller from './components/Customer-Service/HealthProgram/Biller';
 import HPDashboard from './pages/Customer-Service/HealthProgram/HPDashboard';
 import DispatchManagement from './components/Transportation/DispatchManagement';
-import DocumentationManagement from './components/Documentation/DocumentationManagement';
-import DocumentFollowup from './components/Documentation/DocumentFollowup';
-import QualityEvaluation from './components/Quality/QualityEvaluation';
+import DocumentationHP from './components/Documentation/DocumentationHP';
+import QualityEvaluationHP from './components/Quality/QualityEvaluationHP';
 import HPFacilitiesTransport from './components/Transportation/HPFacilities';
 import HPPicklist from './pages/Customer-Service/HealthProgram/HP-PicklistPage';
 import TransportationReports from './pages/Reports/TransportationReports';
@@ -55,6 +56,7 @@ import VehicleManagement from './components/Transportation/VehicleManagement';
 import StoreManagementPage from './pages/Settings/StoreManagementPage';
 import HPComprehensiveReport from './components/Reports/HPComprehensiveReport';
 import RDFReport from './components/Reports/RDFReport';
+import ManagerDashboard from './components/Reports/ManagerDashboard';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
 
@@ -108,18 +110,19 @@ const AppContent = () => {
             <Route path = '/exit-permit' Component={ExitPermit} />
             <Route path = '/gate-keeper' Component={GateKeeperPage} />
             <Route path = '/debug-services' Component={ServiceDebug} />
-            <Route path = '/update-facility' Component={facilityManager} />
+            <Route path = '/update-facility' Component={FacilityManager} />
             <Route path = '/update-employee' Component={EmployeeManager} />
             <Route path = '/hp-facilities' Component={HPFacilitiesCS} />
             <Route path = '/hp-dashboard' Component={HPDashboard} />
             <Route path = '/pi-vehicle-requests' Component={PIVehicleRequests} />
             <Route path = '/tm-manager' Component={TMManager} />
+            <Route path = '/hp-driver-assignment' Component={HPDriverAssignment} />
             <Route path = '/ewm-goods-issue' Component={EWMGoodsIssue} />
+            <Route path = '/ewm-outstanding' Component={EWMOutstanding} />
             <Route path = '/biller' Component={Biller} />
             <Route path = '/dispatch-management' Component={DispatchManagement} />
-            <Route path = '/documentation-management' Component={DocumentationManagement} />
-            <Route path = '/document-followup' Component={DocumentFollowup} />
-            <Route path = '/quality-evaluation' Component={QualityEvaluation} />
+            <Route path = '/documentation-hp' Component={DocumentationHP} />
+            <Route path = '/quality-evaluation' Component={QualityEvaluationHP} />
             <Route path = '/transportation/hp-facilities' Component={HPFacilitiesTransport} />
             <Route path = '/outstandingProcess' Component={OutstandingProcessPage} />
             <Route path = '/service-time-management' Component={ServiceTimeManagement} />
@@ -128,6 +131,7 @@ const AppContent = () => {
             <Route path = '/reports/organization-profile' Component={OrganizationProfileView} />
             <Route path = '/reports/hp-comprehensive' Component={HPComprehensiveReport} />
             <Route path = '/reports/rdf' Component={RDFReport} />
+            <Route path = '/manager-dashboard' Component={ManagerDashboard} />
             <Route path = '/settings/organization-profile' Component={OrganizationProfilePage} />
             <Route path = '/settings/user-management' Component={UserManagementPage} />
             <Route path = '/settings/account-types' Component={AccountTypesManagement} />
@@ -153,7 +157,7 @@ const AppContent = () => {
           "fontWeight": "lighter",
           "zIndex": "1000"
         }}>
-          <h6>© 2025 EPSS-MT.</h6>
+          <h6>© 2026 EPSS-AA1.</h6>
         </footer>
       )}
     </>

@@ -25,6 +25,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    process_type: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'regular',
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -91,6 +96,48 @@ module.exports = (sequelize, DataTypes) => {
     },
     biller_status: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    // Vehicle assignment fields (from TM Manager Phase 1)
+    vehicle_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    vehicle_name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    // Driver and deliverer assignment fields (from Route Management Phase 2)
+    driver_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    driver_name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    deliverer_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
+    deliverer_name: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    driver_assigned_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    departure_kilometer: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: true,
+    },
+    tm_confirmed_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    dispatch_completed_at: {
+      type: DataTypes.DATE,
       allowNull: true,
     }
   }, {

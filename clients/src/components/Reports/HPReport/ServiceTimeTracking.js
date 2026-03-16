@@ -298,6 +298,7 @@ const ServiceTimeTracking = () => {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
+                  <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 60 }}>S.No</TableCell>
                   <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 150 }}>Facility</TableCell>
                   <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 120 }}>O2C Officer</TableCell>
                   <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 120 }}>EWM Officer</TableCell>
@@ -308,11 +309,15 @@ const ServiceTimeTracking = () => {
                   <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 120 }}>Dispatcher</TableCell>
                   <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 120 }}>Dispatch-Doc</TableCell>
                   <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 100 }}>Total Time</TableCell>
+                  <TableCell sx={{ fontWeight: 700, bgcolor: '#f5f5f5', minWidth: 100, wordWrap: 'break-word' }}>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {hpRecords.slice(0, 50).map((record) => (
+                {hpRecords.slice(0, 50).map((record, index) => (
                   <TableRow key={record.id} hover>
+                    <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>
+                      {index + 1}
+                    </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>
                         {record.facility_name || 'N/A'}
@@ -407,6 +412,11 @@ const ServiceTimeTracking = () => {
                         color="primary"
                         sx={{ fontWeight: 'bold' }}
                       />
+                    </TableCell>
+                    <TableCell sx={{ wordWrap: 'break-word', whiteSpace: 'normal', maxWidth: 100 }}>
+                      <Typography variant="caption" sx={{ display: 'block', wordBreak: 'break-word' }}>
+                        {record.status || 'N/A'}
+                      </Typography>
                     </TableCell>
                   </TableRow>
                 ))}

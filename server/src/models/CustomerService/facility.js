@@ -29,9 +29,23 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.STRING,
       allowNull: true,
     },
+    route2: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
     period: {
       type: Sequelize.ENUM('Odd', 'Even', 'Monthly'),
       allowNull: true,
+    },
+    is_vaccine_site: {
+      type: Sequelize.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+    },
+    is_hp_site: {
+      type: Sequelize.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
     },
   }, {
     tableName: 'facilities',

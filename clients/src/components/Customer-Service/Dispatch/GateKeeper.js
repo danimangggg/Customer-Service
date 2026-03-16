@@ -1,22 +1,25 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { recordServiceTimeAuto, formatTimestamp } from '../../../utils/serviceTimeHelper';
 import { 
   Box, Typography, Button, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Paper, CircularProgress, 
   Snackbar, Alert, Chip, Card, CardContent, Stack, Divider,
-  Badge, IconButton, Dialog, DialogTitle, DialogContent, DialogActions
+  Badge, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
+  Select, MenuItem, FormControl, InputLabel, Autocomplete, TextField
 } from '@mui/material';
 import { 
   Security, CheckCircle, LocalShipping, Receipt, 
   Scale, Inventory, Storefront, ExitToApp, Block,
-  NotificationsActive, VolumeUp, VolumeOff
+  NotificationsActive, VolumeUp, VolumeOff, Logout
 } from '@mui/icons-material';
 import Swal from 'sweetalert2';
+import { useNavigate } from 'react-router-dom';
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3000";
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
 
 const GateKeeper = () => {
+  const navigate = useNavigate();
   const [records, setRecords] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,14 +29,20 @@ const GateKeeper = () => {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false); // Track if audio is enabled
   const [notificationDialog, setNotificationDialog] = useState(false);
+  const [storeSelectionDialog, setStoreSelectionDialog] = useState(false);
+  const [selectedStore, setSelectedStore] = useState('');
+  const [selectedStores, setSelectedStores] = useState([]);
+  const [availableStores, setAvailableStores] = useState([]);
+  const [assignedStores, setAssignedStores] = useState([]); // Use state instead of useMemo
+  const [hasCheckedStore, setHasCheckedStore] = useState(false);
   const audioRef = useRef(null);
   const notificationIntervalRef = useRef(null);
+  const isFetchingRef = useRef(false);
+  const hasCheckedStoreRef = useRef(false);
 
   // Access control - only for Gate Keeper users
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const hasAccess = userJobTitle === 'Gate Keeper';
-  
-  // Gate Keepers work across all stores - no store filtering needed
 
   // Initialize audio
   // Initialize audio - Simple approach like AllPicklists
@@ -64,6 +73,73 @@ const GateKeeper = () => {
       window.removeEventListener('touchstart', unlockAudio);
     };
   }, []);
+
+  // Check for store selection on mount
+  useEffect(() => {
+    const checkStoreSelection = async () => {
+      if (!hasAccess || hasCheckedStoreRef.current) return;
+      
+      hasCheckedStoreRef.current = true;
+      console.log('=== GATE KEEPER STORE SELECTION CHECK ===');
+      
+      const userId = localStorage.getItem('UserId') || localStorage.getItem('EmployeeID');
+      console.log('User ID:', userId);
+      console.log('Has Access:', hasAccess);
+      
+      try {
+        // First check localStorage for existing selection (in case of page refresh)
+        const storedStores = localStorage.getItem('GateKeeperStores');
+        if (storedStores && storedStores !== '[]') {
+          try {
+            const stores = JSON.parse(storedStores);
+            if (stores.length > 0) {
+              console.log('Found stores in localStorage (page refresh):', stores);
+              setAssignedStores(stores);
+              setLoading(false);
+              return; // Don't show dialog, user already selected stores
+            }
+          } catch (e) {
+            console.error('Error parsing stored stores:', e);
+          }
+        }
+        
+        // No localStorage data, check database for active sessions
+        console.log('Checking for active sessions in database...');
+        const sessionsResponse = await axios.get(`${API_URL}/api/gate-keeper-sessions/${userId}`);
+        console.log('Sessions response:', sessionsResponse.data);
+        
+        if (sessionsResponse.data.success && sessionsResponse.data.sessions.length > 0) {
+          // User has active sessions from previous login, load them
+          const stores = sessionsResponse.data.sessions.map(s => s.store);
+          console.log('Found active sessions for stores:', stores);
+          localStorage.setItem('GateKeeperStores', JSON.stringify(stores));
+          localStorage.setItem('GateKeeperStore', stores[0]);
+          setAssignedStores(stores);
+          setLoading(false);
+        } else {
+          // No active sessions, show store selection dialog (fresh login)
+          console.log('No active sessions, fetching available stores...');
+          
+          // Fetch available stores
+          const storesResponse = await axios.get(`${API_URL}/api/stores`);
+          console.log('Stores API response:', storesResponse.data);
+          
+          const storeNames = storesResponse.data.map(store => store.store_name);
+          console.log('Available stores:', storeNames);
+          
+          setAvailableStores(storeNames);
+          console.log('Opening store selection dialog');
+          setStoreSelectionDialog(true);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error checking store selection:', error);
+        setLoading(false);
+      }
+    };
+    
+    checkStoreSelection();
+  }, [hasAccess]);
 
   // Play notification sound - Simple approach
   const playNotificationSound = () => {
@@ -106,13 +182,23 @@ const GateKeeper = () => {
     }
   };
 
-  // Fetch Data Logic - show ALL records ready for gate keeper (any store)
+  // Fetch Data Logic - show records for assigned stores
   const fetchData = useCallback(async (isAutoRefresh = false) => {
+    console.log('=== FETCH DATA CALLED ===');
+    console.log('isAutoRefresh:', isAutoRefresh);
+    console.log('assignedStores:', assignedStores);
+    
+    if (!assignedStores || assignedStores.length === 0) {
+      console.log('No stores assigned, skipping fetch');
+      setLoading(false);
+      return; // Don't fetch if no stores assigned
+    }
+    
     if (!isAutoRefresh) setLoading(true);
     try {
       console.log('=== GATE KEEPER DEBUG ===');
       console.log('Gate Keeper Name:', localStorage.getItem('FullName'));
-      console.log('Fetching records for ALL stores');
+      console.log('Assigned Stores:', assignedStores);
       
       // Fetch from TV display endpoint which has ODN-based data
       const [serviceRes, facilityRes] = await Promise.all([
@@ -122,23 +208,26 @@ const GateKeeper = () => {
       
       console.log('Service Response:', serviceRes.data);
       
-      // Filter records that are ready for gate keeper (exit permit completed for ANY store)
+      // Filter records that are ready for gate keeper for ANY of the assigned stores
       const processedRecords = serviceRes.data.filter(row => {
         const storeDetails = row.store_details || {};
         const globalStatus = (row.status || '').toLowerCase();
         
-        // Check if ANY store has completed exit permit and is waiting for gate keeper
-        const hasStoreReadyForGate = Object.keys(storeDetails).some(storeKey => {
-          const storeInfo = storeDetails[storeKey];
+        // Check if ANY of the assigned stores has completed exit permit and is waiting for gate
+        const hasStoreReadyForGate = assignedStores.some(storeName => {
+          const storeInfo = storeDetails[storeName];
+          if (!storeInfo) return false;
+          
           const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
           const gateStatus = (storeInfo.gate_status || '').toLowerCase();
           
-          return exitPermitStatus === 'completed' && 
+          // Accept both 'completed' and 'partial' exit permit statuses
+          return (exitPermitStatus === 'completed' || exitPermitStatus === 'partial') && 
                  (gateStatus === 'pending' || gateStatus === '' || !gateStatus);
         });
         
         // Show records where:
-        // 1. At least one store has completed exit permit
+        // 1. At least one assigned store has completed exit permit
         // 2. That store's gate status is pending or empty
         // 3. Global status is not completed (final completion)
         return hasStoreReadyForGate && globalStatus !== 'completed';
@@ -153,7 +242,7 @@ const GateKeeper = () => {
       setPreviousCount(processedRecords.length);
 
       console.log('Total records:', serviceRes.data.length);
-      console.log('Filtered records for gate keeper:', processedRecords.length);
+      console.log(`Filtered records for gate keeper (${assignedStores.join(', ')}):`, processedRecords.length);
       
       setRecords(processedRecords);
       setFacilities(facilityRes.data);
@@ -162,10 +251,13 @@ const GateKeeper = () => {
     } finally {
       setLoading(false);
     }
-  }, [previousCount, soundEnabled]);
+  }, [previousCount, soundEnabled, assignedStores]);
 
   // Auto-Refresh Effect (every 15 seconds)
   useEffect(() => {
+    // Don't start auto-refresh if store selection dialog is open or no stores assigned
+    if (storeSelectionDialog || !assignedStores || assignedStores.length === 0) return;
+    
     fetchData();
     const interval = setInterval(() => fetchData(true), 15000);
     return () => {
@@ -175,22 +267,35 @@ const GateKeeper = () => {
         clearInterval(notificationIntervalRef.current);
       }
     };
-  }, [fetchData]);
+  }, [fetchData, storeSelectionDialog, assignedStores.length]);
 
   const handleVehicleAction = async (record, action) => {
     const actionText = action === 'allow' ? 'Allow Exit' : 'Cancel Exit';
     const actionColor = action === 'allow' ? '#4caf50' : '#f44336';
     const actionIcon = action === 'allow' ? '✅' : '❌';
 
-    // Get all stores that have completed exit permit for this customer
+    // Find which of the assigned stores are ready for gate processing
     const storeDetails = record.store_details || {};
-    const storesReadyForGate = Object.keys(storeDetails).filter(storeKey => {
-      const storeInfo = storeDetails[storeKey];
+    const storesToProcess = assignedStores.filter(storeName => {
+      const storeInfo = storeDetails[storeName];
+      if (!storeInfo) return false;
+      
       const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
       const gateStatus = (storeInfo.gate_status || '').toLowerCase();
-      return exitPermitStatus === 'completed' && 
+      
+      // Accept both 'completed' and 'partial' exit permit statuses
+      return (exitPermitStatus === 'completed' || exitPermitStatus === 'partial') && 
              (gateStatus === 'pending' || gateStatus === '' || !gateStatus);
     });
+
+    if (storesToProcess.length === 0) {
+      setSnackbar({ 
+        open: true, 
+        message: 'No stores ready for gate processing', 
+        severity: 'warning' 
+      });
+      return;
+    }
 
     const result = await Swal.fire({
       title: `${actionIcon} ${actionText}`,
@@ -201,7 +306,7 @@ const GateKeeper = () => {
           <p><strong>Amount:</strong> ${record.total_amount} ${record.measurement_unit}</p>
           <p><strong>Receipts:</strong> ${record.receipt_count}</p>
           ${record.receipt_number ? `<p><strong>Receipt #:</strong> ${record.receipt_number}</p>` : ''}
-          <p><strong>Stores:</strong> ${storesReadyForGate.join(', ')}</p>
+          <p><strong>Store(s):</strong> ${storesToProcess.join(', ')}</p>
         </div>
       `,
       icon: action === 'allow' ? 'success' : 'warning',
@@ -219,8 +324,49 @@ const GateKeeper = () => {
 
     if (result.isConfirmed) {
       try {
-        // Update ODN gate status for ALL stores that are ready for gate
-        for (const storeName of storesReadyForGate) {
+        // For 'allow' action, record exit history first
+        if (action === 'allow') {
+          try {
+            // Get the current exit number for this process
+            const exitHistoryResponse = await axios.get(`${API_URL}/api/exit-history/${record.id}`);
+            const existingExits = exitHistoryResponse.data.exits || [];
+            const exitNumber = existingExits.length + 1;
+            
+            // Record exit history for each store
+            await Promise.all(storesToProcess.map(storeName => {
+              // Determine if this is partial or full exit based on exit_permit_status for THIS store
+              const storeInfo = storeDetails[storeName];
+              const exitType = (storeInfo?.exit_permit_status || '').toLowerCase() === 'partial' ? 'partial' : 'full';
+              
+              return axios.post(`${API_URL}/api/exit-history`, {
+                process_id: record.id,
+                store_id: storeName,
+                exit_number: exitNumber,
+                vehicle_plate: record.vehicle_plate,
+                total_amount: record.total_amount,
+                measurement_unit: record.measurement_unit,
+                receipt_count: record.receipt_count,
+                receipt_number: record.receipt_number,
+                gate_keeper_id: localStorage.getItem('EmployeeID'),
+                gate_keeper_name: localStorage.getItem('FullName'),
+                exit_type: exitType,
+                exited_at: new Date().toISOString()
+              });
+            }));
+            
+            console.log(`✅ Exit history recorded (Exit #${exitNumber}, Type: ${exitType})`);
+          } catch (err) {
+            console.error('❌ Failed to record exit history:', err);
+            // Don't fail the gate processing if exit history recording fails
+          }
+        }
+        
+        // Update ODN gate status for all stores being processed
+        await Promise.all(storesToProcess.map(async (storeName) => {
+          const storeInfo = storeDetails[storeName];
+          const isPartialExit = (storeInfo?.exit_permit_status || '').toLowerCase() === 'partial';
+          
+          // Update gate status
           await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
             process_id: record.id,
             store: storeName,
@@ -228,32 +374,66 @@ const GateKeeper = () => {
             officer_id: localStorage.getItem('EmployeeID'),
             officer_name: localStorage.getItem('FullName')
           });
-        }
+          
+          // For partial exits, reset exit_permit_status and gate_status back to pending
+          // so the record reappears in Exit Permit list for next visit
+          if (action === 'allow' && isPartialExit) {
+            await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
+              process_id: record.id,
+              store: storeName,
+              exit_permit_status: 'pending',
+              officer_id: localStorage.getItem('EmployeeID'),
+              officer_name: localStorage.getItem('FullName')
+            });
+            
+            await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
+              process_id: record.id,
+              store: storeName,
+              gate_status: 'pending',
+              officer_id: localStorage.getItem('EmployeeID'),
+              officer_name: localStorage.getItem('FullName')
+            });
+            
+            console.log(`✅ Partial exit: Reset ${storeName} statuses to pending for next visit`);
+          }
+        }));
 
-        // Check if all stores have allowed gate exit
+        // Check if all stores have allowed gate exit (only for non-partial exits)
         try {
           const odnResponse = await axios.get(`${API_URL}/api/rdf-odns/${record.id}`);
           const allOdns = odnResponse.data.odns || [];
-          const allGateAllowed = allOdns.every(odn => odn.gate_status === 'allowed');
           
-          if (allGateAllowed) {
-            // All stores allowed exit, mark customer as completed
-            await axios.put(`${API_URL}/api/update-service-status/${record.id}`, {
-              status: 'completed',
-              completed_at: new Date().toISOString()
-            });
-            console.log('✅ All stores allowed exit, customer marked as completed');
+          // Check if any ODN has partial status (which we just reset to pending)
+          const hasPartialExits = storesToProcess.some(storeName => {
+            const storeInfo = storeDetails[storeName];
+            return (storeInfo?.exit_permit_status || '').toLowerCase() === 'partial';
+          });
+          
+          // Only mark as completed if no partial exits and all gates allowed
+          if (!hasPartialExits) {
+            const allGateAllowed = allOdns.every(odn => odn.gate_status === 'allowed');
+            
+            if (allGateAllowed) {
+              // All stores allowed exit, mark customer as completed
+              await axios.put(`${API_URL}/api/update-service-status/${record.id}`, {
+                status: 'completed',
+                completed_at: new Date().toISOString()
+              });
+              console.log('✅ All stores allowed exit, customer marked as completed');
+            }
+          } else {
+            console.log('⏳ Partial exit detected, keeping customer active for next visit');
           }
         } catch (err) {
           console.error('❌ Failed to check all gate statuses:', err);
         }
 
-        // Record service time for Gate Keeper (one entry per store)
+        // Record service time for Gate Keeper for each store
         try {
           const gateProcessedTime = formatTimestamp();
           
-          for (const storeName of storesReadyForGate) {
-            await axios.post(`${API_URL}/api/service-time`, {
+          await Promise.all(storesToProcess.map(storeName =>
+            axios.post(`${API_URL}/api/service-time`, {
               process_id: record.id,
               service_unit: `Gate Keeper - ${storeName}`,
               end_time: gateProcessedTime,
@@ -261,10 +441,10 @@ const GateKeeper = () => {
               officer_name: localStorage.getItem('FullName'),
               status: 'completed',
               notes: `Gate ${action === 'allow' ? 'allowed' : 'denied'} exit for vehicle ${record.vehicle_plate}`
-            });
-          }
+            })
+          ));
           
-          console.log(`✅ Gate Keeper service time recorded for stores: ${storesReadyForGate.join(', ')}`);
+          console.log(`✅ Gate Keeper service time recorded for stores: ${storesToProcess.join(', ')}`);
         } catch (err) {
           console.error('❌ Failed to record Gate Keeper service time:', err);
           // Don't fail the gate processing if service time recording fails
@@ -272,7 +452,7 @@ const GateKeeper = () => {
 
         setSnackbar({ 
           open: true, 
-          message: `Vehicle ${record.vehicle_plate} ${action === 'allow' ? 'allowed to exit' : 'denied exit'} for ${storesReadyForGate.join(', ')}!`, 
+          message: `Vehicle ${record.vehicle_plate} ${action === 'allow' ? 'allowed to exit' : 'denied exit'} for ${storesToProcess.join(', ')}!`, 
           severity: action === 'allow' ? 'success' : 'warning' 
         });
         
@@ -284,14 +464,80 @@ const GateKeeper = () => {
     }
   };
 
-  if (loading && records.length === 0) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-      <CircularProgress thickness={5} size={60} />
-    </Box>
-  );
+  const handleStoreSelection = async () => {
+    if (selectedStores.length === 0) return;
+    
+    try {
+      const userId = localStorage.getItem('UserId') || localStorage.getItem('EmployeeID');
+      
+      console.log('=== SAVING STORE SELECTION ===');
+      console.log('User ID:', userId);
+      console.log('Selected Stores:', selectedStores);
+      
+      // Create sessions in database
+      await axios.post(`${API_URL}/api/gate-keeper-sessions`, {
+        user_id: userId,
+        stores: selectedStores
+      });
+      
+      console.log('✅ Sessions created in database');
+      
+      // Save to localStorage
+      localStorage.setItem('GateKeeperStores', JSON.stringify(selectedStores));
+      localStorage.setItem('GateKeeperStore', selectedStores[0]);
+      
+      console.log('✅ Stores saved to localStorage');
+      
+      // Update state to trigger re-render and fetchData
+      setAssignedStores(selectedStores);
+      
+      // Close dialog - this will trigger fetchData via the useEffect
+      setStoreSelectionDialog(false);
+      
+      console.log('✅ Dialog closed, fetchData should start now');
+      
+    } catch (error) {
+      console.error('❌ Error saving store selection:', error);
+      alert('Failed to save store selection. Please try again.');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const userId = localStorage.getItem('UserId') || localStorage.getItem('EmployeeID');
+      
+      // Deactivate Gate Keeper sessions in database
+      await axios.post(`${API_URL}/api/gate-keeper-sessions/logout`, {
+        user_id: userId
+      });
+    } catch (error) {
+      console.error('Error deactivating sessions:', error);
+    }
+    
+    localStorage.removeItem('GateKeeperStore');
+    localStorage.removeItem('GateKeeperStores');
+    localStorage.clear();
+    navigate('/sign-in');
+  };
+
+  console.log('=== GATE KEEPER COMPONENT STATE ===');
+  console.log('Loading:', loading);
+  console.log('Records length:', records.length);
+  console.log('Has access:', hasAccess);
+  console.log('User job title:', userJobTitle);
+
+  if (loading && records.length === 0) {
+    console.log('Showing loading spinner...');
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+        <CircularProgress thickness={5} size={60} />
+      </Box>
+    );
+  }
 
   // Access control check
   if (!hasAccess) {
+    console.log('Access denied, showing error...');
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography variant="h5" color="error" gutterBottom>
@@ -309,6 +555,11 @@ const GateKeeper = () => {
       </Box>
     );
   }
+
+  console.log('=== RENDERING GATE KEEPER ===');
+  console.log('Store dialog open:', storeSelectionDialog);
+  console.log('Assigned stores:', assignedStores);
+  console.log('Records:', records.length);
 
   return (
     <Box sx={{ 
@@ -335,7 +586,7 @@ const GateKeeper = () => {
             fontSize: { xs: '1.1rem', sm: '1.4rem', md: '1.8rem' },
             lineHeight: 1.2
           }}>
-            Gate Security Control
+            Gate Security Control - {(assignedStores && assignedStores.length > 0) ? assignedStores.join(', ') : 'No Store Selected'}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{
             fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.85rem' }
@@ -642,7 +893,7 @@ const GateKeeper = () => {
                       verticalAlign: 'middle',
                       px: { xs: 0.25, sm: 0.5, md: 0.75 }
                     }}>
-                      <Stack direction="column" spacing={{ xs: 0.5, sm: 0.75 }} alignItems="center">
+                      <Stack direction="column" spacing={{ xs: 2, sm: 2.5, md: 3 }} alignItems="center">
                         <Button 
                           variant="contained" 
                           color="success"
@@ -688,6 +939,81 @@ const GateKeeper = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Store Selection Dialog */}
+      <Dialog
+        open={storeSelectionDialog}
+        disableEscapeKeyDown
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            minWidth: { xs: '280px', sm: '400px', md: '500px' },
+            p: 2,
+            '& .MuiDialogTitle-root + .MuiIconButton-root': {
+              display: 'none'
+            }
+          }
+        }}
+      >
+        <Box sx={{ textAlign: 'center', pb: 1, pt: 2 }}>
+          <Storefront sx={{ fontSize: 48, color: '#2196f3', mb: 1 }} />
+          <Typography variant="h5" fontWeight="bold">
+            Select Your Gate(s)
+          </Typography>
+        </Box>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+            Select one or more store gates you are assigned to. You will see vehicles for all selected stores.
+          </Typography>
+          <Autocomplete
+            multiple
+            options={availableStores}
+            value={selectedStores}
+            onChange={(event, newValue) => setSelectedStores(newValue)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Store Gates"
+                placeholder="Select stores..."
+              />
+            )}
+            renderTags={(value, getTagProps) =>
+              value.map((option, index) => (
+                <Chip
+                  label={option}
+                  {...getTagProps({ index })}
+                  color="primary"
+                  sx={{ m: 0.5 }}
+                />
+              ))
+            }
+            sx={{ width: '100%' }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            {selectedStores.length} store(s) selected
+          </Typography>
+          
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
+            <Button
+              onClick={handleStoreSelection}
+              variant="contained"
+              color="primary"
+              disabled={selectedStores.length === 0}
+              sx={{ px: 4, py: 1 }}
+            >
+              Confirm Selection
+            </Button>
+            <Button
+              onClick={() => setStoreSelectionDialog(false)}
+              variant="outlined"
+              color="secondary"
+              sx={{ px: 4, py: 1 }}
+            >
+              Close
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       {/* New Records Notification Dialog */}
       <Dialog

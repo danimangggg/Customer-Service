@@ -11,8 +11,8 @@ const DefaultRedirect = () => {
       const jobTitle = localStorage.getItem('JobTitle');
       const accountType = localStorage.getItem('AccountType');
       
-      // Redirect HP Officers, PI Officers, Documentation Officers, Documentation Followers, Quality Evaluators, HP Dispatchers, TM Managers, and Billers to HP Dashboard
-      if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer" || jobTitle === "Documentation Follower" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") {
+      // Redirect HP Officers, PI Officers, Documentation Officers, Quality Evaluators, HP Dispatchers, TM Managers, and Billers to HP Dashboard
+      if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") {
         navigate('/hp-dashboard');
       }
       // EWM-Documentation goes to invoice management

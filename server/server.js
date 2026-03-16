@@ -14,6 +14,7 @@ app.use(cors({
     'https://epss-mt.et',
     'https://www.epss-mt.et',
     'http://epss-mt.et',
+    'http://10.2.32.150:3000',
     'http://www.epss-mt.et'
   ]
   // Removed credentials: true since we're using JWT in localStorage, not cookies
@@ -58,6 +59,6 @@ console.log('Starting server on port:', port);
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Database host:', process.env.DB_HOST || 'localhost');
 
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, '10.2.32.150', () => {
   console.log(`Server is running on port ${port}`);
 });

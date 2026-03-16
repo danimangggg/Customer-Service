@@ -73,7 +73,8 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
         const rdfStores = storeData.filter(s => 
           s.value.startsWith('AA') && s.value !== 'HP' && s.value !== 'CR'
         );
-        if (rdfStores.length > 0 && !selectedStore) {
+        if (rdfStores.length > 0) {
+          console.log('Setting default store to:', rdfStores[0].value);
           setSelectedStore(rdfStores[0].value);
         }
       } catch (error) {
@@ -85,9 +86,8 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
           { value: 'AA3', label: 'AA3' },
           { value: 'AA4', label: 'AA4' }
         ]);
-        if (!selectedStore) {
-          setSelectedStore('AA11');
-        }
+        console.log('Setting fallback default store to: AA11');
+        setSelectedStore('AA11');
       }
     };
 

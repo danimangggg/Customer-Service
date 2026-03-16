@@ -105,7 +105,7 @@ const UserManagement = () => {
 
   const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
-  const jobTitles = ['O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Biller', 'Documentation Officer', 'Documentation Follower', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'];
+  const jobTitles = ['Admin', 'O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Biller', 'Documentation Officer - HP', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper'];
 
   useEffect(() => {
     fetchStores();

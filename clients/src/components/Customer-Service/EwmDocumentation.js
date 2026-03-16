@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import MUIDataTable from 'mui-datatables';
+import * as XLSX from 'xlsx';
 import {
   Box,
   Typography,
@@ -153,6 +154,23 @@ const EwmDocumentation = () => {
     } finally {
       setSaving(prev => ({ ...prev, [key]: false }));
     }
+  };
+
+  const handleExportExcel = () => {
+    const rows = customers.map((c, i) => ({
+      '#': i + 1,
+      'Customer Name': c.customer_name || '',
+      'Store': c.store || '',
+      'Region': c.region_name || '',
+      'Woreda': c.woreda_name || '',
+      'ODN Number': c.odn_number || '',
+      'Invoice Number': c.invoice_number || '',
+      'Invoice Date': c.invoice_date ? new Date(c.invoice_date).toLocaleDateString() : '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'EWM Invoices');
+    XLSX.writeFile(wb, `EWM_Invoices_${userStore}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   // Define columns for MUI DataTable
@@ -322,7 +340,7 @@ const EwmDocumentation = () => {
     filterType: 'checkbox',
     responsive: 'standard',
     selectableRows: 'none',
-    download: true,
+    download: false,
     print: true,
     search: true,
     filter: true,
@@ -331,10 +349,6 @@ const EwmDocumentation = () => {
     rowsPerPage: 10,
     rowsPerPageOptions: [10, 25, 50, 100],
     elevation: 3,
-    downloadOptions: {
-      filename: `EWM_Invoices_${userStore}_${new Date().toISOString().split('T')[0]}.csv`,
-      separator: ',',
-    },
     textLabels: {
       body: {
         noMatch: 'No customers with completed EWM status found',
@@ -348,7 +362,6 @@ const EwmDocumentation = () => {
       },
       toolbar: {
         search: 'Search',
-        downloadCsv: 'Download CSV',
         print: 'Print',
         viewColumns: 'View Columns',
         filterTable: 'Filter Table',
@@ -359,10 +372,17 @@ const EwmDocumentation = () => {
         reset: 'RESET',
       },
     },
-    onDownload: (buildHead, buildBody, columns, data) => {
-      // Custom download to include formatted data
-      return '\uFEFF' + buildHead(columns) + buildBody(data);
-    },
+    customToolbar: () => (
+      <Button
+        variant="outlined"
+        size="small"
+        onClick={handleExportExcel}
+        disabled={customers.length === 0}
+        sx={{ ml: 1 }}
+      >
+        Export Excel
+      </Button>
+    ),
   };
 
   if (loading) {

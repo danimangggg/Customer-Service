@@ -252,19 +252,33 @@ const RouteManagement = () => {
 
   const handleSubmit = async () => {
     try {
-      // Validation
-      if (!formData.route_id || !formData.vehicle_id || !formData.driver_id) {
+      // Check if vehicle is already assigned from route assignment
+      const vehicleAlreadyAssigned = editingRoute && editingRoute.assigned_vehicle_id;
+      
+      // Validation - vehicle not required if already assigned
+      if (!formData.route_id || (!vehicleAlreadyAssigned && !formData.vehicle_id) || !formData.driver_id) {
         MySwal.fire('Error', 'Please fill in all required fields (Route, Vehicle, Driver)', 'error');
         return;
       }
 
       const loggedInUserId = localStorage.getItem('UserId');
+      
+      // Explicitly construct the assignment data in the correct order
       const assignmentData = {
-        ...formData,
+        route_id: formData.route_id,
+        vehicle_id: vehicleAlreadyAssigned ? editingRoute.assigned_vehicle_id : formData.vehicle_id,
+        driver_id: formData.driver_id,
+        deliverer_id: formData.deliverer_id || null,
+        departure_kilometer: formData.departure_kilometer || null,
+        notes: formData.notes || null,
         assigned_by: loggedInUserId,
         ethiopian_month: currentEthiopianMonth,
-        ethiopian_year: currentEthiopianYear
+        ethiopian_year: currentEthiopianYear,
+        priority: 'Medium'
       };
+
+      console.log('Assignment data being sent:', assignmentData);
+      console.log('Form data:', formData);
 
       // Check if we're editing an existing assignment or creating a new one
       if (editingRoute && editingRoute.assignment_id) {
@@ -287,15 +301,20 @@ const RouteManagement = () => {
   };
 
   const handleEdit = (route) => {
+    console.log('Editing route:', route);
     setEditingRoute(route);
-    setFormData({
+    // Use vehicle from route assignment if available
+    const vehicleId = route.assigned_vehicle_id || '';
+    const formDataToSet = {
       route_id: route.id,
-      vehicle_id: route.assigned_vehicle_id || '',
+      vehicle_id: vehicleId,
       driver_id: route.assigned_driver_id || '',
       deliverer_id: route.assigned_deliverer_id || '',
       departure_kilometer: route.departure_kilometer || '',
       notes: route.notes || ''
-    });
+    };
+    console.log('Setting form data:', formDataToSet);
+    setFormData(formDataToSet);
     setOpenDialog(true);
   };
 
@@ -697,28 +716,43 @@ const RouteManagement = () => {
               
               {/* Vehicle Selection */}
               <Grid item xs={12} md={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Vehicle</InputLabel>
-                  <Select
-                    value={formData.vehicle_id}
-                    label="Vehicle"
-                    onChange={(e) => setFormData({ ...formData, vehicle_id: e.target.value })}
-                  >
-                    {vehicles.map((vehicle) => (
-                      <MenuItem key={vehicle.id} value={vehicle.id}>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <VehicleIcon />
-                          <Box>
-                            <Typography>{vehicle.vehicle_name}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {vehicle.plate_number} - {vehicle.vehicle_type}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                {editingRoute && editingRoute.assigned_vehicle_id ? (
+                  // Vehicle already assigned - show as read-only
+                  <TextField
+                    fullWidth
+                    label="Vehicle (Already Assigned)"
+                    value={editingRoute.vehicle_name || 'Vehicle Assigned'}
+                    disabled
+                    InputProps={{
+                      startAdornment: <VehicleIcon sx={{ mr: 1, color: 'success.main' }} />
+                    }}
+                    helperText="Vehicle was assigned in TM Manager Phase 1"
+                  />
+                ) : (
+                  // Vehicle not assigned yet - allow selection
+                  <FormControl fullWidth required>
+                    <InputLabel>Vehicle</InputLabel>
+                    <Select
+                      value={formData.vehicle_id}
+                      label="Vehicle"
+                      onChange={(e) => setFormData({ ...formData, vehicle_id: e.target.value })}
+                    >
+                      {vehicles.map((vehicle) => (
+                        <MenuItem key={vehicle.id} value={vehicle.id}>
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <VehicleIcon />
+                            <Box>
+                              <Typography>{vehicle.vehicle_name}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {vehicle.plate_number} - {vehicle.vehicle_type}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
               </Grid>
               
               {/* Driver Selection */}

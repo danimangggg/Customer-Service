@@ -38,7 +38,7 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     departure_kilometer: {
-      type: DataTypes.DECIMAL(10, 2),
+      type: DataTypes.DECIMAL(15, 2),
       allowNull: true,
       comment: 'Departure kilometer reading for the route'
     },
@@ -107,7 +107,7 @@ module.exports = (sequelize, DataTypes) => {
       comment: 'Employee ID who completed the dispatch'
     },
     arrival_kilometer: {
-      type: DataTypes.DECIMAL(10, 2),
+      type: DataTypes.DECIMAL(15, 2),
       allowNull: true,
       comment: 'Arrival kilometer reading for the route'
     },

@@ -3,7 +3,8 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Typography, Card, CardContent, CardHeader, Button, Container, 
   TablePagination, Stack, Box, Chip, Avatar, Divider, Grid, LinearProgress, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton,
+  FormControl, Select, MenuItem
 } from '@mui/material';
 import {
   LocalShipping as DispatchIcon,
@@ -25,6 +26,7 @@ const MySwal = withReactContent(Swal);
 
 const DispatchManagement = () => {
   const [routeData, setRouteData] = useState([]);
+  const [filterType, setFilterType] = useState('Regular');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -92,19 +94,19 @@ const DispatchManagement = () => {
   useEffect(() => {
     fetchAssignedRoutes();
     fetchStats();
-  }, [currentEthiopianMonth, currentEthiopianYear]);
+  }, [currentEthiopianMonth, currentEthiopianYear, filterType]);
 
   const fetchAssignedRoutes = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Fetch routes that have vehicle assigned (previous stage completed)
       const response = await axios.get(`${api_url}/api/dispatch-routes`, {
         params: {
           month: currentEthiopianMonth,
           year: currentEthiopianYear,
-          includeAll: true // Include both active and completed dispatches
+          process_type: filterType.toLowerCase(),
+          includeAll: true
         }
       });
       
@@ -133,57 +135,58 @@ const DispatchManagement = () => {
 
   const handleCompleteDispatch = async (routeId, routeName) => {
     try {
-      await axios.put(`${api_url}/api/route-assignments/${routeId}/complete-dispatch`, {
+      // routeId is now process_id from the new API
+      const processId = routeId;
+      
+      // Update process status to dispatch_completed
+      await axios.put(`${api_url}/api/processes/${processId}/complete-dispatch`, {
         completed_by: loggedInUserId
       });
       
       // Record service time for Dispatcher - HP
-      // Get all process IDs for facilities on this route
       try {
-        const dispatchEndTime = formatTimestamp();
+        const dispatchEndTime = new Date().toISOString();
         
-        // Find the route info to get facilities
-        const routeInfo = routeData.find(r => r.assignment_id === routeId);
-        if (routeInfo && routeInfo.facilities) {
-          for (const facility of routeInfo.facilities) {
-            if (facility.process_id) {
-              // Calculate waiting time: current time - PI end time
-              let waitingMinutes = 0;
-              try {
-                const piResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
-                  params: {
-                    process_id: facility.process_id,
-                    service_unit: 'PI Officer-HP'
-                  }
-                });
-                
-                if (piResponse.data.end_time) {
-                  const prevTime = new Date(piResponse.data.end_time);
-                  const currTime = new Date(dispatchEndTime);
-                  const diffMs = currTime - prevTime;
-                  waitingMinutes = Math.floor(diffMs / 60000);
-                  waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
-                }
-              } catch (err) {
-                console.error('Failed to get PI end time:', err);
-              }
-              
-              await axios.post(`${api_url}/api/service-time-hp`, {
-                process_id: facility.process_id,
-                service_unit: 'Dispatcher - HP',
-                start_time: dispatchEndTime,
-                end_time: dispatchEndTime,
-                waiting_minutes: waitingMinutes,
-                officer_id: loggedInUserId,
-                officer_name: localStorage.getItem('FullName'),
-                status: 'completed',
-                notes: `Dispatch completed for route: ${routeName}`
-              });
-              
-              console.log(`✅ Dispatcher - HP service time recorded for process ${facility.process_id}: ${waitingMinutes} minutes`);
+        // Calculate waiting time from TM Phase 2 end time
+        let waitingMinutes = 0;
+        try {
+          const lastServiceQuery = `
+            SELECT end_time 
+            FROM service_time_hp
+            WHERE process_id = ? AND service_unit = 'TM - Driver & Deliverer Assignment'
+            ORDER BY created_at DESC 
+            LIMIT 1
+          `;
+          
+          const lastServiceResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
+            params: {
+              process_id: processId,
+              service_unit: 'TM - Driver & Deliverer Assignment'
             }
+          });
+          
+          if (lastServiceResponse.data.end_time) {
+            const prevTime = new Date(lastServiceResponse.data.end_time);
+            const currTime = new Date(dispatchEndTime);
+            const diffMs = currTime - prevTime;
+            waitingMinutes = Math.floor(diffMs / 60000);
+            waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
           }
+        } catch (err) {
+          console.error('Failed to get TM end time:', err);
         }
+        
+        await axios.post(`${api_url}/api/service-time-hp`, {
+          process_id: processId,
+          service_unit: 'Dispatcher - HP',
+          end_time: dispatchEndTime,
+          officer_id: loggedInUserId,
+          officer_name: localStorage.getItem('FullName'),
+          status: 'completed',
+          notes: `Dispatch completed for route: ${routeName}, waiting time: ${waitingMinutes} minutes`
+        });
+        
+        console.log(`✅ Dispatcher - HP service time recorded for process ${processId}: ${waitingMinutes} minutes`);
       } catch (err) {
         console.error('❌ Failed to record Dispatcher service time:', err);
         // Don't fail the completion if service time recording fails
@@ -338,6 +341,24 @@ const DispatchManagement = () => {
         {/* Loading Progress */}
         {loading && <LinearProgress sx={{ mb: 2 }} />}
 
+        {/* Type Filter */}
+        <Card sx={{ mb: 2, p: 2 }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography variant="body2" fontWeight="bold" color="text.secondary">Process Type:</Typography>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <Select
+                value={filterType}
+                onChange={(e) => { setFilterType(e.target.value); setPage(0); }}
+              >
+                <MenuItem value="Regular">HP Regular</MenuItem>
+                <MenuItem value="Emergency">Emergency</MenuItem>
+                <MenuItem value="Breakdown">Breakdown</MenuItem>
+                <MenuItem value="Vaccine">Vaccine</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </Card>
+
         {/* Routes Table */}
         <Card className="dispatch-card">
           <CardHeader 
@@ -401,11 +422,11 @@ const DispatchManagement = () => {
               <TableBody>
                 {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => {
                   // Check if this route has passed dispatch stage (already completed)
-                  const isInactive = route.assignment_status === 'Completed';
+                  const isInactive = route.process_status === 'dispatch_completed';
                   
                   return (
                   <TableRow 
-                    key={route.assignment_id} 
+                    key={route.process_id} 
                     hover 
                     sx={{ 
                       '&:hover': { bgcolor: 'grey.50' },
@@ -480,7 +501,7 @@ const DispatchManagement = () => {
                           color="success" 
                           size="small" 
                           startIcon={<CompleteIcon />} 
-                          onClick={() => handleCompleteDispatch(route.assignment_id, route.route_name)}
+                          onClick={() => handleCompleteDispatch(route.process_id, route.route_name)}
                           sx={{ borderRadius: 2 }}
                         >
                           Complete

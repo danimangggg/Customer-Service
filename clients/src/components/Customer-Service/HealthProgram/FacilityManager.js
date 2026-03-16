@@ -3,12 +3,13 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Typography, Chip, IconButton, Box, TextField, InputAdornment, Card,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, MenuItem, 
-  Container, TablePagination
+  Container, TablePagination, FormControlLabel, Checkbox
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BusinessIcon from '@mui/icons-material/Business';
+import VaccinesIcon from '@mui/icons-material/Vaccines';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -18,6 +19,7 @@ const MySwal = withReactContent(Swal);
 const FacilityManager = () => {
   // --- STATE MANAGEMENT ---
   const [facilities, setFacilities] = useState([]);
+  const [routes, setRoutes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -28,7 +30,9 @@ const FacilityManager = () => {
     id: '', 
     facility_name: '', 
     route: '', 
-    period: '' 
+    route2: '',
+    period: '',
+    is_vaccine_site: false
   });
 
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -36,8 +40,12 @@ const FacilityManager = () => {
   // --- DATA FETCHING ---
   const fetchFacilities = async () => {
     try {
-      const res = await axios.get(`${api_url}/api/facilities`);
-      setFacilities(Array.isArray(res.data) ? res.data : []);
+      const [facRes, routesRes] = await Promise.all([
+        axios.get(`${api_url}/api/facilities`),
+        axios.get(`${api_url}/api/routes`)
+      ]);
+      setFacilities(Array.isArray(facRes.data) ? facRes.data : []);
+      setRoutes(routesRes.data || []);
     } catch (err) {
       console.error("Fetch error:", err);
     }
@@ -53,18 +61,22 @@ const FacilityManager = () => {
       id: f.id,
       facility_name: f.facility_name,
       route: f.route || '', 
-      period: f.period || ''
+      route2: f.route2 || '',
+      period: f.period || '',
+      is_vaccine_site: !!f.is_vaccine_site
     });
     setOpenEdit(true);
   };
 
   const handleUpdate = async () => {
     try {
-      // Using your specific API endpoint
-      const res = await axios.put(`${api_url}/api/update-facilities/${selectedFacility.id}`, {
-        route: selectedFacility.route, // Supports symbols, numbers, and letters
-        period: selectedFacility.period
-      });
+      const payload = {
+        route: selectedFacility.route,
+        route2: selectedFacility.period === 'Monthly' ? (selectedFacility.route2 || null) : null,
+        period: selectedFacility.period,
+        is_vaccine_site: selectedFacility.is_vaccine_site ? 1 : 0
+      };
+      const res = await axios.put(`${api_url}/api/update-facilities/${selectedFacility.id}`, payload);
       
       if (res.status === 200) {
         setOpenEdit(false);
@@ -302,7 +314,10 @@ const FacilityManager = () => {
                 </TableCell>
 
                 {/* 2. Route Column (Displays symbols/numbers) */}
-                <TableCell>{f.route || "---"}</TableCell>
+                <TableCell>
+                  {f.route || "---"}
+                  {f.route2 && <><br/><span style={{ color: '#666', fontSize: '0.8em' }}>{f.route2}</span></>}
+                </TableCell>
 
                 <TableCell>
                   <Chip 
@@ -312,6 +327,15 @@ const FacilityManager = () => {
                     variant="outlined"
                     sx={{ fontWeight: 'bold' }}
                   />
+                  {!!f.is_vaccine_site && (
+                    <Chip
+                      icon={<VaccinesIcon />}
+                      label="Vaccine"
+                      size="small"
+                      color="success"
+                      sx={{ ml: 0.5, fontWeight: 'bold' }}
+                    />
+                  )}
                 </TableCell>
 
                 <TableCell align="center">
@@ -343,25 +367,63 @@ const FacilityManager = () => {
         <DialogContent sx={{ pt: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <Typography variant="caption" color="text.secondary">Editing: <strong>{selectedFacility.facility_name}</strong></Typography>
           
-          <TextField 
-            label="Route (Symbols, Letters, Numbers)" 
-            fullWidth 
-            value={selectedFacility.route}
-            onChange={(e) => setSelectedFacility({...selectedFacility, route: e.target.value})}
-            placeholder="e.g. R-123/North#9"
-          />
-
           <TextField
             select
             label="Period"
             fullWidth
             value={selectedFacility.period}
-            onChange={(e) => setSelectedFacility({...selectedFacility, period: e.target.value})}
+            onChange={(e) => setSelectedFacility({...selectedFacility, period: e.target.value, route2: ''})}
           >
             <MenuItem value="Odd">Odd</MenuItem>
             <MenuItem value="Even">Even</MenuItem>
             <MenuItem value="Monthly">Monthly</MenuItem>
           </TextField>
+
+          <TextField
+            select
+            label={selectedFacility.period === 'Monthly' ? 'Route 1' : 'Route'}
+            fullWidth
+            value={selectedFacility.route}
+            onChange={(e) => setSelectedFacility({...selectedFacility, route: e.target.value})}
+          >
+            <MenuItem value="">-- None --</MenuItem>
+            {routes.map(r => (
+              <MenuItem key={r.id} value={r.route_name}>{r.route_name}</MenuItem>
+            ))}
+          </TextField>
+
+          {selectedFacility.period === 'Monthly' && (
+            <TextField
+              select
+              label="Route 2 (optional)"
+              fullWidth
+              value={selectedFacility.route2}
+              onChange={(e) => setSelectedFacility({...selectedFacility, route2: e.target.value})}
+            >
+              <MenuItem value="">-- None --</MenuItem>
+              {routes.map(r => (
+                <MenuItem key={r.id} value={r.route_name}>{r.route_name}</MenuItem>
+              ))}
+            </TextField>
+          )}
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={!!selectedFacility.is_vaccine_site}
+                onChange={(e) => setSelectedFacility({...selectedFacility, is_vaccine_site: e.target.checked})}
+                color="success"
+                icon={<VaccinesIcon />}
+                checkedIcon={<VaccinesIcon />}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2" fontWeight="bold">Vaccine Site</Typography>
+                <Typography variant="caption" color="text.secondary">Register this facility as a vaccine distribution site</Typography>
+              </Box>
+            }
+          />
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid #eee' }}>
           <Button onClick={() => setOpenEdit(false)} color="inherit">Cancel</Button>

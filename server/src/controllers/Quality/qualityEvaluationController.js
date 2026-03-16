@@ -4,26 +4,20 @@ const { Op } = require('sequelize');
 // Get ODNs with completed document follow-up for quality evaluation
 const getODNsForQualityEvaluation = async (req, res) => {
   try {
-    const { month, year, page = 1, limit = 10, search = '' } = req.query;
+    const { month, year, page = 1, limit = 10, search = '', process_type = 'regular' } = req.query;
     const offset = (page - 1) * limit;
 
-    // Build the reporting month string - make it optional for testing
-    let reportingMonthFilter = '';
-    let monthFilter = '';
-    let queryParams = [];
-    
-    if (month && year) {
-      const reportingMonth = `${month} ${year}`;
-      reportingMonthFilter = 'AND p.reporting_month = ?';
-      monthFilter = 'AND ra.ethiopian_month = ?';
-      queryParams.push(reportingMonth, month);
-    }
+    const isEmergencyOrBreakdown = process_type === 'emergency' || process_type === 'breakdown' || process_type === 'vaccine';
 
-    // Query to find ODNs with completed document follow-up that need quality evaluation
+    const processTypeFilter = isEmergencyOrBreakdown
+      ? `AND p.process_type = '${process_type}'`
+      : (month && year ? `AND p.reporting_month = '${month} ${year}' AND p.process_type = '${process_type}'` : `AND p.process_type = '${process_type}'`);
+
     const query = `
       SELECT DISTINCT 
         o.id as odn_id,
         o.odn_number,
+        o.pod_number,
         o.status as odn_status,
         o.pod_confirmed,
         o.documents_signed,
@@ -38,65 +32,29 @@ const getODNsForQualityEvaluation = async (req, res) => {
         f.woreda_name,
         r.route_name,
         p.reporting_month,
-        ra.status as dispatch_status,
-        ra.completed_at as dispatch_completed_at
+        p.created_at,
+        NULL as dispatch_status,
+        NULL as dispatch_completed_at
       FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id ${reportingMonthFilter}
+      INNER JOIN processes p ON o.process_id = p.id
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id ${monthFilter}
-      WHERE ra.status = 'Completed'
-        AND p.status = 'vehicle_requested'
+      LEFT JOIN routes r ON f.route = r.route_name
+      WHERE p.status IN ('documentation_completed')
         AND o.pod_confirmed = TRUE
-        AND o.documents_signed = TRUE
-        AND o.documents_handover = TRUE
+        ${processTypeFilter}
         ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
-      ORDER BY ra.completed_at DESC, f.facility_name, o.odn_number
+      ORDER BY p.created_at DESC, f.facility_name, o.odn_number
       LIMIT ? OFFSET ?
     `;
 
-    const countQuery = `
-      SELECT COUNT(DISTINCT o.id) as total
-      FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id ${reportingMonthFilter}
-      INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id ${monthFilter}
-      WHERE ra.status = 'Completed'
-        AND p.status = 'vehicle_requested'
-        AND o.pod_confirmed = TRUE
-        AND o.documents_signed = TRUE
-        AND o.documents_handover = TRUE
-        ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
-    `;
-
-    if (search) {
-      const searchPattern = `%${search}%`;
-      queryParams.push(searchPattern, searchPattern);
-    }
-
-    queryParams.push(parseInt(limit), parseInt(offset));
+    const searchParams = search ? [`%${search}%`, `%${search}%`] : [];
 
     const odns = await db.sequelize.query(query, {
-      replacements: queryParams,
+      replacements: [...searchParams, parseInt(limit), parseInt(offset)],
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    // For count query, remove limit and offset
-    let countParams = queryParams.slice(0, -2);
-    const countResult = await db.sequelize.query(countQuery, {
-      replacements: countParams,
-      type: db.sequelize.QueryTypes.SELECT
-    });
-
-    const totalCount = countResult[0]?.total || 0;
-
-    res.json({
-      odns,
-      totalCount,
-      currentPage: parseInt(page),
-      totalPages: Math.ceil(totalCount / limit)
-    });
+    res.json({ odns, totalCount: odns.length, currentPage: parseInt(page), totalPages: 1 });
 
   } catch (error) {
     console.error('Error fetching ODNs for quality evaluation:', error);
@@ -116,13 +74,8 @@ const getQualityEvaluationStats = async (req, res) => {
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
+      WHERE p.status IN ('documentation_completed')
         AND o.pod_confirmed = TRUE
-        AND o.documents_signed = TRUE
-        AND o.documents_handover = TRUE
     `;
 
     // Get quality confirmed count
@@ -131,13 +84,8 @@ const getQualityEvaluationStats = async (req, res) => {
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
+      WHERE p.status IN ('documentation_completed')
         AND o.pod_confirmed = TRUE
-        AND o.documents_signed = TRUE
-        AND o.documents_handover = TRUE
         AND o.quality_confirmed = TRUE
     `;
 
@@ -147,13 +95,8 @@ const getQualityEvaluationStats = async (req, res) => {
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
+      WHERE p.status IN ('documentation_completed')
         AND o.pod_confirmed = TRUE
-        AND o.documents_signed = TRUE
-        AND o.documents_handover = TRUE
         AND o.quality_confirmed = FALSE
     `;
 
@@ -163,34 +106,29 @@ const getQualityEvaluationStats = async (req, res) => {
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
+      WHERE p.status IN ('documentation_completed')
         AND o.pod_confirmed = TRUE
-        AND o.documents_signed = TRUE
-        AND o.documents_handover = TRUE
         AND o.quality_feedback IS NOT NULL
         AND o.quality_feedback != ''
     `;
 
     const totalResult = await db.sequelize.query(totalReadyQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
     const confirmedResult = await db.sequelize.query(qualityConfirmedQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
     const pendingResult = await db.sequelize.query(qualityPendingQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
     const feedbackResult = await db.sequelize.query(withFeedbackQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -321,6 +259,154 @@ const updateQualityEvaluation = async (req, res) => {
 
     console.log('Final results:', results);
     console.log('=== BACKEND UPDATE END ===');
+
+    // Record service times for Quality Evaluator Phase
+    try {
+      for (const update of updates) {
+        const { odn_id, quality_confirmed } = update;
+        
+        if (!odn_id || !quality_confirmed) continue;
+
+        try {
+          // Get process_id from ODN
+          const processQuery = `
+            SELECT process_id FROM odns WHERE id = ?
+          `;
+          
+          const [odn] = await db.sequelize.query(processQuery, {
+            replacements: [odn_id],
+            type: db.sequelize.QueryTypes.SELECT
+          });
+
+          if (!odn) continue;
+
+          let waitingMinutes = 0;
+          try {
+            // Look for the last service time recorded (should be Documentation - POD Confirmed)
+            const lastServiceQuery = `
+              SELECT end_time 
+              FROM service_time_hp
+              WHERE process_id = ?
+              ORDER BY created_at DESC 
+              LIMIT 1
+            `;
+            
+            const [lastService] = await db.sequelize.query(lastServiceQuery, {
+              replacements: [odn.process_id],
+              type: db.sequelize.QueryTypes.SELECT
+            });
+            
+            if (lastService && lastService.end_time) {
+              const prevTime = new Date(lastService.end_time);
+              const currTime = new Date();
+              const diffMs = currTime - prevTime;
+              waitingMinutes = Math.floor(diffMs / 60000);
+              waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
+            }
+          } catch (err) {
+            console.error('Failed to calculate Quality Evaluator waiting time:', err);
+          }
+          
+          // Fetch officer name: try employees table first, then users table
+          let finalOfficerName = 'Unknown Officer';
+          if (evaluated_by) {
+            try {
+              const employeeQuery = `SELECT full_name FROM employees WHERE id = ?`;
+              const [employee] = await db.sequelize.query(employeeQuery, {
+                replacements: [evaluated_by],
+                type: db.sequelize.QueryTypes.SELECT
+              });
+              if (employee && employee.full_name) {
+                finalOfficerName = employee.full_name;
+              } else {
+                const userQuery = `SELECT full_name FROM users WHERE id = ?`;
+                const [user] = await db.sequelize.query(userQuery, {
+                  replacements: [evaluated_by],
+                  type: db.sequelize.QueryTypes.SELECT
+                });
+                if (user && user.full_name) finalOfficerName = user.full_name;
+              }
+            } catch (err) {
+              console.error('Failed to fetch Quality Evaluator officer name:', err);
+            }
+          }
+          
+          const insertQuery = `
+            INSERT INTO service_time_hp 
+            (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
+            VALUES (?, ?, NOW(), ?, ?, ?, ?)
+          `;
+          
+          await db.sequelize.query(insertQuery, {
+            replacements: [
+              odn.process_id,
+              'Quality Evaluator - Confirmed',
+              evaluated_by,
+              finalOfficerName,
+              'completed',
+              `Quality Evaluator Phase completed, waiting time: ${waitingMinutes} minutes`
+            ],
+            type: db.sequelize.QueryTypes.INSERT
+          });
+          
+          console.log(`✅ Service time recorded for process ${odn.process_id} with officer_name: ${officerName}`);
+        } catch (err) {
+          console.error(`Failed to record service time for ODN ${odn_id}:`, err);
+        }
+      }
+      
+      console.log(`✅ Quality Evaluator service times recorded`);
+    } catch (err) {
+      console.error('❌ Failed to record Quality Evaluator service times:', err);
+      // Don't fail the update if service time recording fails
+    }
+
+    // Update process status to completed if all ODNs are quality confirmed
+    try {
+      // Get unique process IDs from the updates
+      const processIds = new Set();
+      for (const update of updates) {
+        const { odn_id } = update;
+        if (odn_id) {
+          const [odn] = await db.sequelize.query(
+            'SELECT process_id FROM odns WHERE id = ?',
+            {
+              replacements: [odn_id],
+              type: db.sequelize.QueryTypes.SELECT
+            }
+          );
+          if (odn) processIds.add(odn.process_id);
+        }
+      }
+
+      // For each process, check if all ODNs are quality confirmed
+      for (const processId of processIds) {
+        const [unconfirmedODNs] = await db.sequelize.query(
+          'SELECT COUNT(*) as count FROM odns WHERE process_id = ? AND (quality_confirmed = 0 OR quality_confirmed IS NULL)',
+          {
+            replacements: [processId],
+            type: db.sequelize.QueryTypes.SELECT
+          }
+        );
+
+        // If all ODNs are confirmed, update process status to completed
+        if (unconfirmedODNs && unconfirmedODNs.count === 0) {
+          await db.sequelize.query(
+            'UPDATE processes SET status = ? WHERE id = ?',
+            {
+              replacements: ['completed', processId],
+              type: db.sequelize.QueryTypes.UPDATE
+            }
+          );
+          console.log(`✅ Process ${processId} status updated to completed (all ODNs quality confirmed)`);
+        } else {
+          console.log(`⚠️  Process ${processId} still has ${unconfirmedODNs.count} unconfirmed ODNs`);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to update process status:', err);
+      // Don't fail the response if process status update fails
+    }
 
     res.json({
       message: 'Bulk quality evaluation update completed',

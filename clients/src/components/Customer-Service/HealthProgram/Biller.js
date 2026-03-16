@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Typography, Card, CardContent, CardHeader, Button, Container, 
-  TablePagination, Stack, Box, Chip, Avatar, Divider, LinearProgress, Alert
+  TablePagination, Stack, Box, Chip, Avatar, Divider, LinearProgress, Alert, TextField, MenuItem
 } from '@mui/material';
 import {
   Print as PrintIcon,
@@ -19,6 +19,7 @@ const Biller = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [processType, setProcessType] = useState('regular');
 
   const loggedInUserId = localStorage.getItem('UserId');
   const loggedInUserName = localStorage.getItem('FullName');
@@ -78,23 +79,20 @@ const Biller = () => {
 
   useEffect(() => {
     fetchProcesses();
-  }, []);
+  }, [processType]);
 
   const fetchProcesses = async () => {
     try {
       setLoading(true);
       setError(null);
-      
       const response = await axios.get(`${api_url}/api/biller-processes`, {
         params: {
           month: currentEthiopian.month,
-          year: currentEthiopian.year
+          year: currentEthiopian.year,
+          process_type: processType
         }
       });
-      
-      // Filter out processes without facility data
-      const validProcesses = (response.data.processes || []).filter(p => p.facility);
-      setProcesses(validProcesses);
+      setProcesses(response.data.processes || []);
     } catch (err) {
       console.error("Fetch error:", err);
       setError("Failed to load processes. Please try again.");
@@ -105,11 +103,11 @@ const Biller = () => {
 
   const handlePrintDocuments = async (process) => {
     const result = await Swal.fire({
-      title: 'Print Documents?',
-      text: `Print documents for ${process.facility?.facility_name}`,
+      title: 'Complete Billing?',
+      text: `Complete billing for ${process.facility?.facility_name}`,
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Yes, Print',
+      confirmButtonText: 'Yes, Complete',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#4caf50'
     });
@@ -117,7 +115,7 @@ const Biller = () => {
     if (result.isConfirmed) {
       try {
         // First receive goods if not already received
-        if (process.status === 'ewm_goods_issued') {
+        if (process.status === 'ewm_goods_issued' || process.status === 'tm_confirmed') {
           await axios.post(`${api_url}/api/biller-receive-goods`, {
             process_id: process.id,
             biller_officer_id: loggedInUserId,
@@ -125,16 +123,31 @@ const Biller = () => {
           });
         }
 
-        // Then print documents
+        // Then complete billing
         await axios.post(`${api_url}/api/biller-print-documents`, {
           process_id: process.id
         });
 
-        Swal.fire('Success!', 'Documents printed successfully', 'success');
+        // Record service time for Biller
+        try {
+          await axios.post(`${api_url}/api/service-time-hp`, {
+            process_id: process.id,
+            service_unit: 'Biller - HP',
+            end_time: new Date().toISOString(),
+            officer_id: loggedInUserId,
+            officer_name: loggedInUserName,
+            status: 'completed',
+            notes: `Billing completed for ${process.facility?.facility_name}`
+          });
+        } catch (err) {
+          console.error('Failed to record Biller service time:', err);
+        }
+
+        Swal.fire('Success!', 'Billing completed successfully', 'success');
         fetchProcesses();
       } catch (err) {
-        console.error('Print documents error:', err);
-        Swal.fire('Error', 'Failed to print documents', 'error');
+        console.error('Complete billing error:', err);
+        Swal.fire('Error', 'Failed to complete billing', 'error');
       }
     }
   };
@@ -164,10 +177,10 @@ const Biller = () => {
               </Avatar>
               <Box>
                 <Typography variant="h4" fontWeight="bold">
-                  Biller - Document Printing
+                  Biller - Complete Billing
                 </Typography>
                 <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Print documents for goods issued by EWM
+                  Complete billing for goods issued by EWM
                 </Typography>
               </Box>
             </Stack>
@@ -182,13 +195,26 @@ const Biller = () => {
 
         {loading && <LinearProgress sx={{ mb: 2 }} />}
 
+        {/* Type Filter */}
+        <Card sx={{ mb: 2, p: 2 }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Typography variant="body2" color="text.secondary">Process Type:</Typography>
+            <TextField select size="small" value={processType} onChange={e => setProcessType(e.target.value)} sx={{ minWidth: 140 }}>
+              <MenuItem value="regular">HP Regular</MenuItem>
+              <MenuItem value="emergency">Emergency</MenuItem>
+              <MenuItem value="breakdown">Breakdown</MenuItem>
+              <MenuItem value="vaccine">Vaccine</MenuItem>
+            </TextField>
+          </Stack>
+        </Card>
+
         {/* Processes Table */}
         <Card>
           <CardHeader 
             title={
               <Stack direction="row" alignItems="center" spacing={1}>
                 <AssignmentIcon color="primary" />
-                <Typography variant="h6">Processes Ready for Printing</Typography>
+                <Typography variant="h6">Processes Ready for Billing</Typography>
                 <Chip 
                   label={`${processes.length} processes`} 
                   size="small" 
@@ -253,7 +279,7 @@ const Biller = () => {
                         startIcon={<PrintIcon />} 
                         onClick={() => handlePrintDocuments(process)}
                       >
-                        Print Documents
+                        Complete
                       </Button>
                     </TableCell>
                   </TableRow>

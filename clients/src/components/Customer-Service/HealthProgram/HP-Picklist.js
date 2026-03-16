@@ -77,34 +77,52 @@ const HPPickListDetail = () => {
 
       // Fetch submitted picklists for this HP process
       const picklistsRes = await axios.get(`${api_url}/api/getPicklists`);
-      let allPicklists = Array.isArray(picklistsRes.data) ? picklistsRes.data : [];
+      
+      // Handle both old format (array) and new format (object with data property)
+      let allPicklists = Array.isArray(picklistsRes.data) 
+        ? picklistsRes.data 
+        : (picklistsRes.data.data || []);
 
       console.log('=== PICKLIST FILTERING DEBUG ===');
+      console.log('Raw API response:', picklistsRes.data);
       console.log('Total picklists from API:', allPicklists.length);
       console.log('Current process_id:', process_id);
       console.log('Current userStore:', userStore);
+      console.log('Current jobTitle:', jobTitle);
       
       // Show all picklists for this process_id
       const processPicklists = allPicklists.filter(p => String(p.process_id) === process_id);
       console.log('Picklists for this process_id:', processPicklists.length);
       if (processPicklists.length > 0) {
         console.log('Sample picklist:', processPicklists[0]);
+        console.log('All picklists for this process:', processPicklists);
       }
 
-      // Filter by store AND by process_id for HP processes
-      let filtered = allPicklists.filter(
-        p => String(p.store || '').toUpperCase() === userStore &&
-             String(p.process_id) === process_id
-      );
-
-      console.log('Filtered by store AND process_id:', filtered.length);
+      // For EWM Officer - show ALL picklists for this process (regardless of store)
+      // For Program/WIM Operative - filter by store AND process_id
+      let filtered;
+      if (jobTitle === 'EWM Officer - HP' || jobTitle === 'EWM Officer') {
+        // EWM can see all picklists for this process
+        filtered = allPicklists.filter(p => String(p.process_id) === process_id);
+        console.log('EWM Officer - showing all picklists for process:', filtered.length);
+      } else {
+        // Program/WIM Operative - filter by store AND process_id
+        filtered = allPicklists.filter(
+          p => String(p.store || '').toUpperCase() === userStore &&
+               String(p.process_id) === process_id
+        );
+        console.log('Program/WIM Operative - filtered by store AND process_id:', filtered.length);
+      }
 
       // Remove completed picklists
+      const beforeCompletedFilter = filtered.length;
       filtered = filtered.filter(
         p => String(p.status || '').toLowerCase() !== 'completed'
       );
 
+      console.log('Before removing completed:', beforeCompletedFilter);
       console.log('After removing completed:', filtered.length);
+      console.log('Final filtered picklists:', filtered);
       console.log('=== END PICKLIST DEBUG ===');
 
       setSubmittedPicklists(filtered);
@@ -202,7 +220,11 @@ const HPPickListDetail = () => {
         text: `${pdfFiles.length} picklist(s) uploaded successfully`,
       });
 
+      // Refresh the picklist display
+      console.log('🔄 Refreshing picklists after upload...');
       await fetchAll();
+      console.log('✅ Picklists refreshed');
+      
       setPdfFiles([]);
       setPdfFile(null);
       setSelectedOperator('');
@@ -409,7 +431,7 @@ const HPPickListDetail = () => {
                 <ListItemIcon><CheckCircleIcon color="success" /></ListItemIcon>
                 <ListItemText
                   primary={`ODN: ${item.odn}`}
-                  secondary={`File: ${item.url ? item.url.split('/').pop() : 'Undefined'} | Uploaded: ${item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}`}
+                  secondary={`File: ${item.url ? item.url.split('/').pop() : 'Undefined'}`}
                 />
               </ListItem>
             ))}

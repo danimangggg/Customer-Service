@@ -4,24 +4,58 @@ const { Op } = require('sequelize');
 // Get comprehensive HP report data
 const getComprehensiveHPReport = async (req, res) => {
   try {
-    const { month, year } = req.query;
+    const { month, year, process_type = '' } = req.query;
     const reportingMonth = month && year ? `${month} ${year}` : null;
 
     if (!reportingMonth) {
       return res.status(400).json({ error: 'Month and year are required' });
     }
 
-    // 1. Total Facilities (HP facilities with routes)
-    const totalFacilitiesQuery = `
+    // Emergency/breakdown processes have NULL reporting_month — skip the month filter for them
+    const skipMonthFilter = process_type === 'emergency' || process_type === 'breakdown';
+    console.log('[HP Report] process_type:', process_type, '| skipMonthFilter:', skipMonthFilter, '| reportingMonth:', reportingMonth);
+
+    // Build process_type filter for queries that join processes
+    const ptFilter = process_type ? `AND p.process_type = '${process_type}'` : '';
+    const ptFilter2 = process_type ? `AND p2.process_type = '${process_type}'` : '';
+
+    // Month filter — omitted for emergency/breakdown
+    const monthFilter = skipMonthFilter ? '' : `AND p.reporting_month = ?`;
+    const monthFilter2 = skipMonthFilter ? '' : `AND p2.reporting_month = ?`;
+
+    // 1. Determine which months are odd/even (Ethiopian month index 1-based)
+    const ethMonthsList = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
+    const monthIndex = ethMonthsList.indexOf(month) + 1; // 1-based
+    const isOddMonth = monthIndex % 2 === 1;
+    // Facilities expected this month: Monthly always, Odd if odd month, Even if even month
+    const periodFilter = isOddMonth
+      ? `AND f.period IN ('Monthly', 'Odd')`
+      : `AND f.period IN ('Monthly', 'Even')`;
+
+    // 2. Expected Facilities (should report in current month based on period)
+    // For vaccine: expected = facilities marked as vaccine sites
+    // For HP regular: expected = facilities marked as HP sites matching the current period
+    // For others (emergency/breakdown): expected = HP sites (route+period)
+    const totalFacilitiesQuery = process_type === 'vaccine'
+      ? `SELECT COUNT(DISTINCT f.id) as total FROM facilities f WHERE f.is_vaccine_site = 1`
+      : process_type === 'regular' || process_type === ''
+      ? `
+      SELECT COUNT(DISTINCT f.id) as total
+      FROM facilities f
+      WHERE f.is_hp_site = 1
+        AND f.route IS NOT NULL AND f.route != ''
+        ${periodFilter}
+      `
+      : `
       SELECT COUNT(DISTINCT f.id) as total
       FROM facilities f
       WHERE f.route IS NOT NULL AND f.route != ''
-    `;
+        ${periodFilter}
+      `;
     const [totalFacilitiesResult] = await db.sequelize.query(totalFacilitiesQuery, {
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    // 2. Expected Facilities (should report in current month)
     const expectedFacilities = totalFacilitiesResult.total;
 
     // 3. RRF Sent (facilities that created processes but NOT "RRF not sent" ODN)
@@ -29,17 +63,24 @@ const getComprehensiveHPReport = async (req, res) => {
       SELECT COUNT(DISTINCT p.facility_id) as total
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE p.reporting_month = ?
+      WHERE 1=1
+        ${monthFilter}
         AND f.route IS NOT NULL AND f.route != ''
+        ${ptFilter}
         AND p.facility_id NOT IN (
           SELECT DISTINCT p2.facility_id 
           FROM processes p2 
           INNER JOIN odns o ON p2.id = o.process_id 
-          WHERE o.odn_number = 'RRF not sent' AND p2.reporting_month = ?
+          WHERE o.odn_number = 'RRF not sent'
+          ${monthFilter2}
+          ${ptFilter2}
         )
     `;
+    const rrfSentReplacements = [];
+    if (!skipMonthFilter) rrfSentReplacements.push(reportingMonth);
+    if (!skipMonthFilter) rrfSentReplacements.push(reportingMonth);
     const [rrfSentResult] = await db.sequelize.query(rrfSentQuery, {
-      replacements: [reportingMonth, reportingMonth],
+      replacements: rrfSentReplacements,
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -60,22 +101,35 @@ const getComprehensiveHPReport = async (req, res) => {
         p.reporting_month
       FROM facilities f
       INNER JOIN processes p ON p.facility_id = f.id
-      WHERE p.reporting_month = ?
+      WHERE 1=1
+        ${monthFilter}
         AND f.route IS NOT NULL AND f.route != ''
+        ${ptFilter}
         AND p.facility_id NOT IN (
           SELECT DISTINCT p2.facility_id 
           FROM processes p2 
           INNER JOIN odns o ON p2.id = o.process_id 
-          WHERE o.odn_number = 'RRF not sent' AND p2.reporting_month = ?
+          WHERE o.odn_number = 'RRF not sent'
+          ${monthFilter2}
+          ${ptFilter2}
         )
       ORDER BY f.route, f.facility_name
     `;
+    const rrfSentFacilitiesReplacements = [];
+    if (!skipMonthFilter) rrfSentFacilitiesReplacements.push(reportingMonth);
+    if (!skipMonthFilter) rrfSentFacilitiesReplacements.push(reportingMonth);
     const rrfSentFacilities = await db.sequelize.query(rrfSentFacilitiesQuery, {
-      replacements: [reportingMonth, reportingMonth],
+      replacements: rrfSentFacilitiesReplacements,
       type: db.sequelize.QueryTypes.SELECT
     });
 
     // 6. Facilities with RRF Not Sent - Details
+    const vaccineFacilityFilter = process_type === 'vaccine'
+      ? `f.is_vaccine_site = 1`
+      : (process_type === 'regular' || process_type === '')
+      ? `f.is_hp_site = 1 AND f.route IS NOT NULL AND f.route != '' ${periodFilter}`
+      : `f.route IS NOT NULL AND f.route != '' ${periodFilter}`;
+
     const rrfNotSentFacilitiesQuery = `
       SELECT 
         f.id,
@@ -85,13 +139,14 @@ const getComprehensiveHPReport = async (req, res) => {
         f.woreda_name,
         f.route
       FROM facilities f
-      WHERE f.route IS NOT NULL AND f.route != ''
+      WHERE ${vaccineFacilityFilter}
         AND (
           -- Facilities with no processes at all
           f.id NOT IN (
             SELECT DISTINCT facility_id 
             FROM processes 
-            WHERE reporting_month = ?
+            WHERE 1=1 ${skipMonthFilter ? '' : 'AND reporting_month = ?'}
+            ${process_type ? `AND process_type = '${process_type}'` : ''}
           )
           OR
           -- Facilities with processes but all ODNs are "RRF not sent"
@@ -99,14 +154,19 @@ const getComprehensiveHPReport = async (req, res) => {
             SELECT DISTINCT p.facility_id 
             FROM processes p 
             INNER JOIN odns o ON p.id = o.process_id 
-            WHERE p.reporting_month = ? 
+            WHERE 1=1
+            ${skipMonthFilter ? '' : 'AND p.reporting_month = ?'}
+            ${process_type ? `AND p.process_type = '${process_type}'` : ''}
             AND o.odn_number = 'RRF not sent'
           )
         )
       ORDER BY f.route, f.facility_name
     `;
+    const rrfNotSentReplacements = [];
+    if (!skipMonthFilter) rrfNotSentReplacements.push(reportingMonth);
+    if (!skipMonthFilter) rrfNotSentReplacements.push(reportingMonth);
     const rrfNotSentFacilities = await db.sequelize.query(rrfNotSentFacilitiesQuery, {
-      replacements: [reportingMonth, reportingMonth],
+      replacements: rrfNotSentReplacements,
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -119,11 +179,13 @@ const getComprehensiveHPReport = async (req, res) => {
         COUNT(DISTINCT CASE WHEN o.quality_confirmed = 1 THEN o.id END) as quality_evaluated_odns
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id
-      WHERE p.reporting_month = ?
+      WHERE 1=1
+        ${monthFilter}
         AND o.odn_number != 'RRF not sent'
+        ${ptFilter}
     `;
     const [odnStats] = await db.sequelize.query(odnStatsQuery, {
-      replacements: [reportingMonth],
+      replacements: skipMonthFilter ? [] : [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -146,7 +208,7 @@ const getComprehensiveHPReport = async (req, res) => {
         e.full_name as assigned_by_name
       FROM routes r
       LEFT JOIN facilities f ON f.route = r.route_name
-      LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+      LEFT JOIN processes p ON p.facility_id = f.id ${skipMonthFilter ? (process_type ? `AND p.process_type = '${process_type}'` : '') : `AND p.reporting_month = ? ${process_type ? `AND p.process_type = '${process_type}'` : ''}`}
       LEFT JOIN odns o ON o.process_id = p.id
       LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
       LEFT JOIN employees e ON e.id = ra.assigned_by
@@ -154,8 +216,11 @@ const getComprehensiveHPReport = async (req, res) => {
       HAVING facilities_count > 0
       ORDER BY r.route_name
     `;
+    const routeReplacements = [];
+    if (!skipMonthFilter) routeReplacements.push(reportingMonth);
+    routeReplacements.push(month);
     const routeStats = await db.sequelize.query(routeStatsQuery, {
-      replacements: [reportingMonth, month],
+      replacements: routeReplacements,
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -177,13 +242,17 @@ const getComprehensiveHPReport = async (req, res) => {
       INNER JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN routes r ON f.route = r.route_name
       LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE p.reporting_month = ?
+      WHERE 1=1
+        ${monthFilter}
         AND o.pod_confirmed = 1
         AND o.odn_number != 'RRF not sent'
+        ${ptFilter}
       ORDER BY f.route, f.facility_name, o.odn_number
     `;
+    const podReplacements = [month];
+    if (!skipMonthFilter) podReplacements.push(reportingMonth);
     const podDetails = await db.sequelize.query(podDetailsQuery, {
-      replacements: [month, reportingMonth],
+      replacements: podReplacements,
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -213,11 +282,15 @@ const getComprehensiveHPReport = async (req, res) => {
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN odns o ON o.process_id = p.id
-      WHERE p.reporting_month = ?
+      WHERE 1=1
+        ${monthFilter}
         AND f.route IS NOT NULL AND f.route != ''
+        ${ptFilter}
     `;
+    const workflowReplacements = [reportingMonth];
+    if (!skipMonthFilter) workflowReplacements.push(reportingMonth);
     const [workflowProgress] = await db.sequelize.query(workflowProgressQuery, {
-      replacements: [reportingMonth, reportingMonth],
+      replacements: workflowReplacements,
       type: db.sequelize.QueryTypes.SELECT
     });
 
@@ -291,11 +364,15 @@ const getTimeTrendData = async (req, res) => {
 // Get detailed ODN and POD information
 const getODNPODDetails = async (req, res) => {
   try {
-    const { reporting_month } = req.query;
+    const { reporting_month, process_type = '' } = req.query;
 
-    if (!reporting_month) {
+    if (!reporting_month && !process_type) {
       return res.status(400).json({ error: 'Reporting month is required' });
     }
+
+    const skipMonthFilter = process_type === 'emergency' || process_type === 'breakdown' || process_type === 'vaccine';
+    const ptFilter = process_type ? `AND p.process_type = '${process_type}'` : '';
+    const monthFilter = (!skipMonthFilter && reporting_month) ? `AND p.reporting_month = '${reporting_month}'` : '';
 
     const odnDetailsQuery = `
       SELECT 
@@ -318,14 +395,14 @@ const getODNPODDetails = async (req, res) => {
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id
       INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE p.reporting_month = ?
-        AND f.route IS NOT NULL AND f.route != ''
+      WHERE f.route IS NOT NULL AND f.route != ''
         AND o.odn_number != 'RRF not sent'
+        ${monthFilter}
+        ${ptFilter}
       ORDER BY f.route, f.facility_name, o.odn_number
     `;
 
     const odnDetails = await db.sequelize.query(odnDetailsQuery, {
-      replacements: [reporting_month],
       type: db.sequelize.QueryTypes.SELECT
     });
 

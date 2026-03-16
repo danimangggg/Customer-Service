@@ -56,11 +56,51 @@ const insertServiceTimeHP = async (req, res) => {
       notes 
     } = req.body;
 
+    console.log(`📝 HP service time: process_id=${process_id}, service_unit=${service_unit}, officer_id=${officer_id}, officer_name='${officer_name}'`);
+
+    // Try to fetch officer name from employees table using officer_id
+    // Fall back to officer_name from request body (FullName from localStorage)
+    let finalOfficerName = null;
+    
+    if (officer_id) {
+      try {
+        const userQuery = `SELECT full_name FROM employees WHERE id = ?`;
+        const users = await db.sequelize.query(userQuery, {
+          replacements: [officer_id],
+          type: db.sequelize.QueryTypes.SELECT
+        });
+        
+        if (users && users.length > 0 && users[0].full_name) {
+          finalOfficerName = users[0].full_name;
+          console.log(`✅ Fetched officer name from employees: ${finalOfficerName}`);
+        } else {
+          // officer_id didn't match (UserId != EmployeeID), fall back to sent name
+          finalOfficerName = (officer_name && officer_name !== 'null' && officer_name !== 'Unknown Officer')
+            ? officer_name
+            : null;
+          console.log(`⚠️  No employee found for ID ${officer_id}, using officer_name fallback: ${finalOfficerName}`);
+        }
+      } catch (err) {
+        console.error('Failed to fetch officer name from employees table:', err.message);
+        finalOfficerName = (officer_name && officer_name !== 'null') ? officer_name : null;
+      }
+    } else {
+      // No officer_id — use whatever name was sent
+      finalOfficerName = (officer_name && officer_name !== 'null') ? officer_name : null;
+    }
+
+    // Last resort: if still null, mark as unknown
+    if (!finalOfficerName) {
+      finalOfficerName = 'Unknown Officer';
+    }
+
     const query = `
       INSERT INTO service_time_hp 
       (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
+
+    console.log(`💾 Storing officer_name: '${finalOfficerName}'`);
 
     await db.sequelize.query(query, {
       replacements: [
@@ -68,7 +108,7 @@ const insertServiceTimeHP = async (req, res) => {
         service_unit, 
         end_time, 
         officer_id, 
-        officer_name, 
+        finalOfficerName, 
         status || 'completed', 
         notes
       ],
@@ -121,7 +161,8 @@ const getLastEndTime = async (req, res) => {
 // Get all service times for a process
 const getServiceTimesByProcess = async (req, res) => {
   try {
-    const { process_id, table } = req.query;
+    const { process_id } = req.params;
+    const { table } = req.query;
     
     const tableName = table === 'hp' ? 'service_time_hp' : 'service_time';
     

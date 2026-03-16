@@ -3,19 +3,29 @@ const db = require('../../models');
 // Helper function to convert store name to store_id
 // Handles aliases: AA1 -> AA11, AA2 -> AA12
 const getStoreId = async (storeName) => {
-  if (!storeName) return null;
+  console.log('getStoreId called with:', storeName, 'Type:', typeof storeName);
+  
+  if (!storeName || storeName === 'null' || storeName === 'undefined' || storeName === 'NULL') {
+    console.log('Invalid store name provided:', storeName);
+    return null;
+  }
   
   // Normalize store name
-  let normalizedName = storeName.trim();
+  let normalizedName = String(storeName).trim();
   
   // Handle aliases
   if (normalizedName === 'AA1') normalizedName = 'AA11';
   if (normalizedName === 'AA2') normalizedName = 'AA12';
   
+  console.log('Looking up store:', normalizedName);
+  
   const [result] = await db.sequelize.query(
     'SELECT id FROM stores WHERE store_name = ?',
     { replacements: [normalizedName], type: db.sequelize.QueryTypes.SELECT }
   );
+  
+  console.log('Store lookup result:', result);
+  
   return result ? result.id : null;
 };
 
@@ -62,9 +72,12 @@ const addOdn = async (req, res) => {
   try {
     const { processId, odnNumber, store, addedById, addedByName } = req.body;
 
-    console.log('Adding ODN:', { processId, odnNumber, store });
+    console.log('=== ADD ODN REQUEST ===');
+    console.log('Request body:', req.body);
+    console.log('Adding ODN:', { processId, odnNumber, store, addedById, addedByName });
 
     if (!processId || !odnNumber || !store) {
+      console.log('❌ Missing required fields');
       return res.status(400).json({
         success: false,
         error: 'Process ID, ODN number, and store are required'
@@ -72,8 +85,12 @@ const addOdn = async (req, res) => {
     }
 
     // Convert store name to store_id
+    console.log('Converting store name to ID...');
     const storeId = await getStoreId(store);
+    console.log('Store ID:', storeId);
+    
     if (!storeId) {
+      console.log('❌ Invalid store:', store);
       return res.status(400).json({
         success: false,
         error: `Invalid store: ${store}`
@@ -81,6 +98,7 @@ const addOdn = async (req, res) => {
     }
 
     // Check if ODN already exists
+    console.log('Checking for existing ODN...');
     const checkQuery = `
       SELECT * FROM odns_rdf
       WHERE process_id = ? AND odn_number = ? AND store_id = ?
@@ -91,7 +109,10 @@ const addOdn = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
+    console.log('Existing ODNs found:', existing.length);
+
     if (existing && existing.length > 0) {
+      console.log('❌ ODN already exists');
       return res.status(400).json({
         success: false,
         error: 'This ODN already exists for this process and store'
@@ -99,6 +120,7 @@ const addOdn = async (req, res) => {
     }
 
     // Insert new ODN with default status values
+    console.log('Inserting new ODN...');
     const insertQuery = `
       INSERT INTO odns_rdf 
       (process_id, odn_number, store_id, status, next_service_point, added_by_id, added_by_name, created_at, updated_at)
@@ -106,19 +128,21 @@ const addOdn = async (req, res) => {
     `;
 
     await db.sequelize.query(insertQuery, {
-      replacements: [processId, odnNumber, storeId, addedById, addedByName],
+      replacements: [processId, odnNumber, storeId, addedById || null, addedByName || null],
       type: db.sequelize.QueryTypes.INSERT
     });
 
-    console.log('ODN added successfully');
+    console.log('✅ ODN added successfully');
 
     res.json({
       success: true,
       message: 'ODN added successfully'
     });
   } catch (error) {
-    console.error('Error adding ODN:', error);
+    console.error('❌ Error adding ODN:', error);
+    console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
+    console.error('Request body:', req.body);
     res.status(500).json({
       success: false,
       error: 'Failed to add ODN',
@@ -205,7 +229,7 @@ const updateOdn = async (req, res) => {
     // Update ODN
     const updateQuery = `
       UPDATE odns_rdf
-      SET odn_number = ?, store_id = ?, updated_at = NOW()
+      SET odn_number = ?, store_id = ?
       WHERE id = ?
     `;
 
@@ -249,8 +273,7 @@ const startEwm = async (req, res) => {
        SET ewm_status = 'started',
            ewm_started_at = NOW(),
            ewm_officer_id = ?,
-           ewm_officer_name = ?,
-           updated_at = NOW()
+           ewm_officer_name = ?
        WHERE process_id = ? AND store_id = ? AND (ewm_status IS NULL OR ewm_status = 'pending')`,
       {
         replacements: [officer_id, officer_name, process_id, storeId],
@@ -279,10 +302,43 @@ const completeEwm = async (req, res) => {
   try {
     const { process_id, store, officer_id, officer_name } = req.body;
 
-    console.log('Completing EWM for ODNs:', { process_id, store });
+    console.log('=== COMPLETE EWM REQUEST ===');
+    console.log('Request body:', req.body);
+    console.log('Process ID:', process_id);
+    console.log('Store:', store);
+    console.log('Officer ID:', officer_id);
+    console.log('Officer Name:', officer_name);
+
+    // Validate required fields
+    if (!process_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'process_id is required'
+      });
+    }
+
+    if (!store) {
+      return res.status(400).json({
+        success: false,
+        error: 'store is required'
+      });
+    }
 
     // Convert store name to store_id
-    const storeId = await getStoreId(store);
+    console.log('Converting store name to ID...');
+    let storeId;
+    try {
+      storeId = await getStoreId(store);
+      console.log('Store ID:', storeId);
+    } catch (storeError) {
+      console.error('Error getting store ID:', storeError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to lookup store',
+        details: storeError.message
+      });
+    }
+    
     if (!storeId) {
       return res.status(400).json({
         success: false,
@@ -291,21 +347,23 @@ const completeEwm = async (req, res) => {
     }
 
     // Update ODNs EWM status
+    console.log('Updating ODNs EWM status...');
     await db.sequelize.query(
       `UPDATE odns_rdf 
        SET ewm_status = 'completed',
            ewm_completed_at = NOW(),
            ewm_officer_id = ?,
-           ewm_officer_name = ?,
-           updated_at = NOW()
+           ewm_officer_name = ?
        WHERE process_id = ? AND store_id = ? AND ewm_status = 'started'`,
       {
-        replacements: [officer_id, officer_name, process_id, storeId],
+        replacements: [officer_id || null, officer_name || null, process_id, storeId],
         type: db.sequelize.QueryTypes.UPDATE
       }
     );
+    console.log('ODNs updated successfully');
 
     // Check if all stores have completed EWM for this process
+    console.log('Checking if all stores completed EWM...');
     const [allCompleted] = await db.sequelize.query(
       `SELECT COUNT(*) as pending_count
        FROM odns_rdf
@@ -315,34 +373,40 @@ const completeEwm = async (req, res) => {
         type: db.sequelize.QueryTypes.SELECT
       }
     );
+    console.log('Pending count:', allCompleted.pending_count);
 
     // If all stores completed EWM, update global status
     if (allCompleted.pending_count === 0) {
+      console.log('All stores completed - updating global status...');
       await db.sequelize.query(
         `UPDATE customer_queue 
-         SET status = 'ewm_completed',
-             updated_at = NOW()
+         SET status = 'ewm_completed'
          WHERE id = ?`,
         {
           replacements: [process_id],
           type: db.sequelize.QueryTypes.UPDATE
         }
       );
-      console.log('All stores completed EWM - updated global status to ewm_completed');
+      console.log('Global status updated to ewm_completed');
     }
 
-    console.log('EWM completed successfully');
+    console.log('=== EWM COMPLETED SUCCESSFULLY ===');
 
     res.json({
       success: true,
       message: 'EWM process completed'
     });
   } catch (error) {
-    console.error('Error completing EWM:', error);
+    console.error('=== ERROR COMPLETING EWM ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Request body:', req.body);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to complete EWM',
-      details: error.message
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
@@ -367,8 +431,7 @@ const revertEwm = async (req, res) => {
       `UPDATE odns_rdf 
        SET ewm_status = 'pending',
            ewm_started_at = NULL,
-           ewm_completed_at = NULL,
-           updated_at = NOW()
+           ewm_completed_at = NULL
        WHERE process_id = ? AND store_id = ?`,
       {
         replacements: [process_id, storeId],
@@ -445,7 +508,7 @@ const updateDispatchStatus = async (req, res) => {
     const values = [...Object.values(updateData), process_id, storeId];
     await db.sequelize.query(query, {
       replacements: values,
-      type: db.Sequelize.QueryTypes.UPDATE
+      type: db.sequelize.QueryTypes.UPDATE
     });
 
     res.status(200).json({
@@ -515,7 +578,7 @@ const updateExitPermitStatus = async (req, res) => {
     const values = [...Object.values(updateData), process_id, storeId];
     await db.sequelize.query(query, {
       replacements: values,
-      type: db.Sequelize.QueryTypes.UPDATE
+      type: db.sequelize.QueryTypes.UPDATE
     });
 
     res.status(200).json({
@@ -571,7 +634,7 @@ const updateGateStatus = async (req, res) => {
     const values = [...Object.values(updateData), process_id, storeId];
     await db.sequelize.query(query, {
       replacements: values,
-      type: db.Sequelize.QueryTypes.UPDATE
+      type: db.sequelize.QueryTypes.UPDATE
     });
 
     res.status(200).json({

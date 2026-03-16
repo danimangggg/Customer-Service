@@ -69,41 +69,48 @@ const OutstandingCustomers = () => {
     
     // START: Auto-Cancellation Logic
     const autoCancelOverdueCustomers = async (data) => {
+        // RDF flow after EWM: Dispatcher → EWM Documentation → Gate Keeper
+        // Never auto-cancel once the process has reached or passed EWM
+        // Full status progression: registered → started → notifying → o2c_started → o2c_completed → ewm_started → ewm_completed → archived → completed
+        // Auto-cancel applies to everything BEFORE ewm_completed (72h timeout)
+        const pastEWMStatuses = ['ewm_completed', 'archived', 'dispatched', 'completed'];
+        const pastEWMServicePoints = ['dispatch', 'dispatched', 'ewm documentation', 'ewm_documentation', 'gate keeper', 'gate_keeper', 'finance', 'completed'];
+
         const overdueCustomers = data.filter(customer => {
-            // Only check active customers that haven't been canceled, completed, or rejected
-            if (customer.status?.toLowerCase() === 'completed' || customer.status?.toLowerCase() === 'canceled' || customer.status?.toLowerCase() === 'rejected') {
+            // Skip already terminal statuses
+            if (['completed', 'canceled', 'rejected'].includes(customer.status?.toLowerCase())) {
                 return false;
             }
             if (!customer.started_at) {
                 return false;
             }
+            // Never auto-cancel if process has passed EWM stage
+            if (pastEWMStatuses.includes(customer.status?.toLowerCase())) {
+                return false;
+            }
+            if (pastEWMServicePoints.includes(customer.next_service_point?.toLowerCase())) {
+                return false;
+            }
 
-            const start = new Date(customer.started_at);
-            const now = new Date();
-            const diffMs = now - start;
-            // 48 hours in milliseconds (48 * 60 * 60 * 1000)
-            const fortyEightHoursMs = 172800000; 
-
-            return diffMs > fortyEightHoursMs;
+            const diffMs = new Date() - new Date(customer.started_at);
+            // 72 hours in milliseconds
+            return diffMs > 259200000;
         });
 
         if (overdueCustomers.length > 0) {
             console.log(`Auto-cancelling ${overdueCustomers.length} overdue customer(s).`);
             for (const customer of overdueCustomers) {
-                // Perform silent cancellation
                 try {
-                    const payload = {
+                    await axios.put(`${api_url}/api/update-service-point`, {
                         id: customer.id,
                         status: 'Canceled',
                         next_service_point: "Auto-Canceled",
                         completed_at: new Date().toISOString()
-                    };
-                    await axios.put(`${api_url}/api/update-service-point`, payload);
+                    });
                 } catch (error) {
                     console.error(`Failed to auto-cancel customer ${customer.id}:`, error.message);
                 }
             }
-            // Re-fetch data once after all cancellations
             await fetchData();
         }
     };
@@ -467,18 +474,46 @@ const OutstandingCustomers = () => {
             return;
         }
 
-        const { isConfirmed } = await Swal.fire({
-            title: 'Confirm Cancellation',
-            text: 'Are you sure you want to cancel this service?',
-            icon: 'warning',
+        // Ask for cancellation reason
+        const { value: cancellationReason, isConfirmed } = await Swal.fire({
+            title: 'Cancel Service',
+            html: `
+                <div style="text-align: left;">
+                    <p style="margin-bottom: 10px;">Please provide a reason for cancellation:</p>
+                </div>
+            `,
+            input: 'textarea',
+            inputPlaceholder: 'Enter cancellation reason...',
+            inputAttributes: {
+                'aria-label': 'Cancellation reason',
+                'style': 'min-height: 100px;'
+            },
             showCancelButton: true,
             confirmButtonColor: '#d33',
             confirmButtonText: 'Yes, cancel it!',
-            cancelButtonText: 'No, do not cancel',
+            cancelButtonText: 'No, keep it',
+            inputValidator: (value) => {
+                if (!value || value.trim() === '') {
+                    return 'You must provide a reason for cancellation!';
+                }
+            }
         });
 
-        if (isConfirmed) {
+        if (isConfirmed && cancellationReason) {
             try {
+                const cancellationData = { 
+                    cancellation_reason: cancellationReason.trim(),
+                    cancelled_by_id: localStorage.getItem('EmployeeID'),
+                    cancelled_by_name: localStorage.getItem('FullName'),
+                    cancelled_at: new Date().toISOString()
+                };
+                
+                console.log('=== CANCELLATION DATA ===');
+                console.log('Cancellation reason:', cancellationData.cancellation_reason);
+                console.log('Cancelled by ID:', cancellationData.cancelled_by_id);
+                console.log('Cancelled by name:', cancellationData.cancelled_by_name);
+                console.log('Cancelled at:', cancellationData.cancelled_at);
+                
                 // Use the shared update function to set status to 'Canceled'
                 await updateServiceStatus(
                     customer,
@@ -486,10 +521,12 @@ const OutstandingCustomers = () => {
                     customer.started_at,
                     customer.assigned_officer_id,
                     "Canceled",
-                    new Date().toISOString()
+                    new Date().toISOString(),
+                    cancellationData
                 );
                 Swal.fire('Canceled!', 'The service has been successfully canceled.', 'success');
             } catch (error) {
+                console.error('Error cancelling service:', error);
                 Swal.fire('Error', 'Failed to cancel the service.', 'error');
             }
         }

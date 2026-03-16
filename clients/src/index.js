@@ -6,48 +6,43 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import './disableErrorOverlay'; // Disable error overlay for TV display
 
-// Define a more vibrant Material-UI theme
+// Red & White theme
 const theme = createTheme({
   palette: {
     primary: {
-      // A more vibrant, energetic blue or even a bold teal/purple
-      // Example: A brighter, more saturated blue:
-      main: '#2196f3', // Original was '#1976d2'
-      light: '#6ec6ff',
-      dark: '#0069c0',
+      main: '#c62828',       // deep red
+      light: '#ef5350',
+      dark: '#8e0000',
       contrastText: '#fff',
     },
     secondary: {
-      // A strong, complementary color
-      // Example: A punchy orange or magenta
-      main: '#ff5722', // Original was '#dc004e' (deep red) - this is a vibrant orange
-      light: '#ff8a50',
-      dark: '#c41c00',
+      main: '#e53935',       // bright red accent
+      light: '#ff6f60',
+      dark: '#ab000d',
       contrastText: '#fff',
     },
     background: {
-      // Keep a clean background but slightly brighter if possible, or subtly textured if desired
-      default: '#e0f2f7', // A very light, cool background for vibrancy
-      paper: '#ffffff', // White for cards/tables - keep it clean
+      default: '#fafafa',    // near-white page background
+      paper: '#ffffff',
     },
     success: {
-      main: '#4caf50', // Keep green for success, it's generally good
+      main: '#4caf50',
       light: '#e8f5e9',
     },
     warning: {
-      main: '#ffc107', // Brighter yellow/orange for warning
+      main: '#ffc107',
       light: '#fff8e1',
     },
     error: {
-      main: '#f44336', // Keep red for error
+      main: '#c62828',
       light: '#ffebee',
     },
-    info: { // Good for general info chips
-        main: '#03a9f4',
-        light: '#e0f7fa',
+    info: {
+      main: '#e53935',
+      light: '#ffebee',
     },
     grey: {
-      100: '#f5f5f5', // Still good for subtle header background
+      100: '#f5f5f5',
       200: '#eeeeee',
       300: '#e0e0e0',
     },
@@ -55,101 +50,91 @@ const theme = createTheme({
   typography: {
     fontFamily: 'Roboto, sans-serif',
     h4: {
-      fontSize: '2.2rem', // Slightly larger
-      fontWeight: 700, // Bolder
-      letterSpacing: '-0.02em', // A bit tighter for energy
-      color: '#303030', // A strong dark grey
+      fontSize: '2.2rem',
+      fontWeight: 700,
+      letterSpacing: '-0.02em',
+      color: '#1a1a1a',
     },
     h5: {
       fontSize: '1.7rem',
       fontWeight: 600,
-      color: '#424242',
+      color: '#2d2d2d',
     },
-    body1: {
-        fontSize: '1rem', // Standard body text
-    },
-    body2: {
-        fontSize: '0.875rem', // Smaller text for secondary info
-    }
+    body1: { fontSize: '1rem' },
+    body2: { fontSize: '0.875rem' },
   },
   components: {
     MuiButton: {
       styleOverrides: {
         root: {
-          textTransform: 'none', // Keep initial caps for buttons
+          textTransform: 'none',
           fontWeight: 600,
-          borderRadius: '8px', // Slightly more rounded buttons
+          borderRadius: '8px',
         },
         containedPrimary: {
-            boxShadow: '0 4px 8px rgba(33, 150, 243, 0.3)', // Stronger shadow for primary button
-            '&:hover': {
-                boxShadow: '0 6px 12px rgba(33, 150, 243, 0.4)', // Even stronger on hover
-            }
-        }
+          boxShadow: '0 4px 8px rgba(198, 40, 40, 0.3)',
+          '&:hover': {
+            boxShadow: '0 6px 12px rgba(198, 40, 40, 0.45)',
+          },
+        },
       },
     },
     MuiPaper: {
-        styleOverrides: {
-            root: {
-                borderRadius: '12px', // More rounded cards/tables
-                boxShadow: '0 4px 15px rgba(0,0,0,0.08)', // A softer, more spread-out shadow
-            }
-        }
+      styleOverrides: {
+        root: {
+          borderRadius: '12px',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
+        },
+      },
     },
     MuiChip: {
-        styleOverrides: {
-            root: {
-                fontWeight: 600, // Make chip text bolder
-                textTransform: 'uppercase', // Uppercase for a more "tag" like feel
-                letterSpacing: '0.05em', // A bit of letter spacing
-            },
-            outlined: {
-                // Adjust colors for outlined chips for vibrancy
-                borderColor: 'currentColor', // Use the chip's color
-            }
-        }
+      styleOverrides: {
+        root: {
+          fontWeight: 600,
+          letterSpacing: '0.04em',
+        },
+        outlined: {
+          borderColor: 'currentColor',
+        },
+      },
     },
     MuiTableCell: {
       styleOverrides: {
         head: {
-          fontWeight: 700, // Header cells bolder
-          color: '#505050', // Stronger header text color
-          fontSize: '0.9rem', // Slightly larger header text
-          backgroundColor: '#e3f2fd', // A light, vibrant background for table head
+          fontWeight: 700,
+          color: '#fff',
+          fontSize: '0.9rem',
+          backgroundColor: '#c62828',  // red table headers
         },
         body: {
-          fontSize: '0.875rem', // Body cells font size
+          fontSize: '0.875rem',
         },
       },
     },
     MuiTableSortLabel: {
-        styleOverrides: {
-            icon: {
-                color: 'inherit !important', // Ensure icon color inherits from cell text
-            },
-        },
+      styleOverrides: {
+        root: { color: '#fff !important' },
+        icon: { color: '#fff !important' },
+        active: { color: '#fff !important' },
+      },
     },
     MuiTableRow: {
-        styleOverrides: {
-            root: {
-                '&.MuiTableRow-hover:hover': { // Ensure hover effect is always strong
-                    backgroundColor: 'rgba(0, 0, 0, 0.04) !important', // A more noticeable hover
-                },
-            },
-            head: {
-                height: '60px', // Taller header rows
-            }
-        }
-    }
-  }
+      styleOverrides: {
+        root: {
+          '&.MuiTableRow-hover:hover': {
+            backgroundColor: 'rgba(198, 40, 40, 0.06) !important',
+          },
+        },
+        head: { height: '60px' },
+      },
+    },
+  },
 });
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <App />
-    </ThemeProvider>
-  </React.StrictMode>
+  <ThemeProvider theme={theme}>
+    <CssBaseline />
+    <App />
+  </ThemeProvider>
 );

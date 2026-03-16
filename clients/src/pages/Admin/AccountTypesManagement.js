@@ -120,27 +120,18 @@ const AccountTypesManagement = () => {
       icon: <TaskIcon />
     },
     {
-      jobTitle: "Documentation Officer",
+      jobTitle: "Documentation Officer - HP",
       accountType: "Documentation",
-      description: "Manages proof of delivery documentation",
+      description: "Manages proof of delivery documentation and follow-up for HP",
       permissions: [
         "Documentation Management",
         "POD confirmation",
-        "Document tracking"
-      ],
-      color: "#9c27b0",
-      icon: <TaskIcon />
-    },
-    {
-      jobTitle: "Documentation Follower",
-      accountType: "Documentation",
-      description: "Follows up on document completion",
-      permissions: [
+        "Document tracking",
         "Document Follow-up",
         "Document signing tracking",
         "Handover management"
       ],
-      color: "#2196f3",
+      color: "#9c27b0",
       icon: <TaskIcon />
     },
     {

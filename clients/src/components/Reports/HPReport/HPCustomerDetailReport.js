@@ -1,19 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, CircularProgress, Card, CardContent,
-  Grid, Chip, Alert, Stack,
+  Grid, Chip, Alert, Stack, Container,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, TablePagination, TableSortLabel, IconButton,
   InputAdornment, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import {
-  Search, GetApp, Clear, FilterList
+  Search, GetApp, Clear, Business
 } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
+const ethiopianMonths = [
+  'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit',
+  'Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
+];
+
+const getCurrentEthiopianMonth = () => {
+  const gDate = new Date();
+  const gy = gDate.getFullYear(), gm = gDate.getMonth(), gd = gDate.getDate();
+  const isLeap = (gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0);
+  const newYearDay = isLeap ? 12 : 11;
+  let ethYear, ethMonthIndex;
+  if (gm > 8 || (gm === 8 && gd >= newYearDay)) {
+    ethYear = gy - 7;
+    const diffDays = Math.floor((gDate - new Date(gy, 8, newYearDay)) / 86400000);
+    ethMonthIndex = diffDays < 360 ? Math.floor(diffDays / 30) : 12;
+  } else {
+    ethYear = gy - 8;
+    const prevIsLeap = ((gy-1)%4===0&&(gy-1)%100!==0)||((gy-1)%400===0);
+    const diffDays = Math.floor((gDate - new Date(gy-1, 8, prevIsLeap?12:11)) / 86400000);
+    ethMonthIndex = diffDays < 360 ? Math.floor(diffDays / 30) : 12;
+  }
+  return { year: ethYear, monthIndex: Math.max(0, Math.min(ethMonthIndex, 12)) };
+};
 
 const HPCustomerDetailReport = () => {
   const [customers, setCustomers] = useState([]);
@@ -31,53 +55,49 @@ const HPCustomerDetailReport = () => {
   const [sortBy, setSortBy] = useState('created_at');
   const [sortOrder, setSortOrder] = useState('DESC');
   const [statusFilter, setStatusFilter] = useState('');
+  const [processType, setProcessType] = useState('regular');
 
-  useEffect(() => {
-    fetchHPCustomers();
-  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter]);
+  // Ethiopian month/year filter — default to current
+  const _eth = getCurrentEthiopianMonth();
+  const [selectedMonth, setSelectedMonth] = useState(ethiopianMonths[_eth.monthIndex]);
+  const [selectedYear, setSelectedYear] = useState(_eth.year);
+  const ethYears = Array.from({ length: 6 }, (_, i) => _eth.year - 2 + i);
 
-  const fetchHPCustomers = async () => {
+  const fetchHPCustomers = useCallback(async () => {
     try {
       setCustomersLoading(true);
       setError(null);
-      console.log('=== HP CUSTOMER FETCH DEBUG ===');
-      console.log('API_URL:', API_URL);
-      
       const params = {
         page: page + 1,
         limit: rowsPerPage,
         search: searchTerm,
-        sortBy: sortBy,
-        sortOrder: sortOrder,
-        statusFilter: statusFilter
+        sortBy,
+        sortOrder,
+        statusFilter,
+        process_type: processType,
+        month: selectedMonth,
+        year: selectedYear
       };
-      
-      console.log('Fetching HP customers with params:', params);
-      
       const response = await axios.get(`${API_URL}/api/hp-customers-detail-report`, { params });
-      console.log('Response status:', response.status);
-      console.log('Response data:', response.data);
-      
       if (response.data.success && response.data.customers) {
         setCustomers(response.data.customers);
         setTotalCount(response.data.pagination?.total || 0);
-        console.log('✅ Successfully loaded', response.data.customers.length, 'HP customers');
       } else {
-        console.log('❌ Invalid response format:', response.data);
         setError('Invalid response format from server');
         setCustomers([]);
       }
     } catch (err) {
-      console.error('=== HP CUSTOMER FETCH ERROR ===');
-      console.error('Error object:', err);
-      
       const errorMessage = err.response?.data?.error || err.response?.statusText || err.message || 'Unknown error';
       setError(`Failed to load HP customers: ${errorMessage}`);
       setCustomers([]);
     } finally {
       setCustomersLoading(false);
     }
-  };
+  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter, processType, selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchHPCustomers();
+  }, [fetchHPCustomers]);
 
   const handleSort = (column) => {
     const isAsc = sortBy === column && sortOrder === 'ASC';
@@ -148,7 +168,15 @@ const HPCustomerDetailReport = () => {
   const fetchCustomerServiceDetails = async (customerId) => {
     try {
       const response = await axios.get(`${API_URL}/api/hp-customers/${customerId}/service-details`);
-      setCustomerServiceDetails(response.data.serviceDetails || []);
+      const serviceDetails = response.data.serviceDetails || [];
+      setCustomerServiceDetails(serviceDetails);
+      
+      // Calculate total time (sum of all waiting_minutes)
+      const totalMinutes = serviceDetails.reduce((sum, service) => sum + (service.waiting_minutes || 0), 0);
+      setSelectedCustomer(prev => ({
+        ...prev,
+        total_time_minutes: totalMinutes
+      }));
     } catch (err) {
       console.error('Error fetching HP customer service details:', err);
       setCustomerServiceDetails([]);
@@ -162,85 +190,95 @@ const HPCustomerDetailReport = () => {
   };
 
   return (
-    <Box>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
-        HP Customer Detail Report
-      </Typography>
-
-      {/* Search and Export Controls */}
-      <Card sx={{ mb: 3 }}>
+    <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
+      {/* Header */}
+      <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
         <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                variant="outlined"
-                placeholder="Search HP customers..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchTerm && (
-                    <InputAdornment position="end">
-                      <IconButton onClick={handleClearSearch} size="small">
-                        <Clear />
-                      </IconButton>
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth variant="outlined">
-                <InputLabel>Filter by Status</InputLabel>
-                <Select
-                  value={statusFilter}
-                  onChange={handleStatusFilterChange}
-                  label="Filter by Status"
-                  startAdornment={
-                    <InputAdornment position="start">
-                      <FilterList />
-                    </InputAdornment>
-                  }
-                >
-                  <MenuItem value="">All Status</MenuItem>
-                  <MenuItem value="In Progress">In Progress</MenuItem>
-                  <MenuItem value="Completed">Completed</MenuItem>
-                  <MenuItem value="Vehicle Requested">Vehicle Requested</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={5}>
-              <Stack direction="row" spacing={2} justifyContent="flex-end">
-                {(searchTerm || statusFilter) && (
-                  <Button
-                    variant="outlined"
-                    startIcon={<Clear />}
-                    onClick={handleClearFilters}
-                    disabled={customersLoading}
-                  >
-                    Clear Filters
-                  </Button>
-                )}
-                <Button
-                  variant="contained"
-                  startIcon={<GetApp />}
-                  onClick={exportToExcel}
-                  disabled={customers.length === 0}
-                >
-                  Export Excel
-                </Button>
-              </Stack>
-            </Grid>
-          </Grid>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Business sx={{ fontSize: 56, color: 'white' }} />
+            <Box>
+              <Typography variant="h4" fontWeight="bold" color="white">
+                HP Customer Detail Report
+              </Typography>
+              <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
+                Health Program - Customer Detail Report
+              </Typography>
+            </Box>
+          </Stack>
         </CardContent>
       </Card>
 
       <Card>
+        {/* Inline Table Toolbar */}
+        <Box sx={{ px: 2, pt: 2, pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" gap={1}>
+
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Month</InputLabel>
+              <Select value={selectedMonth} label="Month" onChange={e => { setSelectedMonth(e.target.value); setPage(0); }}>
+                <MenuItem value="">All</MenuItem>
+                {ethiopianMonths.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 90 }}>
+              <InputLabel>Year</InputLabel>
+              <Select value={selectedYear} label="Year" onChange={e => { setSelectedYear(e.target.value); setPage(0); }}>
+                <MenuItem value="">All</MenuItem>
+                {ethYears.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>Type</InputLabel>
+              <Select value={processType} label="Type" onChange={e => { setProcessType(e.target.value); setPage(0); }}>
+                <MenuItem value="regular">HP Regular</MenuItem>
+                <MenuItem value="vaccine">Vaccine</MenuItem>
+                <MenuItem value="breakdown">Breakdown</MenuItem>
+                <MenuItem value="emergency">Emergency</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>Status</InputLabel>
+              <Select value={statusFilter} label="Status" onChange={handleStatusFilterChange}>
+                <MenuItem value="">All Status</MenuItem>
+                <MenuItem value="in_progress">At O2C</MenuItem>
+                <MenuItem value="o2c_completed">At EWM</MenuItem>
+                <MenuItem value="ewm_completed">At TM Manager</MenuItem>
+                <MenuItem value="tm_confirmed">At EWM Goods Issue</MenuItem>
+                <MenuItem value="ewm_goods_issued">At Biller</MenuItem>
+                <MenuItem value="biller_completed">At PI Officer</MenuItem>
+                <MenuItem value="vehicle_requested">At Dispatch (Requested)</MenuItem>
+                <MenuItem value="vehicle_assigned">At Dispatch (Assigned)</MenuItem>
+                <MenuItem value="dispatched">At Documentation</MenuItem>
+                <MenuItem value="dispatch_completed">Dispatch Completed</MenuItem>
+                <MenuItem value="documentation_completed">Completed</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              size="small"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              sx={{ minWidth: 180 }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><Search fontSize="small" /></InputAdornment>,
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton onClick={handleClearSearch} size="small"><Clear fontSize="small" /></IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+            {(searchTerm || statusFilter) && (
+              <IconButton size="small" onClick={handleClearFilters} title="Clear filters">
+                <Clear fontSize="small" />
+              </IconButton>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" variant="outlined" startIcon={<GetApp />} onClick={exportToExcel} disabled={customers.length === 0}>
+              Export
+            </Button>
+          </Stack>
+        </Box>
         <CardContent>
           {customersLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -253,9 +291,6 @@ const HPCustomerDetailReport = () => {
             </Alert>
           ) : (
             <>
-              <Typography variant="h6" gutterBottom>
-                HP Customer Records ({totalCount} total)
-              </Typography>
               <TableContainer component={Paper}>
                 <Table stickyHeader>
                   <TableHead>
@@ -263,18 +298,11 @@ const HPCustomerDetailReport = () => {
                       <TableCell sx={{ 
                         color: 'white', 
                         fontWeight: 'bold', 
-                        minWidth: 100,
+                        minWidth: 80,
                         fontSize: '0.9rem',
                         bgcolor: '#1976d2 !important'
                       }}>
-                        <TableSortLabel
-                          active={sortBy === 'id'}
-                          direction={sortBy === 'id' ? sortOrder.toLowerCase() : 'asc'}
-                          onClick={() => handleSort('id')}
-                          sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
-                        >
-                          Process ID
-                        </TableSortLabel>
+                        S.No
                       </TableCell>
                       <TableCell sx={{ 
                         color: 'white', 
@@ -300,38 +328,6 @@ const HPCustomerDetailReport = () => {
                         bgcolor: '#1976d2 !important'
                       }}>
                         <TableSortLabel
-                          active={sortBy === 'region_name'}
-                          direction={sortBy === 'region_name' ? sortOrder.toLowerCase() : 'asc'}
-                          onClick={() => handleSort('region_name')}
-                          sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
-                        >
-                          Region
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell sx={{ 
-                        color: 'white', 
-                        fontWeight: 'bold', 
-                        minWidth: 120,
-                        fontSize: '0.9rem',
-                        bgcolor: '#1976d2 !important'
-                      }}>
-                        <TableSortLabel
-                          active={sortBy === 'zone_name'}
-                          direction={sortBy === 'zone_name' ? sortOrder.toLowerCase() : 'asc'}
-                          onClick={() => handleSort('zone_name')}
-                          sx={{ color: 'white !important', '& .MuiTableSortLabel-icon': { color: 'white !important' } }}
-                        >
-                          Zone
-                        </TableSortLabel>
-                      </TableCell>
-                      <TableCell sx={{ 
-                        color: 'white', 
-                        fontWeight: 'bold', 
-                        minWidth: 120,
-                        fontSize: '0.9rem',
-                        bgcolor: '#1976d2 !important'
-                      }}>
-                        <TableSortLabel
                           active={sortBy === 'woreda_name'}
                           direction={sortBy === 'woreda_name' ? sortOrder.toLowerCase() : 'asc'}
                           onClick={() => handleSort('woreda_name')}
@@ -343,7 +339,8 @@ const HPCustomerDetailReport = () => {
                       <TableCell sx={{ 
                         color: 'white', 
                         fontWeight: 'bold', 
-                        minWidth: 120,
+                        minWidth: 150,
+                        maxWidth: 150,
                         fontSize: '0.9rem',
                         bgcolor: '#1976d2 !important'
                       }}>
@@ -363,6 +360,15 @@ const HPCustomerDetailReport = () => {
                         fontSize: '0.9rem',
                         bgcolor: '#1976d2 !important'
                       }}>
+                        Total Waiting Time
+                      </TableCell>
+                      <TableCell sx={{ 
+                        color: 'white', 
+                        fontWeight: 'bold', 
+                        minWidth: 120,
+                        fontSize: '0.9rem',
+                        bgcolor: '#1976d2 !important'
+                      }}>
                         Actions
                       </TableCell>
                     </TableRow>
@@ -370,31 +376,58 @@ const HPCustomerDetailReport = () => {
                   <TableBody>
                     {customers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {searchTerm ? 'No HP customers found matching your search.' : 'No HP customers found. Make sure HP customers are registered in the system.'}
                           </Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      customers.map((customer) => (
+                      customers.map((customer, index) => (
                         <TableRow key={customer.id} hover sx={{ '&:nth-of-type(odd)': { bgcolor: '#f9f9f9' } }}>
-                          <TableCell sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{customer.id}</TableCell>
+                          <TableCell sx={{ fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'center' }}>
+                            {page * rowsPerPage + index + 1}
+                          </TableCell>
                           <TableCell sx={{ fontSize: '0.9rem', maxWidth: 180 }}>
                             <Typography variant="body2" sx={{ fontWeight: 600 }}>
                               {customer.facility_name || 'N/A'}
                             </Typography>
                           </TableCell>
-                          <TableCell sx={{ fontSize: '0.9rem' }}>{customer.region_name || 'N/A'}</TableCell>
-                          <TableCell sx={{ fontSize: '0.9rem' }}>{customer.zone_name || 'N/A'}</TableCell>
                           <TableCell sx={{ fontSize: '0.9rem' }}>{customer.woreda_name || 'N/A'}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={customer.process_status || customer.status || 'Unknown'} 
-                              color={customer.process_status === 'Completed' ? 'success' : 'primary'}
-                              size="small"
-                              sx={{ fontSize: '0.75rem' }}
-                            />
+                          <TableCell sx={{ 
+                            fontSize: '0.85rem',
+                            maxWidth: 150,
+                            wordWrap: 'break-word',
+                            whiteSpace: 'normal',
+                            lineHeight: 1.3
+                          }}>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+                              {customer.process_status || customer.status || 'Unknown'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>
+                            {customer.total_waiting_time ? (
+                              <Typography 
+                                variant="body2" 
+                                fontWeight="bold"
+                                sx={{
+                                  color: customer.total_waiting_time < 1440 ? '#2e7d32' : // Green: < 1 day (1440 min)
+                                         customer.total_waiting_time < 2880 ? '#ed6c02' : // Yellow: 1-2 days (2880 min)
+                                         '#d32f2f', // Red: > 2 days
+                                  bgcolor: customer.total_waiting_time < 1440 ? '#e8f5e9' : // Light green
+                                           customer.total_waiting_time < 2880 ? '#fff3e0' : // Light yellow
+                                           '#ffebee', // Light red
+                                  px: 1.5,
+                                  py: 0.5,
+                                  borderRadius: 1,
+                                  display: 'inline-block'
+                                }}
+                              >
+                                {Math.floor(customer.total_waiting_time / 60)}h {customer.total_waiting_time % 60}m
+                              </Typography>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">—</Typography>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -434,121 +467,246 @@ const HPCustomerDetailReport = () => {
       <Dialog 
         open={customerDetailOpen} 
         onClose={() => setCustomerDetailOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+          }
+        }}
       >
-        <DialogTitle>
-          HP Process Details - {selectedCustomer?.facility_name}
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          py: 3
+        }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Business sx={{ fontSize: 40 }} />
+            <Box>
+              <Typography variant="h5" fontWeight="bold">
+                HP Process Details
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                {selectedCustomer?.facility_name}
+              </Typography>
+            </Box>
+          </Stack>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ mt: 3 }}>
           {selectedCustomer && (
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Process ID</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.id}</Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Facility Name</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>
-                  {selectedCustomer.facility_name}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Typography variant="subtitle2" color="text.secondary">Region</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.region_name}</Typography>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Typography variant="subtitle2" color="text.secondary">Zone</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.zone_name}</Typography>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Typography variant="subtitle2" color="text.secondary">Woreda</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.woreda_name}</Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Route</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.route}</Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Reporting Month</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.reporting_month || 'N/A'}</Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Current Service Point</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.service_point || 'N/A'}</Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Process Status</Typography>
-                <Typography variant="body1" sx={{ mb: 2 }}>{selectedCustomer.process_status || selectedCustomer.status}</Typography>
-              </Grid>
-              
+            <Grid container spacing={3}>
+              {/* Process Information Card */}
               <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>Service Unit Status</Typography>
+                <Card sx={{ 
+                  background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                  border: '1px solid rgba(102, 126, 234, 0.2)',
+                  borderRadius: 2
+                }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ 
+                      fontWeight: 700,
+                      color: '#667eea',
+                      mb: 2
+                    }}>
+                      Process Information
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <Stack spacing={2}>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Process ID
+                            </Typography>
+                            <Typography variant="body1" fontWeight="bold">
+                              {selectedCustomer.id}
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Facility Name
+                            </Typography>
+                            <Typography variant="body1" fontWeight="bold">
+                              {selectedCustomer.facility_name}
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Route
+                            </Typography>
+                            <Chip 
+                              label={selectedCustomer.route || 'N/A'} 
+                              size="small"
+                              color="secondary"
+                              variant="outlined"
+                              sx={{ mt: 0.5 }}
+                            />
+                          </Box>
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Stack spacing={2}>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Reporting Month
+                            </Typography>
+                            <Typography variant="body1" fontWeight="bold">
+                              {selectedCustomer.reporting_month || 'N/A'}
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Process Status
+                            </Typography>
+                            <Chip 
+                              label={selectedCustomer.process_status || selectedCustomer.status || 'Unknown'} 
+                              color={
+                                selectedCustomer.process_status === 'Completed' ? 'success' :
+                                selectedCustomer.process_status === 'In Progress' ? 'warning' :
+                                'default'
+                              }
+                              sx={{ mt: 0.5, fontWeight: 'bold' }}
+                            />
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              Current Service Point
+                            </Typography>
+                            <Typography variant="body1" fontWeight="bold">
+                              {selectedCustomer.status === 'o2c_started' ? 'O2C' :
+                               selectedCustomer.status === 'o2c_completed' ? 'EWM' :
+                               selectedCustomer.status === 'ewm_completed' ? 'TM Manager' :
+                               selectedCustomer.status === 'tm_confirmed' ? 'EWM Goods Issue' :
+                               selectedCustomer.status === 'ewm_goods_issued' ? 'Biller' :
+                               selectedCustomer.status === 'biller_completed' ? 'PI Officer' :
+                               selectedCustomer.status === 'vehicle_requested' ? 'Dispatch' :
+                               selectedCustomer.status === 'vehicle_assigned' ? 'Dispatch' :
+                               selectedCustomer.status === 'dispatched' ? 'Documentation' :
+                               selectedCustomer.status === 'completed' ? 'Completed' :
+                               selectedCustomer.service_point?.toUpperCase() || 'N/A'}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <Box>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                            Total Waiting Time
+                          </Typography>
+                          <Chip 
+                            label={
+                              selectedCustomer.total_time_minutes 
+                                ? `${Math.floor(selectedCustomer.total_time_minutes / 60)}h ${selectedCustomer.total_time_minutes % 60}m` 
+                                : 'Not Available'
+                            } 
+                            color={
+                              selectedCustomer.total_time_minutes >= 1440 ? 'error' : // 24 hours
+                              selectedCustomer.total_time_minutes >= 480 ? 'warning' : // 8 hours
+                              'success'
+                            }
+                            sx={{ mt: 0.5, fontWeight: 'bold', fontSize: '1rem' }}
+                          />
+                        </Box>
+                      </Grid>
+                    </Grid>
+                  </CardContent>
+                </Card>
               </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Registration Status</Typography>
-                <Chip 
-                  label={selectedCustomer.registration_status || 'Not Started'} 
-                  color={selectedCustomer.registration_status === 'completed' ? 'success' : 'default'}
-                  sx={{ mb: 2 }}
-                />
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">O2C Status</Typography>
-                <Chip 
-                  label={selectedCustomer.o2c_status || 'Not Started'} 
-                  color={selectedCustomer.o2c_status === 'completed' ? 'success' : 'default'}
-                  sx={{ mb: 2 }}
-                />
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">EWM Status</Typography>
-                <Chip 
-                  label={selectedCustomer.ewm_status || 'Not Started'} 
-                  color={selectedCustomer.ewm_status === 'completed' ? 'success' : 'default'}
-                  sx={{ mb: 2 }}
-                />
-              </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle2" color="text.secondary">Dispatch Status</Typography>
-                <Chip 
-                  label={selectedCustomer.dispatch_status || 'Not Started'} 
-                  color={selectedCustomer.dispatch_status === 'completed' ? 'success' : 'default'}
-                  sx={{ mb: 2 }}
-                />
+
+              {/* Location Information */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 700,
+                  color: '#667eea',
+                  borderBottom: '2px solid #667eea',
+                  pb: 1,
+                  mb: 2
+                }}>
+                  Location Information
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Region
+                    </Typography>
+                    <Typography variant="body1">{selectedCustomer.region_name || 'N/A'}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Zone
+                    </Typography>
+                    <Typography variant="body1">{selectedCustomer.zone_name || 'N/A'}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      Woreda
+                    </Typography>
+                    <Typography variant="body1">{selectedCustomer.woreda_name || 'N/A'}</Typography>
+                  </Grid>
+                </Grid>
               </Grid>
 
               {/* Service Time Details */}
               <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>Service Time Details</Typography>
+                <Typography variant="h6" gutterBottom sx={{ 
+                  fontWeight: 700,
+                  color: '#667eea',
+                  borderBottom: '2px solid #667eea',
+                  pb: 1,
+                  mb: 2
+                }}>
+                  Service Time Tracking
+                </Typography>
                 {customerServiceDetails.length > 0 ? (
-                  <TableContainer component={Paper} sx={{ mt: 2 }}>
+                  <TableContainer component={Paper} sx={{ 
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    borderRadius: 2
+                  }}>
                     <Table size="small">
                       <TableHead>
-                        <TableRow>
-                          <TableCell>Service Unit</TableCell>
-                          <TableCell>Officer</TableCell>
-                          <TableCell>Start Time</TableCell>
-                          <TableCell>End Time</TableCell>
-                          <TableCell>Duration</TableCell>
-                          <TableCell>Status</TableCell>
+                        <TableRow sx={{ bgcolor: '#f5f5f5' }}>
+                          <TableCell sx={{ fontWeight: 700 }}>Service Unit</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Officer</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Start Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>End Time</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Duration</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {customerServiceDetails.map((service, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{service.service_unit}</TableCell>
-                            <TableCell>{service.officer_name}</TableCell>
-                            <TableCell>{new Date(service.start_time).toLocaleString()}</TableCell>
-                            <TableCell>{new Date(service.end_time).toLocaleString()}</TableCell>
-                            <TableCell>{service.waiting_minutes} min</TableCell>
+                          <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight="bold">
+                                {service.service_unit}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {service.officer_name || 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {service.start_time ? new Date(service.start_time).toLocaleString() : 'N/A'}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {service.end_time ? new Date(service.end_time).toLocaleString() : 'N/A'}
+                              </Typography>
+                            </TableCell>
                             <TableCell>
                               <Chip 
-                                label={service.status} 
+                                label={`${service.waiting_minutes || 0} min`}
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={service.status || 'N/A'} 
                                 color={service.status === 'completed' ? 'success' : 'default'}
                                 size="small"
                               />
@@ -559,17 +717,25 @@ const HPCustomerDetailReport = () => {
                     </Table>
                   </TableContainer>
                 ) : (
-                  <Typography color="text.secondary">No service time records found.</Typography>
+                  <Alert severity="info" sx={{ borderRadius: 2 }}>
+                    No service time records found for this process. Service times are recorded when officers complete their tasks.
+                  </Alert>
                 )}
               </Grid>
             </Grid>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCustomerDetailOpen(false)}>Close</Button>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid rgba(0,0,0,0.1)' }}>
+          <Button 
+            onClick={() => setCustomerDetailOpen(false)}
+            variant="contained"
+            sx={{ borderRadius: 2 }}
+          >
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Container>
   );
 };
 
