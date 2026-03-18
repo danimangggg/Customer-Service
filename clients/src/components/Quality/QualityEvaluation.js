@@ -392,8 +392,9 @@ const QualityEvaluation = () => {
             border-radius: 16px;
           }
           .header-gradient {
-            background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 24px;
             border-radius: 16px 16px 0 0;
           }

@@ -1,45 +1,101 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Typography,
-  Paper,
-  CircularProgress,
-  Container,
-  Card,
-  Avatar,
-  Stack,
-  Fade,
-  Chip,
-  Button,
+  Box, Typography, CircularProgress, Container,
+  Card, Avatar, Stack, Fade, Chip, Button,
 } from '@mui/material';
-import MUIDataTable from 'mui-datatables';
+import { DataGrid, GridToolbar } from '@mui/x-data-grid';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import PendingActionsIcon from '@mui/icons-material/PendingActions';
 
 const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
+const formatDate = (val) => val ? new Date(val).toLocaleString() : '—';
+const formatWaiting = (mins) => {
+  if (mins === null || mins === undefined) return '—';
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+};
+
+const columns = [
+  {
+    field: '_row',
+    headerName: '#',
+    width: 60,
+    sortable: false,
+    filterable: false,
+    renderCell: (params) => (
+      <Typography variant="body2" color="text.secondary">
+        {params.api.getRowIndexRelativeToVisibleRows(params.id) + 1}
+      </Typography>
+    ),
+  },
+  { field: 'facility_name', headerName: 'Facility', flex: 1, minWidth: 200 },
+  { field: 'odn', headerName: 'ODN Number', width: 160 },
+  {
+    field: 'store',
+    headerName: 'Store',
+    width: 100,
+    renderCell: (params) => (
+      <Chip
+        label={params.value}
+        color={params.value === 'AA11' ? 'primary' : params.value === 'AA12' ? 'secondary' : params.value === 'AA3' ? 'success' : 'warning'}
+        size="small"
+        sx={{ fontWeight: 'bold' }}
+      />
+    ),
+  },
+  { field: 'operator_name', headerName: 'Operator', width: 160 },
+  {
+    field: 'completed_at',
+    headerName: 'Completed At',
+    width: 180,
+    renderCell: (params) => formatDate(params.value),
+  },
+  {
+    field: 'waiting_minutes',
+    headerName: 'Waiting Time',
+    width: 130,
+    renderCell: (params) => formatWaiting(params.value),
+  },
+  {
+    field: 'region_name',
+    headerName: 'Region',
+    width: 140,
+    columnVisibilityModel: false,
+  },
+  {
+    field: 'woreda_name',
+    headerName: 'Woreda',
+    width: 140,
+  },
+];
 
 const RDFPicklistsCompleted = () => {
   const [picklists, setPicklists] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${api_url}/api/picklist-history`, { 
-        params: { 
-          page: 1, 
-          limit: 10000 // Get all records
-        } 
+      const response = await axios.get(`${api_url}/api/picklist-history`, {
+        params: { page: 1, limit: 10000 }
       });
-
       if (response.data.success && response.data.picklists) {
-        // Filter for RDF picklists only (AA1, AA2, AA3)
-        const rdfPicklists = response.data.picklists.filter(
-          p => ['AA1', 'AA2', 'AA3'].includes(p.store)
-        );
-        console.log('RDF Completed Picklists:', rdfPicklists);
-        setPicklists(rdfPicklists);
+        const rows = response.data.picklists
+          .filter(p => p.store && p.store !== 'HP' && p.store !== 'CR')
+          .map(p => ({
+            ...p,
+            facility_name: p.facility?.facility_name || 'Unknown',
+            region_name: p.facility?.region_name || 'N/A',
+            woreda_name: p.facility?.woreda_name || 'N/A',
+          }));
+        setPicklists(rows);
       } else {
         setPicklists([]);
       }
@@ -51,215 +107,96 @@ const RDFPicklistsCompleted = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const columns = [
-    { name: 'odn', label: 'ODN Number' },
-    {
-      name: 'facility',
-      label: 'Facility',
-      options: {
-        customBodyRender: (facility) =>
-          facility ? facility.facility_name : 'Unknown',
-      },
-    },
-    {
-      name: 'region',
-      label: 'Region',
-      options: {
-        customBodyRenderLite: (dataIndex) =>
-          picklists[dataIndex].facility?.region_name || 'N/A',
-      },
-    },
-    {
-      name: 'woreda',
-      label: 'Woreda',
-      options: {
-        customBodyRenderLite: (dataIndex) =>
-          picklists[dataIndex].facility?.woreda_name || 'N/A',
-      },
-    },
-    {
-      name: 'store',
-      label: 'Store',
-      options: {
-        customBodyRender: (value) => (
-          <Chip 
-            label={value} 
-            color={value === 'AA1' ? 'primary' : value === 'AA2' ? 'secondary' : 'success'}
-            size="small"
-            variant="filled"
-            sx={{ fontWeight: 'bold', borderRadius: 2 }}
-          />
-        )
-      }
-    },
-    {
-      name: 'operator_name',
-      label: 'Operator',
-      options: {
-        customBodyRender: (value) => value || 'N/A',
-      },
-    },
-  ];
-
-  const options = {
-    selectableRows: 'none',
-    filter: true,
-    search: true,
-    download: true,
-    print: true,
-    rowsPerPage: 25,
-    rowsPerPageOptions: [10, 25, 50, 100],
-    responsive: 'standard',
-    elevation: 3,
-    textLabels: {
-      body: {
-        noMatch: loading
-          ? 'Loading completed picklists...'
-          : 'No completed picklists found.',
-      },
-    },
-  };
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading)
     return (
       <Container maxWidth="md" sx={{ py: 8 }}>
         <Fade in={loading}>
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 3
-          }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
             <CircularProgress size={60} thickness={4} />
-            <Typography variant="h6" color="text.secondary">
-              Loading completed picklists...
-            </Typography>
+            <Typography variant="h6" color="text.secondary">Loading completed picklists...</Typography>
           </Box>
         </Fade>
       </Container>
     );
 
   return (
-    <>
-      <style>
-        {`
-          @keyframes fadeInUp {
-            from {
-              opacity: 0;
-              transform: translateY(20px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          .animate-fade-in {
-            animation: fadeInUp 0.6s ease-out;
-          }
-          .completed-card {
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            border: 1px solid rgba(25, 118, 210, 0.1);
-          }
-          .completed-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-          }
-          .header-gradient {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-            padding: 32px;
-            border-radius: 20px 20px 0 0;
-            position: relative;
-            overflow: hidden;
-          }
-          .header-gradient::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-            pointer-events: none;
-          }
-          .enhanced-table {
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-          }
-        `}
-      </style>
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Card className="completed-card animate-fade-in" elevation={0}>
-          {/* Header Section */}
-          <Box className="header-gradient">
-            <Stack direction="row" alignItems="center" spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
-              <Avatar sx={{ 
-                bgcolor: 'rgba(255,255,255,0.2)', 
-                width: 64, 
-                height: 64,
-                backdropFilter: 'blur(10px)',
-                border: '2px solid rgba(255,255,255,0.3)'
-              }}>
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <Card elevation={0} sx={{ borderRadius: 3, border: '1px solid rgba(25,118,210,0.1)' }}>
+        {/* Header */}
+        <Box sx={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', p: 4, borderRadius: '12px 12px 0 0' }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Stack direction="row" alignItems="center" spacing={2}>
+              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
                 <AssignmentTurnedInIcon fontSize="large" />
               </Avatar>
               <Box>
-                <Typography variant="h3" fontWeight="bold" sx={{ 
-                  textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                  mb: 1
-                }}>
-                  Completed RDF Picklists
-                </Typography>
-                <Typography variant="h6" sx={{ 
-                  opacity: 0.9, 
-                  fontWeight: 300,
-                  textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                }}>
-                  View all successfully completed RDF picklist submissions
+                <Typography variant="h4" fontWeight="bold" color="white">Completed RDF Picklists</Typography>
+                <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+                  All successfully completed RDF picklist submissions
                 </Typography>
               </Box>
             </Stack>
-          </Box>
+            <Button
+              variant="contained"
+              startIcon={<PendingActionsIcon />}
+              onClick={() => navigate('/rdf-picklists')}
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                border: '2px solid rgba(255,255,255,0.3)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
+              }}
+            >
+              On Progress
+            </Button>
+          </Stack>
+        </Box>
 
-          {/* Content Section */}
-          <Box sx={{ p: 4 }}>
-            <Paper className="enhanced-table" elevation={0}>
-              <MUIDataTable
-                title={
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <CheckCircleIcon color="success" />
-                    <Typography variant="h6" fontWeight="bold">
-                      All Completed RDF Picklists
-                    </Typography>
-                    <Chip 
-                      label={`${picklists.length} completed`} 
-                      color="success" 
-                      size="small"
-                      variant="outlined"
-                    />
-                  </Stack>
-                }
-                data={picklists}
-                columns={columns}
-                options={{
-                  ...options,
-                  customToolbar: () => null,
-                  elevation: 0,
-                }}
-              />
-            </Paper>
+        {/* Table */}
+        <Box sx={{ p: 3 }}>
+          <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+            <CheckCircleIcon color="success" />
+            <Typography variant="h6" fontWeight="bold">All Completed RDF Picklists</Typography>
+            <Chip label={`${picklists.length} records`} color="success" size="small" variant="outlined" />
+          </Stack>
+
+          <Box sx={{ height: 650 }}>
+            <DataGrid
+              rows={picklists}
+              columns={columns}
+              pageSize={25}
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              disableSelectionOnClick
+              initialState={{
+                columns: {
+                  columnVisibilityModel: {
+                    region_name: false,
+                    woreda_name: false,
+                  },
+                },
+              }}
+              components={{ Toolbar: GridToolbar }}
+              componentsProps={{
+                toolbar: { showQuickFilter: true, quickFilterProps: { debounceMs: 400 } },
+              }}
+              sx={{
+                bgcolor: 'white',
+                borderRadius: 2,
+                '& .MuiDataGrid-columnHeaders': {
+                  bgcolor: '#059669',
+                  color: 'white',
+                  fontWeight: 700,
+                },
+                '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700 },
+                '& .MuiDataGrid-row:hover': { bgcolor: '#f0fdf4' },
+              }}
+            />
           </Box>
-        </Card>
-      </Container>
-    </>
+        </Box>
+      </Card>
+    </Container>
   );
 };
 

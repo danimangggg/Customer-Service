@@ -17,7 +17,7 @@ exports.getTMProcesses = async (req, res) => {
       include: [{
         model: Facility,
         as: 'facility',
-        attributes: ['id', 'facility_name', 'region_name', 'route'],
+        attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
         required: false
       }],
       order: [['created_at', 'DESC']]
@@ -200,7 +200,7 @@ exports.getVehicleAssignmentProcesses = async (req, res) => {
         include: [{
           model: Facility,
           as: 'facility',
-          attributes: ['id', 'facility_name', 'region_name', 'route'],
+          attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
           where: { route: routeNames },
           required: true
         }],
@@ -234,7 +234,7 @@ exports.getVehicleAssignmentProcesses = async (req, res) => {
       include: [{
         model: Facility,
         as: 'facility',
-        attributes: ['id', 'facility_name', 'region_name', 'route'],
+        attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
         required: false
       }],
       order: [['created_at', 'DESC']]

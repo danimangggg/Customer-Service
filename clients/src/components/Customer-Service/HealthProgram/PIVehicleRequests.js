@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../../utils/toast';
 import withReactContent from 'sweetalert2-react-content';
 import { formatTimestamp } from '../../../utils/serviceTimeHelper';
 
@@ -234,7 +235,7 @@ const PIVehicleRequests = () => {
           console.error('Failed to record PI Officer service time:', err);
         }
 
-        MySwal.fire('Success!', 'Vehicle request submitted successfully.', 'success');
+        successToast('Vehicle request submitted successfully.');
         fetchRouteData();
         fetchStats();
         
@@ -278,7 +279,7 @@ const PIVehicleRequests = () => {
           console.error('Failed to record PI Officer service time:', err);
         }
 
-        MySwal.fire('Success!', 'Vehicle request submitted successfully.', 'success');
+        successToast('Vehicle request submitted successfully.');
         fetchFacilityData();
         
       } catch (err) {
@@ -315,7 +316,7 @@ const PIVehicleRequests = () => {
         notes: assignmentData.notes
       });
 
-      MySwal.fire('Success!', 'Vehicle assignment created successfully.', 'success');
+      successToast('Vehicle assignment created successfully.');
       setOpenAssignDialog(false);
       setEditingRoute(null);
       fetchRouteData();
@@ -346,7 +347,7 @@ const PIVehicleRequests = () => {
           }
         });
         
-        MySwal.fire('Success!', 'Vehicle request deleted successfully.', 'success');
+        successToast('Vehicle request deleted successfully.');
         fetchRouteData();
         fetchStats();
         
@@ -388,8 +389,9 @@ const PIVehicleRequests = () => {
             border-left-color: #1976d2;
           }
           .header-gradient {
-            background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 24px;
             border-radius: 16px 16px 0 0;
           }

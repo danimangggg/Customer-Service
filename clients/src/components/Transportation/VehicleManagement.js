@@ -418,62 +418,6 @@ const VehicleManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <CarIcon color="primary" />
-                <Box>
-                  <Typography variant="h6">{vehicles.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Total Vehicles</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <SpeedIcon color="success" />
-                <Box>
-                  <Typography variant="h6">{vehicles.filter(v => v.status === 'Active').length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Active</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <CalendarIcon color="warning" />
-                <Box>
-                  <Typography variant="h6">{vehicles.filter(v => v.status === 'Maintenance').length}</Typography>
-                  <Typography variant="body2" color="text.secondary">In Maintenance</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" gap={2}>
-                <TruckIcon color="info" />
-                <Box>
-                  <Typography variant="h6">{vehicles.filter(v => v.vehicle_type === 'Truck').length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Trucks</Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
       {/* Search and Filter */}
       <Card sx={{ mb: 3 }}>
         <CardContent>

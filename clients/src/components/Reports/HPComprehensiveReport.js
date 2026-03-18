@@ -140,11 +140,10 @@ const HPComprehensiveReport = () => {
   const tabs = [
     { label: 'HP Customer Detail Report', icon: <PeopleIcon /> },
     { label: 'ODN/POD Details', icon: <AssignmentIcon /> },
-    { label: 'ODN/RRF', icon: <AssessmentIcon /> },
+    { label: 'RRF/VRF', icon: <AssessmentIcon /> },
     { label: 'Service Units Detail', icon: <TableChartIcon /> },
     { label: 'Route Analysis', icon: <RouteIcon /> },
     { label: 'All Picklists', icon: <TrendingUpIcon /> },
-    { label: 'Organization Profile', icon: <TimelineIcon /> },
     { label: 'Best Of', icon: <EmojiEventsIcon /> }
   ];
 
@@ -215,8 +214,7 @@ const HPComprehensiveReport = () => {
             {activeTab === 3 && <ServiceUnitsDetail data={reportData} />}
             {activeTab === 4 && <RouteAnalysis data={reportData} />}
             {activeTab === 5 && <AllPicklists />}
-            {activeTab === 6 && <OrganizationProfileView />}
-            {activeTab === 7 && (
+            {activeTab === 6 && (
               <Box>
                 {/* Date Range Controls */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>

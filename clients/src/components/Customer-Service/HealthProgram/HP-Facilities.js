@@ -27,6 +27,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../../utils/toast';
 import withReactContent from 'sweetalert2-react-content';
 import { formatTimestamp } from '../../../utils/serviceTimeHelper';
 
@@ -53,6 +54,7 @@ const HpFacilities = () => {
   // Filtering States
   const [filterType, setFilterType] = useState("Regular");
   const [filterRoute, setFilterRoute] = useState("All");
+  const [filterPeriod, setFilterPeriod] = useState("All");
 
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
@@ -176,6 +178,29 @@ const HpFacilities = () => {
     };
   }, [api_url]);
 
+  // Silent background polling — refreshes processes every 30s without disturbing the user
+  useEffect(() => {
+    const silentRefresh = async () => {
+      try {
+        const [procRes, facRes] = await Promise.all([
+          axios.get(`${api_url}/api/active-processes`),
+          axios.get(`${api_url}/api/facilities`),
+        ]);
+        const processes = procRes.data || [];
+        setActiveProcesses(processes);
+        setFacilities(facRes.data || []);
+        if (processes.length > 0) {
+          await fetchODNCounts(processes);
+        }
+      } catch (err) {
+        // silent — don't show error to user on background refresh
+      }
+    };
+
+    const interval = setInterval(silentRefresh, 4000);
+    return () => clearInterval(interval);
+  }, [api_url]);
+
   // Function to fetch ODN counts for processes
   const fetchODNCounts = async (processes) => {
     try {
@@ -237,7 +262,7 @@ const HpFacilities = () => {
           ...prev,
           [res.data.process_id]: 0
         }));
-        Swal.fire('Success', 'Process Started', 'success');
+        successToast('Process Started');
       }
     } catch (err) {
       Swal.fire('Error', 'Failed to start process', 'error');
@@ -262,7 +287,7 @@ const HpFacilities = () => {
         delete newCounts[processId];
         return newCounts;
       });
-      Swal.fire('Reverted', '', 'success');
+      successToast('Reverted');
     } catch (err) {
       Swal.fire('Error', 'Could not revert', 'error');
     }
@@ -363,7 +388,7 @@ const HpFacilities = () => {
           [processId]: (prev[processId] || 0) + 1
         }));
         
-        Swal.fire('Saved!', 'ODN number saved successfully.', 'success');
+        successToast('ODN number saved successfully.');
         // Refresh the manage ODNs modal
         setTimeout(() => handleManageODNs(processId), 500);
         
@@ -400,7 +425,7 @@ const HpFacilities = () => {
           odn_number: newOdnNumber.trim()
         });
         
-        Swal.fire('Updated!', 'ODN number updated successfully.', 'success');
+        successToast('ODN number updated successfully.');
         // Refresh the manage ODNs modal
         setTimeout(() => handleManageODNs(processId), 500);
         
@@ -433,7 +458,7 @@ const HpFacilities = () => {
           [processId]: Math.max(0, (prev[processId] || 0) - 1)
         }));
         
-        Swal.fire('Deleted!', 'ODN number deleted successfully.', 'success');
+        successToast('ODN number deleted successfully.');
         // Refresh the manage ODNs modal
         setTimeout(() => handleManageODNs(processId), 500);
         
@@ -489,7 +514,7 @@ const HpFacilities = () => {
         setActiveProcesses(prev =>
           prev.map(p => p.id === processId ? { ...p, status: 'o2c_completed' } : p)
         );
-        Swal.fire('Completed!', `Process completed with "${isVaccine ? 'VRF' : 'RRF'} not sent" status.`, 'success');
+        successToast(`Process completed with "${isVaccine ? 'VRF' : 'RRF'} not sent" status.`);
       } catch (err) {
         console.error('Complete process error:', err);
         Swal.fire('Error', 'Failed to complete process.', 'error');
@@ -547,7 +572,7 @@ const HpFacilities = () => {
             )
           );
           
-          Swal.fire('Completed!', 'Process has been marked as completed.', 'success');
+          successToast('Process has been marked as completed.');
           
         } catch (err) {
           console.error('Complete process error:', err);
@@ -588,7 +613,7 @@ const HpFacilities = () => {
           )
         );
         
-        Swal.fire('Completed!', 'EWM Process completed and TM Manager notified.', 'success');
+        successToast('EWM Process completed and TM Manager notified.');
         
       } catch (err) {
         console.error('EWM Complete process error:', err);
@@ -685,7 +710,7 @@ const HpFacilities = () => {
           return newData;
         });
         
-        Swal.fire('Completed!', 'ODN has been marked as EWM completed.', 'success');
+        successToast('ODN has been marked as EWM completed.');
         
       } catch (err) {
         console.error('Complete ODN error:', err);
@@ -719,7 +744,7 @@ const HpFacilities = () => {
           )
         );
         
-        Swal.fire('Reverted!', 'Process has been reverted to O2C started.', 'success');
+        successToast('Process has been reverted to O2C started.');
         
       } catch (err) {
         console.error('EWM Revert process error:', err);
@@ -755,7 +780,7 @@ const HpFacilities = () => {
           )
         );
         
-        Swal.fire('Returned!', 'Process has been returned to O2C Officer for corrections.', 'success');
+        successToast('Process has been returned to O2C Officer for corrections.');
         
       } catch (err) {
         console.error('Return to O2C error:', err);
@@ -819,7 +844,9 @@ const HpFacilities = () => {
     }
     
     // Regular: show only facilities marked as HP sites
-    return !!facility.is_hp_site;
+    if (!facility.is_hp_site) return false;
+    if (filterPeriod !== 'All' && facility.period !== filterPeriod) return false;
+    return true;
   };
 
   // For EWM Officers: Create rows for each ODN instead of each facility
@@ -999,8 +1026,9 @@ const HpFacilities = () => {
             border-radius: 16px;
           }
           .header-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 24px;
             border-radius: 16px 16px 0 0;
           }
@@ -1082,7 +1110,7 @@ const HpFacilities = () => {
                   fullWidth 
                   value={filterRoute} 
                   onChange={(e) => setFilterRoute(e.target.value)}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, display: (filterType === 'Emergency' || filterType === 'Breakdown' || filterType === 'Vaccine') ? 'none' : undefined }}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, display: (filterType === 'Emergency' || filterType === 'Breakdown') ? 'none' : undefined }}
                 >
                   {routes.map(r => <MenuItem key={r} value={r}>{r}</MenuItem>)}
                 </TextField>
@@ -1101,6 +1129,22 @@ const HpFacilities = () => {
                   <MenuItem value="Emergency">Emergency</MenuItem>
                   <MenuItem value="Breakdown">Breakdown</MenuItem>
                   <MenuItem value="Vaccine">Vaccine</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <TextField
+                  select
+                  label="Period"
+                  size="small"
+                  fullWidth
+                  value={filterPeriod}
+                  onChange={(e) => setFilterPeriod(e.target.value)}
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, display: (filterType !== 'Regular') ? 'none' : undefined }}
+                >
+                  <MenuItem value="All">All</MenuItem>
+                  <MenuItem value="Monthly">Monthly</MenuItem>
+                  <MenuItem value="Odd">Odd</MenuItem>
+                  <MenuItem value="Even">Even</MenuItem>
                 </TextField>
               </Grid>
               <Grid item xs={12} md={2}>

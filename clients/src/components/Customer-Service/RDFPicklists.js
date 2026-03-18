@@ -34,13 +34,18 @@ const RDFPicklists = () => {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const pickRes = await axios.get(`${api_url}/api/getPicklists`);
+      const pickRes = await axios.get(`${api_url}/api/getPicklists`, {
+        params: { page: 1, limit: 10000 }
+      });
 
-      let allPicklists = Array.isArray(pickRes.data) ? pickRes.data : [];
+      let allPicklists = Array.isArray(pickRes.data)
+        ? pickRes.data
+        : (pickRes.data?.data || []);
 
-      // ✅ Remove completed picklists - show only uncompleted
+      // Only uncompleted, only RDF stores (not HP/CR)
       allPicklists = allPicklists.filter(
         (p) => String(p.status || '').toLowerCase() !== 'completed'
+          && p.store && p.store !== 'HP' && p.store !== 'CR'
       );
 
       setPicklists(allPicklists);
@@ -126,8 +131,9 @@ const RDFPicklists = () => {
             box-shadow: 0 8px 32px rgba(0,0,0,0.12);
           }
           .header-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 32px;
             border-radius: 20px 20px 0 0;
             position: relative;
@@ -187,33 +193,16 @@ const RDFPicklists = () => {
                   textShadow: '0 2px 4px rgba(0,0,0,0.1)',
                   mb: 1
                 }}>
-                  RDF Picklists
+                  RDF Picklists - On Progress
                 </Typography>
                 <Typography variant="h6" sx={{ 
                   opacity: 0.9, 
                   fontWeight: 300,
                   textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                 }}>
-                  Manage and track RDF picklist submissions
+                  Uncompleted RDF picklist submissions
                 </Typography>
               </Box>
-              <Button
-                variant="contained"
-                onClick={() => navigate('/rdf-completed-picklists')}
-                className="action-button"
-                sx={{
-                  bgcolor: 'rgba(255,255,255,0.2)',
-                  color: 'white',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  backdropFilter: 'blur(10px)',
-                  '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.3)',
-                    border: '2px solid rgba(255,255,255,0.5)',
-                  }
-                }}
-              >
-                Completed Picklists
-              </Button>
             </Stack>
           </Box>
 

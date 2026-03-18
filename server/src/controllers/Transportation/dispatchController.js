@@ -260,6 +260,20 @@ const completeDispatch = async (req, res) => {
       type: db.sequelize.QueryTypes.UPDATE
     });
 
+    // Also update all processes for this route assignment to dispatch_completed
+    const updateProcessesQuery = `
+      UPDATE processes p
+      INNER JOIN facilities f ON f.id = p.facility_id
+      INNER JOIN routes r ON r.route_name = f.route
+      INNER JOIN route_assignments ra ON ra.route_id = r.id
+      SET p.status = 'dispatch_completed', p.dispatch_completed_at = NOW()
+      WHERE ra.id = ? AND p.status = 'driver_assigned'
+    `;
+    await db.sequelize.query(updateProcessesQuery, {
+      replacements: [id],
+      type: db.sequelize.QueryTypes.UPDATE
+    });
+
     // Record service time for Dispatch Phase
     try {
       // Get all processes for this route to record service times

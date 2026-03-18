@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../utils/toast';
 import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
     Button, Typography, CircularProgress, Box, Chip, Checkbox, IconButton,
@@ -55,7 +56,7 @@ const OutstandingCustomers = () => {
             await axios.put(`${api_url}/api/update-service-point`, payload);
             // Only re-fetch if the status change was successful
             fetchData();
-            Swal.fire('Success', `Customer status updated to ${newStatus}.`, 'success');
+            successToast(`Customer status updated to ${newStatus}.`);
             return true;
         } catch (error) {
             console.error("Error updating service status:", error.response ? error.response.data : error.message);
@@ -370,9 +371,9 @@ const OutstandingCustomers = () => {
                     'Dispatch',
                     undefined  // Don't set completed_at
                 );
-                Swal.fire('Completed!', 'All stores have completed this task. Service is now sent to Dispatch.', 'success');
+                successToast('All stores have completed this task. Service is now sent to Dispatch.');
             } else {
-                Swal.fire('Completed!', 'You have completed your part. Waiting for other stores to complete their tasks.', 'success');
+                successToast('You have completed your part. Waiting for other stores to complete their tasks.');
             }
             fetchData();
         } catch (error) {
@@ -414,7 +415,7 @@ const OutstandingCustomers = () => {
                     'O2C',
                     null,
                 );
-                Swal.fire('Success', 'Task has been shared with the selected officer.', 'success');
+                successToast('Task has been shared with the selected officer.');
             } catch (error) {
                 Swal.fire('Error', 'Failed to share the task.', 'error');
             }
@@ -524,7 +525,7 @@ const OutstandingCustomers = () => {
                     new Date().toISOString(),
                     cancellationData
                 );
-                Swal.fire('Canceled!', 'The service has been successfully canceled.', 'success');
+                successToast('The service has been successfully canceled.');
             } catch (error) {
                 console.error('Error cancelling service:', error);
                 Swal.fire('Error', 'Failed to cancel the service.', 'error');
@@ -554,7 +555,7 @@ const OutstandingCustomers = () => {
                 'Customer Service',
                 null
             );
-            Swal.fire('Updated!', 'Customer approved and sent to Customer Service.', 'success');
+            successToast('Customer approved and sent to Customer Service.');
             fetchData();
         } catch (error) {
             console.error("Error approving customer:", error.response ? error.response.data : error.message);
@@ -584,7 +585,7 @@ const OutstandingCustomers = () => {
                 customer.next_service_point,
                 null
             );
-            Swal.fire('Updated!', 'Customer has been rejected.', 'success');
+            successToast('Customer has been rejected.');
             fetchData();
         } catch (error) {
             console.error("Error rejecting customer:", error.response ? error.response.data : error.message);
@@ -742,7 +743,7 @@ const OutstandingCustomers = () => {
                     // Don't fail the completion if service time recording fails
                 }
                 
-                Swal.fire('Success', 'Service point updated', 'success');
+                successToast('Service point updated');
                 fetchData();
             } catch (error) {
                 console.error("Error updating service point:", error.response ? error.response.data : error.message);
@@ -791,7 +792,7 @@ const OutstandingCustomers = () => {
                     assignedOfficerId,
                     selectedRole,
                 );
-                Swal.fire('Updated!', `Service point updated to ${selectedRole}.`, 'success');
+                successToast(`Service point updated to ${selectedRole}.`);
                 fetchData();
             } catch (error) {
                 console.error("Error updating service point:", error.response ? error.response.data : error.message);
@@ -839,7 +840,7 @@ const OutstandingCustomers = () => {
                     assignedOfficerId,
                     selectedRole
                 );
-                Swal.fire('Updated!', `Service point updated to ${selectedRole}.`, 'success');
+                successToast(`Service point updated to ${selectedRole}.`);
                 fetchData();
             } catch (error) {
                 console.error("Error updating service point:", error.response ? error.response.data : error.message);
@@ -859,9 +860,21 @@ const OutstandingCustomers = () => {
     };
 
     const handleCloseOdnManager = () => {
+        const closingCustomerId = selectedCustomer?.id;
         setOdnManagerOpen(false);
         setSelectedCustomer(null);
-        fetchData(); // Refresh data when closing
+        fetchData();
+        // Re-fetch ODNs for this customer so the Complete button state updates
+        if (closingCustomerId) {
+            axios.get(`${api_url}/api/rdf-odns/${closingCustomerId}`)
+                .then(res => {
+                    setCustomerOdns(prev => ({
+                        ...prev,
+                        [closingCustomerId]: res.data.odns || []
+                    }));
+                })
+                .catch(err => console.error('Error refreshing ODNs:', err));
+        }
     };
 
     const handleRevert = async (customer) => {
@@ -873,7 +886,7 @@ const OutstandingCustomers = () => {
             });
             
             if (response.data.success) {
-                Swal.fire('Success', 'Your store\'s EWM process has been reverted.', 'success');
+                successToast("Your store's EWM process has been reverted.");
                 fetchData();
             } else {
                 Swal.fire('Error', 'Failed to revert your store\'s process.', 'error');
@@ -895,7 +908,7 @@ const OutstandingCustomers = () => {
             });
             
             if (response.data.success) {
-                Swal.fire('Success', 'EWM process started for your store', 'success');
+                successToast('EWM process started for your store');
                 fetchData();
             }
         } catch (error) {
@@ -948,8 +961,9 @@ const OutstandingCustomers = () => {
                         box-shadow: 0 8px 32px rgba(0,0,0,0.12);
                     }
                     .header-gradient {
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
+                        background: #f5f5f5;
+                        color: #333;
+                        border-bottom: 1px solid #e0e0e0;
                         padding: 32px;
                         border-radius: 20px 20px 0 0;
                         position: relative;
@@ -1114,6 +1128,7 @@ const OutstandingCustomers = () => {
                                 const showNotifyButton = customer.next_service_point?.toLowerCase() === 'o2c' && (normalizedStatus === null || normalizedStatus === '' || normalizedStatus === 'started');
                                 const showStartAndStopButtons = normalizedStatus === 'notifying';
                                 const showCompleteButton = normalizedStatus === 'o2c_started';
+                                const hasOdns = (customerOdns[customer.id] || []).length > 0;
 
                                 const myStoreStatus = getStoreODN(customer);
                                 
@@ -1258,6 +1273,8 @@ const OutstandingCustomers = () => {
                                                                     color="success"
                                                                     onClick={() => handleComplete(customer)}
                                                                     size="small"
+                                                                    disabled={!hasOdns}
+                                                                    title={!hasOdns ? 'Add at least one ODN before completing' : ''}
                                                                 >
                                                                     Complete
                                                                 </Button>

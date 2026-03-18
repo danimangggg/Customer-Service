@@ -256,28 +256,51 @@ const getComprehensiveHPReport = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    // 10. Workflow Progress by Stage (ODN-based, cumulative counts, excluding "RRF not sent")
+    // 10. Workflow Progress by Stage — cumulative counts
+    // Uses timestamp columns where available, falls back to status for older records
+    // Statuses that mean "passed through this stage or beyond":
+    //   ewm: ewm_goods_issued_at OR status IN (ewm_completed, biller_completed, tm_confirmed, vehicle_requested, driver_assigned, dispatch_completed, completed)
+    //   biller: biller_received_at OR status IN (biller_completed, tm_confirmed, vehicle_requested, driver_assigned, dispatch_completed, completed)
+    //   tm1: tm_confirmed_at OR status IN (tm_confirmed, vehicle_requested, driver_assigned, dispatch_completed, completed)
+    //   tm2: driver_assigned_at OR status IN (driver_assigned, dispatch_completed, completed)
+    //   dispatch: dispatch_completed_at OR status IN (dispatch_completed, completed)
     const workflowProgressQuery = `
       SELECT 
-        COUNT(DISTINCT CASE WHEN p.status IN ('completed', 'o2c_started', 'o2c_completed', 'ewm_completed', 'vehicle_requested') AND o.odn_number != 'RRF not sent' THEN o.id END) as o2c_stage,
-        COUNT(DISTINCT CASE WHEN p.status IN ('o2c_completed', 'ewm_completed', 'vehicle_requested') AND o.odn_number != 'RRF not sent' THEN o.id END) as ewm_stage,
-        COUNT(DISTINCT CASE WHEN p.status IN ('ewm_completed', 'vehicle_requested') AND o.odn_number != 'RRF not sent' THEN o.id END) as pi_stage,
-        COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' AND o.odn_number != 'RRF not sent' THEN o.id END) as tm_stage,
-        COUNT(DISTINCT CASE 
-          WHEN p.status = 'vehicle_requested' 
-          AND o.odn_number != 'RRF not sent' 
-          AND EXISTS (
-            SELECT 1 FROM route_assignments ra 
-            WHERE ra.route_id IN (
-              SELECT r.id FROM routes r WHERE r.route_name = f.route
-            ) 
-            AND ra.ethiopian_month = SUBSTRING_INDEX(?, ' ', 1)
-            AND ra.status IN ('Assigned', 'In Progress', 'Completed')
-          )
-          THEN o.id 
-        END) as dispatched_stage,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' THEN o.id END) as o2c_stage,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
+          p.ewm_goods_issued_at IS NOT NULL OR
+          p.biller_received_at IS NOT NULL OR
+          p.tm_confirmed_at IS NOT NULL OR
+          p.status IN ('ewm_completed','biller_completed','tm_confirmed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          o.pod_confirmed = 1
+        ) THEN o.id END) as ewm_phase1_facilities,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
+          p.biller_received_at IS NOT NULL OR
+          p.tm_confirmed_at IS NOT NULL OR
+          p.status IN ('biller_completed','tm_confirmed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          o.pod_confirmed = 1
+        ) THEN o.id END) as biller_facilities,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
+          p.tm_confirmed_at IS NOT NULL OR
+          p.status IN ('tm_confirmed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          o.pod_confirmed = 1
+        ) THEN o.id END) as tm_phase1_facilities,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
+          p.driver_assigned_at IS NOT NULL OR
+          p.status IN ('driver_assigned','dispatch_completed','completed') OR
+          o.pod_confirmed = 1
+        ) THEN o.id END) as tm_phase2_facilities,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
+          p.dispatch_completed_at IS NOT NULL OR
+          p.status IN ('dispatch_completed','completed') OR
+          o.pod_confirmed = 1 OR
+          (p.status = 'driver_assigned' AND EXISTS (
+            SELECT 1 FROM route_assignments ra2
+            INNER JOIN routes r2 ON r2.id = ra2.route_id
+            WHERE r2.route_name = f.route AND ra2.status = 'Completed'
+          ))
+        ) THEN o.id END) as dispatch_odns,
         COUNT(DISTINCT CASE WHEN o.pod_confirmed = 1 AND o.odn_number != 'RRF not sent' THEN o.id END) as documentation_stage,
-        COUNT(DISTINCT CASE WHEN o.documents_signed = 1 AND o.odn_number != 'RRF not sent' THEN o.id END) as doc_followup_stage,
         COUNT(DISTINCT CASE WHEN o.quality_confirmed = 1 AND o.odn_number != 'RRF not sent' THEN o.id END) as quality_stage
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id
@@ -287,7 +310,7 @@ const getComprehensiveHPReport = async (req, res) => {
         AND f.route IS NOT NULL AND f.route != ''
         ${ptFilter}
     `;
-    const workflowReplacements = [reportingMonth];
+    const workflowReplacements = [];
     if (!skipMonthFilter) workflowReplacements.push(reportingMonth);
     const [workflowProgress] = await db.sequelize.query(workflowProgressQuery, {
       replacements: workflowReplacements,
@@ -299,6 +322,7 @@ const getComprehensiveHPReport = async (req, res) => {
       summary: {
         totalFacilities: expectedFacilities,
         expectedFacilities,
+        expectedThisMonth: expectedFacilities,
         rrfSent: rrfSentResult.total,
         rrfNotSent,
         totalODNs: odnStats.total_odns || 0,
@@ -373,6 +397,7 @@ const getODNPODDetails = async (req, res) => {
     const skipMonthFilter = process_type === 'emergency' || process_type === 'breakdown' || process_type === 'vaccine';
     const ptFilter = process_type ? `AND p.process_type = '${process_type}'` : '';
     const monthFilter = (!skipMonthFilter && reporting_month) ? `AND p.reporting_month = '${reporting_month}'` : '';
+    const vaccineFilter = process_type === 'vaccine' ? `AND f.is_vaccine_site = 1` : `AND f.route IS NOT NULL AND f.route != ''`;
 
     const odnDetailsQuery = `
       SELECT 
@@ -395,8 +420,8 @@ const getODNPODDetails = async (req, res) => {
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id
       INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE f.route IS NOT NULL AND f.route != ''
-        AND o.odn_number != 'RRF not sent'
+      WHERE o.odn_number != 'RRF not sent'
+        ${vaccineFilter}
         ${monthFilter}
         ${ptFilter}
       ORDER BY f.route, f.facility_name, o.odn_number

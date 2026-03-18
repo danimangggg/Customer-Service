@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../utils/toast';
 import withReactContent from 'sweetalert2-react-content';
 
 const MySwal = withReactContent(Swal);
@@ -133,10 +134,10 @@ const ServiceTimeManagement = () => {
 
       if (editingService) {
         await axios.put(`${api_url}/api/service-times/${editingService.id}`, payload);
-        MySwal.fire('Success!', 'Service time updated successfully.', 'success');
+        successToast('Service time updated successfully.');
       } else {
         await axios.post(`${api_url}/api/service-times`, payload);
-        MySwal.fire('Success!', 'Service time created successfully.', 'success');
+        successToast('Service time created successfully.');
       }
 
       setDialogOpen(false);
@@ -162,7 +163,7 @@ const ServiceTimeManagement = () => {
     if (result.isConfirmed) {
       try {
         await axios.delete(`${api_url}/api/service-times/${serviceId}`);
-        MySwal.fire('Deleted!', 'Service time has been deleted.', 'success');
+        successToast('Service time has been deleted.');
         fetchServiceTimes();
         fetchStats();
       } catch (err) {
@@ -228,8 +229,9 @@ const ServiceTimeManagement = () => {
             border-left-color: #2196f3;
           }
           .header-gradient {
-            background: linear-gradient(135deg, #2196f3 0%, #64b5f6 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 24px;
             border-radius: 16px 16px 0 0;
           }

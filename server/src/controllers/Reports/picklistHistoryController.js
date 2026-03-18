@@ -45,6 +45,14 @@ const getPicklistHistory = async (req, res) => {
     const total = totalResult[0].total;
 
     // Get picklist history with facility information
+    // Check if completed_at column exists
+    const colCheck = await db.sequelize.query(
+      `SELECT COUNT(*) as cnt FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'picklist' AND COLUMN_NAME = 'completed_at'`,
+      { type: db.sequelize.QueryTypes.SELECT }
+    );
+    const hasCompletedAt = colCheck[0].cnt > 0;
+
     const query = `
       SELECT 
         p.id,
@@ -53,6 +61,8 @@ const getPicklistHistory = async (req, res) => {
         p.store,
         p.process_id,
         p.status,
+        ${hasCompletedAt ? 'p.completed_at,' : 'NULL as completed_at,'}
+        p.created_at as picklist_created_at,
         e.full_name as operator_name,
         e.id as operator_id,
         COALESCE(f_hp.id, f_aa.id) as facility_id,
@@ -76,6 +86,8 @@ const getPicklistHistory = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
+    console.log('Picklist history query returned:', picklists.length, 'records');
+
     // Format the results to include facility object
     const formatted = picklists.map(row => ({
       id: row.id,
@@ -84,6 +96,11 @@ const getPicklistHistory = async (req, res) => {
       store: row.store,
       process_id: row.process_id,
       status: row.status,
+      completed_at: row.completed_at,
+      started_at: row.picklist_created_at,
+      waiting_minutes: (row.completed_at && row.picklist_created_at)
+        ? Math.round((new Date(row.completed_at) - new Date(row.picklist_created_at)) / 60000)
+        : null,
       operator_name: row.operator_name,
       operator_id: row.operator_id,
       facility: row.facility_id ? {

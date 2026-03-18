@@ -13,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../../utils/toast';
 
 const EWMGoodsIssue = () => {
   const [processes, setProcesses] = useState([]);
@@ -123,7 +124,7 @@ const EWMGoodsIssue = () => {
           ewm_officer_name: loggedInUserName
         });
 
-        Swal.fire('Success!', 'Goods issued successfully and sent to Biller', 'success');
+        successToast('Goods issued successfully and sent to Biller');
         fetchProcesses();
       } catch (err) {
         console.error('Issue goods error:', err);

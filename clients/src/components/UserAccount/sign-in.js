@@ -190,13 +190,13 @@ export default function SignIn() {
         } else if (jobTitle === 'Customer Service Officer') { navigate('/register-customer');
         } else if (jobTitle === 'O2C Officer')              { navigate('/outstandingProcess');
         } else if (jobTitle === 'EWM Officer')              { navigate('/outstandingProcess');
-        } else if (jobTitle === 'O2C Officer - HP')         { navigate('/hp-facilities');
-        } else if (jobTitle === 'EWM Officer - HP')         { navigate('/hp-facilities');
-        } else if (jobTitle === 'PI Officer-HP')            { navigate('/pi-vehicle-requests');
-        } else if (jobTitle === 'TM Manager')               { navigate('/tm-manager');
-        } else if (jobTitle === 'Biller')                   { navigate('/biller');
+        } else if (jobTitle === 'O2C Officer - HP')         { navigate('/hp-dashboard');
+        } else if (jobTitle === 'EWM Officer - HP')         { navigate('/hp-dashboard');
+        } else if (jobTitle === 'PI Officer-HP')            { navigate('/hp-dashboard');
+        } else if (jobTitle === 'TM Manager')               { navigate('/hp-dashboard');
+        } else if (jobTitle === 'Biller')                   { navigate('/hp-dashboard');
         } else if (jobTitle === 'Dispatcher')               { navigate('/dispatch');
-        } else if (jobTitle === 'Dispatcher - HP')          { navigate('/dispatch-management');
+        } else if (jobTitle === 'Dispatcher - HP')          { navigate('/hp-dashboard');
         } else if (jobTitle === 'Dispatch-Documentation')   { navigate('/exit-permit');
         } else if (jobTitle === 'EWM-Documentation')        { navigate('/ewm-documentation');
         } else if (jobTitle === 'Gate Keeper')              { navigate('/gate-keeper');
@@ -265,7 +265,7 @@ export default function SignIn() {
                 <FeatureBox sx={{ animationDelay: '0.2s' }}>
                   <SecurityIcon />
                   <Box sx={{ textAlign: 'left' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.3, fontSize: '1.1rem', color: '#fff' }}>Transport &amp; Delivery</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.3, fontSize: '1.1rem', color: '#fff' }}>RDF</Typography>
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.85rem' }}>Route planning &amp; dispatch tracking</Typography>
                   </Box>
                 </FeatureBox>

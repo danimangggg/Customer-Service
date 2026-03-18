@@ -57,6 +57,8 @@ const Sidebar = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tmSettingsOpen, setTmSettingsOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [mgmtReportsOpen, setMgmtReportsOpen] = useState(false);
+  const [mgmtProfileOpen, setMgmtProfileOpen] = useState(false);
 
   const signOut = async () => {
     const jobTitle = localStorage.getItem('JobTitle');
@@ -99,11 +101,11 @@ const Sidebar = () => {
     borderRadius: 2,
     mx: 1,
     mb: 1,
-    bgcolor: isActivePath(path) ? 'rgba(198, 40, 40, 0.12)' : 'transparent',
+    bgcolor: isActivePath(path) ? 'rgba(21, 101, 192, 0.12)' : 'transparent',
     borderLeft: isActivePath(path) ? 4 : 0,
-    borderColor: isActivePath(path) ? '#c62828' : 'transparent',
+    borderColor: isActivePath(path) ? '#1565c0' : 'transparent',
     '&:hover': {
-      bgcolor: 'rgba(198, 40, 40, 0.08)',
+      bgcolor: 'rgba(21, 101, 192, 0.08)',
       transform: 'translateX(4px)',
       transition: 'all 0.2s ease'
     },
@@ -135,8 +137,8 @@ const Sidebar = () => {
             overflowX: 'hidden',
             position: 'fixed',
             height: '100vh',
-            boxShadow: '4px 0 20px rgba(198,40,40,0.12)',
-            borderRight: '2px solid #c62828',
+            boxShadow: '4px 0 20px rgba(21,101,192,0.12)',
+            borderRight: '2px solid #1565c0',
             '&::-webkit-scrollbar': {
               width: '6px',
             },
@@ -144,7 +146,7 @@ const Sidebar = () => {
               background: '#f5f5f5',
             },
             '&::-webkit-scrollbar-thumb': {
-              background: 'rgba(198,40,40,0.3)',
+              background: 'rgba(21,101,192,0.3)',
               borderRadius: '3px',
             },
             // Global text wrapping for all menu items
@@ -167,10 +169,10 @@ const Sidebar = () => {
       >
         {/* Enhanced Header */}
         <Box sx={{ 
-          bgcolor: '#c62828',
+          bgcolor: '#1565c0',
           px: 2,
           py: 0.5,
-          borderBottom: '1px solid rgba(198,40,40,0.3)'
+          borderBottom: '1px solid rgba(21,101,192,0.3)'
         }}>
           <Stack direction="column" alignItems="center" spacing={-2}>
             <Box
@@ -263,6 +265,26 @@ const Sidebar = () => {
                <ListItemText 
                  primary={"Outstanding"} 
                  sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/ewm-outstanding') ? 600 : 500, fontSize: '0.95rem' } }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Goods Issue - for EWM Officer - HP */}
+         {jobTitle === "EWM Officer - HP" && (
+           <MenuTooltip title={"Goods Issue"}>
+             <ListItem 
+               button 
+               component={Link} 
+               to="/ewm-goods-issue"
+               sx={getActiveStyles('/ewm-goods-issue')}
+             >
+               <ListItemIcon>
+                 <Inventory sx={{ color: '#c62828' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"Goods Issue"} 
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/ewm-goods-issue') ? 600 : 500, fontSize: '0.95rem' } }} 
                />
              </ListItem>
            </MenuTooltip>
@@ -914,9 +936,9 @@ const Sidebar = () => {
 
 
 
-         {/* Route Assignment - TM Manager only */}
+         {/* Outstanding - TM Manager only */}
          {jobTitle === "TM Manager" && (
-           <MenuTooltip title={"Route Assignment"}>
+           <MenuTooltip title={"Outstanding"}>
              <ListItem 
                button 
                component={Link} 
@@ -927,7 +949,7 @@ const Sidebar = () => {
                  <LocalShipping sx={{ color: '#e53935' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Routes"} 
+                 primary={"Outstanding"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: isActivePath('/tm-manager') ? 600 : 500,
@@ -1084,7 +1106,7 @@ const Sidebar = () => {
            </>
          )}
 
-         {/* HP Report - flat, for Manager and Coordinator */}
+         {/* Dashboard - Manager and Coordinator */}
          {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
            <MenuTooltip title={"Dashboard"}>
              <ListItem button component={Link} to="/manager-dashboard"
@@ -1096,28 +1118,68 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* HP Report - flat, for Manager and Coordinator */}
+         {/* Reports submenu - Manager and Coordinator */}
          {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
-           <MenuTooltip title={"HP Report"}>
-             <ListItem button component={Link} to="/reports/hp-comprehensive"
-               sx={getActiveStyles('/reports/hp-comprehensive')}>
-               <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
-               <ListItemText primary={"HP Report"}
-                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.95rem' } }} />
-             </ListItem>
-           </MenuTooltip>
+           <>
+             <MenuTooltip title={"Reports"}>
+               <ListItem button onClick={() => setMgmtReportsOpen(!mgmtReportsOpen)}
+                 sx={{ borderRadius: 2, mx: 1, mb: 1, bgcolor: mgmtReportsOpen ? 'rgba(21,101,192,0.12)' : 'transparent', '&:hover': { bgcolor: 'rgba(21,101,192,0.08)' } }}>
+                 <ListItemIcon><BarChart sx={{ color: '#1565c0' }} /></ListItemIcon>
+                 <ListItemText primary={"Reports"} sx={{ '& .MuiListItemText-primary': { fontWeight: mgmtReportsOpen ? 600 : 500, fontSize: '0.95rem' } }} />
+                 {mgmtReportsOpen ? <ExpandLess /> : <ExpandMore />}
+               </ListItem>
+             </MenuTooltip>
+             <Collapse in={mgmtReportsOpen} timeout="auto" unmountOnExit>
+               <List component="div" disablePadding>
+                 <MenuTooltip title={"HP Report"}>
+                   <ListItem button component={Link} to="/reports/hp-comprehensive"
+                     sx={{ pl: 4, ...getActiveStyles('/reports/hp-comprehensive') }}>
+                     <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"HP Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"RDF Report"}>
+                   <ListItem button component={Link} to="/reports/rdf"
+                     sx={{ pl: 4, ...getActiveStyles('/reports/rdf') }}>
+                     <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"RDF Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+               </List>
+             </Collapse>
+           </>
          )}
 
-         {/* RDF Report - flat, for Manager and Coordinator */}
+         {/* Profile submenu - Manager and Coordinator */}
          {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
-           <MenuTooltip title={"RDF Report"}>
-             <ListItem button component={Link} to="/reports/rdf"
-               sx={getActiveStyles('/reports/rdf')}>
-               <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
-               <ListItemText primary={"RDF Report"}
-                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.95rem' } }} />
-             </ListItem>
-           </MenuTooltip>
+           <>
+             <MenuTooltip title={"Profile"}>
+               <ListItem button onClick={() => setMgmtProfileOpen(!mgmtProfileOpen)}
+                 sx={{ borderRadius: 2, mx: 1, mb: 1, bgcolor: mgmtProfileOpen ? 'rgba(21,101,192,0.12)' : 'transparent', '&:hover': { bgcolor: 'rgba(21,101,192,0.08)' } }}>
+                 <ListItemIcon><Business sx={{ color: '#1565c0' }} /></ListItemIcon>
+                 <ListItemText primary={"Profile"} sx={{ '& .MuiListItemText-primary': { fontWeight: mgmtProfileOpen ? 600 : 500, fontSize: '0.95rem' } }} />
+                 {mgmtProfileOpen ? <ExpandLess /> : <ExpandMore />}
+               </ListItem>
+             </MenuTooltip>
+             <Collapse in={mgmtProfileOpen} timeout="auto" unmountOnExit>
+               <List component="div" disablePadding>
+                 <MenuTooltip title={"Organization Profile"}>
+                   <ListItem button component={Link} to="/reports/organization-profile"
+                     sx={{ pl: 4, ...getActiveStyles('/reports/organization-profile') }}>
+                     <ListItemIcon><Business sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"Organization Profile"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/organization-profile') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"Users"}>
+                   <ListItem button component={Link} to="/settings/user-management"
+                     sx={{ pl: 4, ...getActiveStyles('/settings/user-management') }}>
+                     <ListItemIcon><Group sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"Users"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/settings/user-management') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+               </List>
+             </Collapse>
+           </>
          )}
 
          {/* HP Report - for HP users only */}

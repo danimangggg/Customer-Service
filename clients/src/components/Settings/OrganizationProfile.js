@@ -636,8 +636,9 @@ const OrganizationProfile = () => {
             box-shadow: 0 8px 32px rgba(0,0,0,0.12);
           }
           .header-gradient {
-            background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 32px;
             border-radius: 20px 20px 0 0;
             position: relative;
@@ -854,159 +855,112 @@ const OrganizationProfile = () => {
 
             {/* Tab Content */}
             {activeTab === 0 && (
-              <Grid container spacing={4}>
-                {/* Employee Information */}
-                <Grid item xs={12} md={6}>
-                  <Zoom in timeout={1000}>
-                    <Box className="professional-section">
-                      <Typography variant="h5" className="section-title">
-                        Employee Information
-                      </Typography>
-                      
-                      {/* Total Employees - Full Width */}
-                      <Box sx={{ mb: 3 }}>
-                        <Paper className="stat-card" elevation={0} sx={{ '--card-gradient': 'linear-gradient(90deg, #4caf50 0%, #66bb6a 100%)' }}>
-                          <Typography variant="h4" fontWeight="bold" color="success.main">
-                            {employees.length}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                            Total Employees
-                          </Typography>
-                        </Paper>
+              <Box>
+                {/* ── EMPLOYEE INFORMATION ── */}
+                <Fade in timeout={600}>
+                  <Box sx={{ mb: 4 }}>
+                    {/* Section header */}
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
+                      <Avatar sx={{ bgcolor: '#e8f5e9', width: 40, height: 40 }}>
+                        <Info sx={{ color: '#2e7d32', fontSize: 22 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h6" fontWeight={700} color="#1a1a2e">Employee Information</Typography>
+                        <Typography variant="caption" color="text.secondary">Breakdown by role across the organization</Typography>
+                      </Box>
+                      <Chip label={`${employees.length} Total`} size="small" sx={{ ml: 'auto', bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 700 }} />
+                    </Stack>
+
+                    {/* Cards row */}
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      {/* Total card — highlighted */}
+                      <Box sx={{
+                        minWidth: 150, flex: '0 0 auto', borderRadius: 3, p: 2.5,
+                        background: 'linear-gradient(135deg, #2e7d32 0%, #43a047 100%)',
+                        boxShadow: '0 6px 20px rgba(46,125,50,0.3)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        transition: 'transform 0.2s', cursor: 'default',
+                        '&:hover': { transform: 'translateY(-4px)' }
+                      }}>
+                        <Typography variant="h3" fontWeight={800} color="#fff">{employees.length}</Typography>
+                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600, mt: 0.5 }}>Total Employees</Typography>
                       </Box>
 
-                      {/* Job Title Cards - Side by Side Grid */}
-                      <Grid container spacing={2}>
-                        {jobTitleStats.map(([jobTitle, count], index) => {
-                          const colors = [
-                            { color: "primary.main", gradient: "linear-gradient(90deg, #2196f3 0%, #21cbf3 100%)" },
-                            { color: "secondary.main", gradient: "linear-gradient(90deg, #9c27b0 0%, #e91e63 100%)" },
-                            { color: "error.main", gradient: "linear-gradient(90deg, #f44336 0%, #ff5722 100%)" },
-                            { color: "warning.main", gradient: "linear-gradient(90deg, #ff9800 0%, #ffc107 100%)" },
-                            { color: "info.main", gradient: "linear-gradient(90deg, #00bcd4 0%, #009688 100%)" },
-                            { color: "success.main", gradient: "linear-gradient(90deg, #4caf50 0%, #8bc34a 100%)" }
-                          ];
-                          const colorConfig = colors[index % colors.length];
-                          
-                          return (
-                            <Grid item xs={6} key={jobTitle}>
-                              <Paper 
-                                className="stat-card" 
-                                elevation={0}
-                                sx={{ 
-                                  '--card-gradient': colorConfig.gradient,
-                                  height: '100px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  justifyContent: 'center'
-                                }}
-                              >
-                                <Typography variant="h5" fontWeight="bold" color={colorConfig.color}>
-                                  {count}
-                                </Typography>
-                                <Typography 
-                                  variant="body2" 
-                                  color="text.secondary" 
-                                  sx={{ 
-                                    fontSize: '0.8rem',
-                                    fontWeight: 500,
-                                    lineHeight: 1.2,
-                                    mt: 0.5
-                                  }}
-                                >
-                                  {jobTitle}
-                                </Typography>
-                              </Paper>
-                            </Grid>
-                          );
-                        })}
-                      </Grid>
+                      {jobTitleStats.map(([jobTitle, count], index) => {
+                        const palettes = [
+                          { bg: '#e3f2fd', accent: '#1565c0', text: '#1565c0' },
+                          { bg: '#fce4ec', accent: '#c62828', text: '#c62828' },
+                          { bg: '#fff3e0', accent: '#e65100', text: '#e65100' },
+                          { bg: '#f3e5f5', accent: '#6a1b9a', text: '#6a1b9a' },
+                          { bg: '#e0f7fa', accent: '#00695c', text: '#00695c' },
+                          { bg: '#fff8e1', accent: '#f57f17', text: '#f57f17' },
+                          { bg: '#fbe9e7', accent: '#bf360c', text: '#bf360c' },
+                          { bg: '#e8eaf6', accent: '#283593', text: '#283593' },
+                        ];
+                        const p = palettes[index % palettes.length];
+                        return (
+                          <Box key={jobTitle} sx={{
+                            minWidth: 140, flex: '0 0 auto', borderRadius: 3, p: 2,
+                            bgcolor: p.bg, border: `1.5px solid ${p.accent}22`,
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                            transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'default',
+                            '&:hover': { transform: 'translateY(-4px)', boxShadow: `0 8px 24px ${p.accent}33` }
+                          }}>
+                            <Typography variant="h4" fontWeight={800} sx={{ color: p.text }}>{count}</Typography>
+                            <Typography variant="caption" sx={{ color: p.text, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, mt: 0.5, opacity: 0.85 }}>
+                              {jobTitle}
+                            </Typography>
+                          </Box>
+                        );
+                      })}
                     </Box>
-                  </Zoom>
-                </Grid>
+                  </Box>
+                </Fade>
 
-                {/* Customer Information */}
-                <Grid item xs={12} md={6}>
-                  <Zoom in timeout={1200}>
-                    <Box className="professional-section">
-                      <Typography variant="h5" className="section-title">
-                        Customer Information
-                      </Typography>
-                      
-                      {/* Customer Cards - Side by Side Grid */}
-                      <Grid container spacing={2}>
-                        <Grid item xs={6}>
-                          <Paper className="stat-card" elevation={0} sx={{ 
-                            '--card-gradient': 'linear-gradient(90deg, #f44336 0%, #e91e63 100%)',
-                            height: '120px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center'
-                          }}>
-                            <Typography variant="h4" fontWeight="bold" color="error.main">
-                              {regions.length}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                              Regions
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                        
-                        <Grid item xs={6}>
-                          <Paper className="stat-card" elevation={0} sx={{ 
-                            '--card-gradient': 'linear-gradient(90deg, #ff9800 0%, #ffc107 100%)',
-                            height: '120px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center'
-                          }}>
-                            <Typography variant="h4" fontWeight="bold" color="warning.main">
-                              {zones.length}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                              Zones
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                        
-                        <Grid item xs={6}>
-                          <Paper className="stat-card" elevation={0} sx={{ 
-                            '--card-gradient': 'linear-gradient(90deg, #9c27b0 0%, #673ab7 100%)',
-                            height: '120px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center'
-                          }}>
-                            <Typography variant="h4" fontWeight="bold" color="secondary.main">
-                              {woredas.length}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                              Woredas
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                        
-                        <Grid item xs={6}>
-                          <Paper className="stat-card" elevation={0} sx={{ 
-                            '--card-gradient': 'linear-gradient(90deg, #00bcd4 0%, #2196f3 100%)',
-                            height: '120px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center'
-                          }}>
-                            <Typography variant="h4" fontWeight="bold" color="info.main">
-                              {facilities.length}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                              Facilities
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
+                <Divider sx={{ my: 3, borderColor: 'rgba(0,0,0,0.06)' }} />
+
+                {/* ── CUSTOMER INFORMATION ── */}
+                <Fade in timeout={800}>
+                  <Box>
+                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2.5 }}>
+                      <Avatar sx={{ bgcolor: '#e3f2fd', width: 40, height: 40 }}>
+                        <LocationOn sx={{ color: '#1565c0', fontSize: 22 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h6" fontWeight={700} color="#1a1a2e">Customer Information</Typography>
+                        <Typography variant="caption" color="text.secondary">Administrative coverage and facility network</Typography>
+                      </Box>
+                    </Stack>
+
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'Regions',    value: regions.length,    bg: '#fce4ec', accent: '#c62828',  icon: <Public sx={{ fontSize: 28, color: '#c62828' }} /> },
+                        { label: 'Zones',      value: zones.length,      bg: '#fff3e0', accent: '#e65100',  icon: <Map sx={{ fontSize: 28, color: '#e65100' }} /> },
+                        { label: 'Woredas',    value: woredas.length,    bg: '#f3e5f5', accent: '#6a1b9a',  icon: <LocationCity sx={{ fontSize: 28, color: '#6a1b9a' }} /> },
+                        { label: 'Facilities', value: facilities.length, bg: '#e0f7fa', accent: '#00695c',  icon: <Domain sx={{ fontSize: 28, color: '#00695c' }} /> },
+                      ].map(({ label, value, bg, accent, icon }) => (
+                        <Box key={label} sx={{
+                          minWidth: 160, flex: '1 1 160px', maxWidth: 220, borderRadius: 3, p: 2.5,
+                          bgcolor: bg, border: `1.5px solid ${accent}22`,
+                          display: 'flex', alignItems: 'center', gap: 2,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                          transition: 'transform 0.2s, box-shadow 0.2s', cursor: 'default',
+                          '&:hover': { transform: 'translateY(-4px)', boxShadow: `0 8px 24px ${accent}33` }
+                        }}>
+                          <Avatar sx={{ bgcolor: '#fff', width: 48, height: 48, boxShadow: `0 2px 8px ${accent}33` }}>
+                            {icon}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="h4" fontWeight={800} sx={{ color: accent, lineHeight: 1 }}>{value}</Typography>
+                            <Typography variant="body2" sx={{ color: accent, fontWeight: 600, opacity: 0.8, mt: 0.3 }}>{label}</Typography>
+                          </Box>
+                        </Box>
+                      ))}
                     </Box>
-                  </Zoom>
-                </Grid>
-              </Grid>
+                  </Box>
+                </Fade>
+              </Box>
             )}
 
             {/* Regions Tab */}

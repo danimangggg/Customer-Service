@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../utils/toast';
 import withReactContent from 'sweetalert2-react-content';
 import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
@@ -192,7 +193,7 @@ const DispatchManagement = () => {
         // Don't fail the completion if service time recording fails
       }
       
-      MySwal.fire('Success!', 'Route completed successfully.', 'success');
+      successToast('Route completed successfully.');
       fetchAssignedRoutes();
       fetchStats();
       
@@ -248,8 +249,9 @@ const DispatchManagement = () => {
             border-radius: 16px;
           }
           .header-gradient {
-            background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 24px;
             border-radius: 16px 16px 0 0;
           }

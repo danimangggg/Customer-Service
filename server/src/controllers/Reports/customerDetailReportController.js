@@ -12,7 +12,9 @@ const getCustomersDetailReport = async (req, res) => {
       search = '',
       sortBy = 'started_at',
       sortOrder = 'DESC',
-      statusFilter = ''
+      statusFilter = '',
+      dateFrom = '',
+      dateTo = ''
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -38,15 +40,35 @@ const getCustomersDetailReport = async (req, res) => {
     if (statusFilter) {
       if (statusFilter === 'completed') {
         statusFilterCondition = `AND cq.status = 'completed'`;
-      } else if (statusFilter === 'registration') {
-        statusFilterCondition = `AND cq.next_service_point = 'registration'`;
+      } else if (statusFilter === 'Canceled') {
+        statusFilterCondition = `AND cq.status = 'Canceled' AND (cq.next_service_point IS NULL OR cq.next_service_point != 'Auto-Canceled')`;
+      } else if (statusFilter === 'Auto-Canceled') {
+        statusFilterCondition = `AND cq.status = 'Canceled' AND cq.next_service_point = 'Auto-Canceled'`;
       } else if (statusFilter === 'o2c') {
-        statusFilterCondition = `AND cq.next_service_point = 'o2c'`;
+        statusFilterCondition = `AND (cq.next_service_point = 'o2c' OR cq.status IN ('o2c_started','o2c_completed','notifying'))`;
       } else if (statusFilter === 'ewm') {
-        statusFilterCondition = `AND cq.next_service_point = 'ewm'`;
+        statusFilterCondition = `AND (cq.next_service_point IN ('ewm','EWM') OR cq.status = 'ewm_completed')`;
       } else if (statusFilter === 'dispatch') {
-        statusFilterCondition = `AND cq.next_service_point = 'dispatch'`;
+        statusFilterCondition = `AND (cq.next_service_point = 'dispatch' OR cq.status = 'dispatch_completed')`;
+      } else if (statusFilter === 'finance') {
+        statusFilterCondition = `AND cq.next_service_point = 'finance'`;
+      } else if (statusFilter === 'Exit-Permit') {
+        statusFilterCondition = `AND cq.next_service_point = 'Exit-Permit'`;
+      } else if (statusFilter === 'archived') {
+        statusFilterCondition = `AND cq.status = 'archived'`;
+      } else if (statusFilter === 'started') {
+        statusFilterCondition = `AND cq.status = 'started'`;
       }
+    }
+
+    // Build date range filter condition
+    let periodCondition = '';
+    if (dateFrom && dateTo) {
+      periodCondition = `AND DATE(cq.started_at) BETWEEN '${dateFrom}' AND '${dateTo}'`;
+    } else if (dateFrom) {
+      periodCondition = `AND DATE(cq.started_at) >= '${dateFrom}'`;
+    } else if (dateTo) {
+      periodCondition = `AND DATE(cq.started_at) <= '${dateTo}'`;
     }
 
     // Validate sort column
@@ -64,6 +86,7 @@ const getCustomersDetailReport = async (req, res) => {
       WHERE 1=1
       ${searchCondition}
       ${statusFilterCondition}
+      ${periodCondition}
     `;
 
     const totalResult = await db.sequelize.query(countQuery, {
@@ -102,6 +125,7 @@ const getCustomersDetailReport = async (req, res) => {
       WHERE 1=1
       ${searchCondition}
       ${statusFilterCondition}
+      ${periodCondition}
       ORDER BY ${validSortBy === 'facility_name' ? 'COALESCE(f.facility_name, cq.delegate)' : validSortBy === 'started_at' ? 'cq.started_at' : 'cq.' + validSortBy} ${validSortOrder}
       LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;

@@ -17,6 +17,7 @@ const uploadPicklist = async (req, res) => {
         store: req.body.store,
         status: req.body.status || 'pending',
         operator_id: req.body.operator_id,
+        created_at: new Date(),
       });
       
       if(result){

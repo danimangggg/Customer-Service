@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../../utils/toast';
 
 const Biller = () => {
   const [processes, setProcesses] = useState([]);
@@ -143,7 +144,7 @@ const Biller = () => {
           console.error('Failed to record Biller service time:', err);
         }
 
-        Swal.fire('Success!', 'Billing completed successfully', 'success');
+        successToast('Billing completed successfully');
         fetchProcesses();
       } catch (err) {
         console.error('Complete billing error:', err);

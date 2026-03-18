@@ -242,7 +242,7 @@ const deletePdf = async (req, res) => {
 
     // Update using raw SQL
     const [updateResult] = await db.sequelize.query(
-      'UPDATE picklist SET status = ? WHERE id = ?',
+      'UPDATE picklist SET status = ?, completed_at = NOW() WHERE id = ?',
       {
         replacements: ['completed', picklistId],
         type: db.sequelize.QueryTypes.UPDATE

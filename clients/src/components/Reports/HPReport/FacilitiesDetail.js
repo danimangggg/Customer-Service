@@ -15,6 +15,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import QualityIcon from '@mui/icons-material/HighQuality';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 const ServiceUnitsDetail = ({ data }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -26,50 +27,73 @@ const ServiceUnitsDetail = ({ data }) => {
 
   const { summary, workflowProgress } = data;
 
-  // Service units data
+  const wp = workflowProgress || {};
+
+  // Service units data — ordered by workflow stage, counts are cumulative (each >= next)
   const serviceUnits = [
+    {
+      name: 'Expected This Month',
+      icon: <TrendingUpIcon />,
+      count: summary?.expectedThisMonth ?? summary?.expectedFacilities ?? 0,
+      color: 'primary',
+      description: 'Facilities expected to be processed this month'
+    },
     {
       name: 'O2C (Order to Cash)',
       icon: <AccountBalanceIcon />,
-      count: workflowProgress?.o2c_stage || 0,
-      color: 'primary',
+      count: wp.o2c_stage || 0,
+      color: 'secondary',
       description: 'Initial order processing and cash management'
     },
     {
-      name: 'EWM (Extended Warehouse Management)',
+      name: 'EWM Phase 1',
       icon: <BusinessIcon />,
-      count: workflowProgress?.ewm_stage || 0,
-      color: 'secondary',
-      description: 'Warehouse management and inventory control'
+      count: wp.ewm_phase1_facilities || 0,
+      color: 'info',
+      description: 'EWM goods issued'
     },
     {
-      name: 'PI (Physical Inventory)',
+      name: 'EWM Phase 2 / Biller',
       icon: <InventoryIcon />,
-      count: workflowProgress?.pi_stage || 0,
-      color: 'success',
-      description: 'Physical inventory verification and counting'
+      count: wp.biller_facilities || 0,
+      color: 'warning',
+      description: 'Biller received — ready for TM'
     },
     {
-      name: 'TM Management',
+      name: 'TM Phase 1',
       icon: <LocalShippingIcon />,
-      count: workflowProgress?.tm_stage || 0,
-      color: 'warning',
-      description: 'Transportation and logistics management'
+      count: wp.tm_phase1_facilities || 0,
+      color: 'success',
+      description: 'TM confirmed — vehicle assigned'
+    },
+    {
+      name: 'TM Phase 2',
+      icon: <LocalShippingIcon />,
+      count: wp.tm_phase2_facilities || 0,
+      color: 'success',
+      description: 'Driver & deliverer assigned'
+    },
+    {
+      name: 'Dispatch',
+      icon: <AssignmentIcon />,
+      count: wp.dispatch_odns || 0,
+      color: 'error',
+      description: 'ODNs dispatched to facilities'
     },
     {
       name: 'Documentation',
       icon: <DescriptionIcon />,
-      count: workflowProgress?.documentation_stage || 0,
+      count: wp.documentation_stage || 0,
       color: 'info',
-      description: 'Document processing and POD confirmation'
+      description: 'POD confirmed'
     },
     {
       name: 'Quality Evaluation',
       icon: <QualityIcon />,
-      count: workflowProgress?.quality_stage || 0,
+      count: wp.quality_stage || 0,
       color: 'error',
-      description: 'Quality assessment and evaluation'
-    }
+      description: 'Quality assessment completed'
+    },
   ];
 
   const handleTabChange = (event, newValue) => {
@@ -83,13 +107,14 @@ const ServiceUnitsDetail = ({ data }) => {
 
   // Workflow Progress Data for Bar Chart
   const workflowData = [
-    { stage: 'O2C', count: workflowProgress?.o2c_stage || 0, color: '#2196f3' },
-    { stage: 'EWM', count: workflowProgress?.ewm_stage || 0, color: '#4caf50' },
-    { stage: 'PI', count: workflowProgress?.pi_stage || 0, color: '#ff9800' },
-    { stage: 'TM Management', count: workflowProgress?.tm_stage || 0, color: '#9c27b0' },
-    { stage: 'Dispatched', count: workflowProgress?.dispatched_stage || 0, color: '#795548' },
-    { stage: 'Documentation', count: workflowProgress?.documentation_stage || 0, color: '#f44336' },
-    { stage: 'Quality', count: workflowProgress?.quality_stage || 0, color: '#607d8b' }
+    { stage: 'O2C', count: wp.o2c_stage || 0, color: '#2196f3' },
+    { stage: 'EWM Ph1', count: wp.ewm_phase1_facilities || 0, color: '#4caf50' },
+    { stage: 'EWM Ph2/Biller', count: wp.biller_facilities || 0, color: '#ff9800' },
+    { stage: 'TM Ph1', count: wp.tm_phase1_facilities || 0, color: '#9c27b0' },
+    { stage: 'TM Ph2', count: wp.tm_phase2_facilities || 0, color: '#673ab7' },
+    { stage: 'Dispatch', count: wp.dispatch_odns || 0, color: '#795548' },
+    { stage: 'Documentation', count: wp.documentation_stage || 0, color: '#f44336' },
+    { stage: 'Quality', count: wp.quality_stage || 0, color: '#607d8b' }
   ];
 
   // Custom label component for bar charts

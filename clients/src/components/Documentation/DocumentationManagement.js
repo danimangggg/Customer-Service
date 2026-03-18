@@ -438,8 +438,9 @@ const DocumentationManagement = () => {
             border-radius: 16px;
           }
           .header-gradient {
-            background: linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 24px;
             border-radius: 16px 16px 0 0;
           }

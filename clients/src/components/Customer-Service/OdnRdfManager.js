@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../utils/toast';
 import {
   Dialog,
   DialogTitle,
@@ -128,7 +129,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
         setNewOdn('');
         // Keep the selected store for convenience
         fetchOdns();
-        Swal.fire('Success', 'ODN added successfully', 'success');
+        successToast('ODN added successfully');
       }
     } catch (error) {
       console.error('Error adding ODN:', error);
@@ -160,7 +161,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
         setEditOdn('');
         setEditStore('');
         fetchOdns();
-        Swal.fire('Success', 'ODN updated successfully', 'success');
+        successToast('ODN updated successfully');
       }
     } catch (error) {
       console.error('Error updating ODN:', error);

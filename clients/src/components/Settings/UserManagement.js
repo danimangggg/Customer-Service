@@ -66,7 +66,7 @@ const MySwal = withReactContent(Swal);
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
-const UserManagement = () => {
+const UserManagement = ({ viewOnly = false }) => {
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,7 +85,7 @@ const UserManagement = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterJobTitle, setFilterJobTitle] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -118,7 +118,7 @@ const UserManagement = () => {
     }, 300); // 300ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [page, rowsPerPage, searchTerm, filterStatus]);
+  }, [page, rowsPerPage, searchTerm, filterJobTitle]);
 
   const fetchStores = async () => {
     try {
@@ -138,7 +138,7 @@ const UserManagement = () => {
           page: page + 1,
           limit: rowsPerPage,
           search: searchTerm,
-          account_status: filterStatus
+          jobTitle: filterJobTitle
         }
       });
       console.log('API Response:', response.data); // Debug log
@@ -444,12 +444,13 @@ const UserManagement = () => {
             box-shadow: 0 8px 32px rgba(0,0,0,0.12);
           }
           .header-gradient {
-            background: linear-gradient(135deg, #673ab7 0%, #9c27b0 100%);
-            color: white;
-            padding: 32px;
+            background: #f5f5f5;
+            color: #333;
+            padding: 12px 32px;
             border-radius: 16px 16px 0 0;
             position: relative;
             overflow: hidden;
+            border-bottom: 1px solid #e0e0e0;
           }
           .header-gradient::before {
             content: '';
@@ -526,139 +527,44 @@ const UserManagement = () => {
           <Box className="header-gradient">
             <Box sx={{ position: 'relative', zIndex: 1 }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Stack direction="row" alignItems="center" spacing={3}>
-                  <Avatar sx={{ 
-                    bgcolor: 'rgba(255,255,255,0.2)', 
-                    width: 64, 
-                    height: 64,
-                    backdropFilter: 'blur(10px)',
-                    border: '2px solid rgba(255,255,255,0.3)'
-                  }}>
-                    <GroupIcon fontSize="large" />
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Avatar sx={{ bgcolor: '#e0e0e0', width: 40, height: 40 }}>
+                    <GroupIcon sx={{ color: '#555' }} />
                   </Avatar>
                   <Box>
-                    <Typography variant="h3" fontWeight="bold" sx={{ 
-                      textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                      mb: 1
-                    }}>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color: '#333' }}>
                       User Management
                     </Typography>
-                    <Typography variant="h6" sx={{ 
-                      opacity: 0.9, 
-                      fontWeight: 300,
-                      textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                    }}>
+                    <Typography variant="body2" sx={{ color: '#666' }}>
                       Manage system users, roles, and permissions
                     </Typography>
                   </Box>
                 </Stack>
                 
+                {!viewOnly && (
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={() => handleOpenDialog()}
                   sx={{
-                    bgcolor: 'rgba(255,255,255,0.2)',
+                    bgcolor: '#d32f2f',
                     color: 'white',
-                    px: 4,
-                    py: 1.5,
-                    borderRadius: 3,
+                    px: 3,
+                    py: 1,
+                    borderRadius: 2,
                     fontWeight: 'bold',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.3)',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(0,0,0,0.2)'
-                    }
+                    '&:hover': { bgcolor: '#b71c1c' }
                   }}
                 >
                   Add User
                 </Button>
+                )}
               </Stack>
             </Box>
           </Box>
 
           {/* Stats Cards */}
           <Box sx={{ p: 4, pb: 2 }}>
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card className="stats-card" sx={{ 
-                  background: 'linear-gradient(135deg, #2196f3 0%, #42a5f5 100%)',
-                  color: 'white'
-                }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <GroupIcon sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {stats.totalUsers || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Total Users
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} sm={6} md={3}>
-                <Card className="stats-card" sx={{ 
-                  background: 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)',
-                  color: 'white'
-                }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <ActiveIcon sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {stats.activeUsers || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Active
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} sm={6} md={3}>
-                <Card className="stats-card" sx={{ 
-                  background: 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
-                  color: 'white'
-                }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <InactiveIcon sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {stats.inactiveUsers || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Inactive
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} sm={6} md={3}>
-                <Card className="stats-card" sx={{ 
-                  background: 'linear-gradient(135deg, #f44336 0%, #ef5350 100%)',
-                  color: 'white'
-                }}>
-                  <Stack direction="row" alignItems="center" spacing={2}>
-                    <SuspendedIcon sx={{ fontSize: 40 }} />
-                    <Box>
-                      <Typography variant="h4" fontWeight="bold">
-                        {stats.suspendedUsers || 0}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        Suspended
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Card>
-              </Grid>
-            </Grid>
-
             {/* Filters */}
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} md={4}>
@@ -689,15 +595,15 @@ const UserManagement = () => {
               </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
+                  <InputLabel>Job Title</InputLabel>
                   <Select
-                    value={filterStatus}
-                    label="Status"
-                    onChange={(e) => setFilterStatus(e.target.value)}
+                    value={filterJobTitle}
+                    label="Job Title"
+                    onChange={(e) => setFilterJobTitle(e.target.value)}
                   >
-                    <MenuItem value="">All Status</MenuItem>
-                    {statusOptions.map((status) => (
-                      <MenuItem key={status} value={status}>{status}</MenuItem>
+                    <MenuItem value="">All Job Titles</MenuItem>
+                    {jobTitles.map((title) => (
+                      <MenuItem key={title} value={title}>{title}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -722,7 +628,7 @@ const UserManagement = () => {
                     <TableCell>Username</TableCell>
                     <TableCell>Job Title</TableCell>
                     <TableCell>Status</TableCell>
-                    <TableCell align="center">Actions</TableCell>
+                    {!viewOnly && <TableCell align="center">Actions</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -755,6 +661,7 @@ const UserManagement = () => {
                           size="small"
                         />
                       </TableCell>
+                      {!viewOnly && (
                       <TableCell align="center">
                         <IconButton
                           color="primary"
@@ -777,6 +684,7 @@ const UserManagement = () => {
                           <DeleteIcon />
                         </IconButton>
                       </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>

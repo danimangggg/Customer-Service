@@ -22,7 +22,6 @@ import {
   Assignment,
   LocalHospital,
   Send,
-  LocalShipping,
   CheckCircle,
   Star,
   TrendingUp,
@@ -36,6 +35,7 @@ const HPDashboard = () => {
   const [error, setError] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState('');
   const [selectedYear, setSelectedYear] = useState('');
+  const [processType, setProcessType] = useState('regular');
 
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -124,7 +124,7 @@ const HPDashboard = () => {
     fetchDashboardData(currentEthDate.month, currentEthDate.year.toString());
   }, []);
 
-  const fetchDashboardData = async (month = selectedMonth, year = selectedYear) => {
+  const fetchDashboardData = async (month = selectedMonth, year = selectedYear, type = processType) => {
     try {
       setLoading(true);
       const params = {};
@@ -132,6 +132,7 @@ const HPDashboard = () => {
         params.month = month;
         params.year = year;
       }
+      if (type) params.process_type = type;
       
       const response = await axios.get(`${api_url}/api/hp-dashboard-data`, { params });
       setDashboardData(response.data);
@@ -147,19 +148,25 @@ const HPDashboard = () => {
   const handleMonthChange = (event) => {
     const month = event.target.value;
     setSelectedMonth(month);
-    fetchDashboardData(month, selectedYear);
+    fetchDashboardData(month, selectedYear, processType);
   };
 
   const handleYearChange = (event) => {
     const year = event.target.value;
     setSelectedYear(year);
-    fetchDashboardData(selectedMonth, year);
+    fetchDashboardData(selectedMonth, year, processType);
+  };
+
+  const handleTypeChange = (event) => {
+    const type = event.target.value;
+    setProcessType(type);
+    fetchDashboardData(selectedMonth, selectedYear, type);
   };
 
   const handleClearFilter = () => {
     setSelectedMonth('');
     setSelectedYear('');
-    fetchDashboardData('', '');
+    fetchDashboardData('', '', processType);
   };
 
   const MetricCard = ({ title, value, icon, color, subtitle, progress, isMonthDependent = false }) => (
@@ -304,13 +311,16 @@ const HPDashboard = () => {
           {/* Filter Controls */}
           <Stack direction="row" spacing={2} alignItems="center">
             <FilterList sx={{ color: 'primary.main' }} />
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>Type</InputLabel>
+              <Select value={processType} label="Type" onChange={handleTypeChange}>
+                <MenuItem value="regular">HP Regular</MenuItem>
+                <MenuItem value="vaccine">Vaccine</MenuItem>
+              </Select>
+            </FormControl>
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <InputLabel>Month</InputLabel>
-              <Select
-                value={selectedMonth}
-                label="Month"
-                onChange={handleMonthChange}
-              >
+              <Select value={selectedMonth} label="Month" onChange={handleMonthChange}>
                 <MenuItem value="">All Time</MenuItem>
                 {ethiopianMonths.map((month) => (
                   <MenuItem key={month} value={month}>{month}</MenuItem>
@@ -319,11 +329,7 @@ const HPDashboard = () => {
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 100 }}>
               <InputLabel>Year</InputLabel>
-              <Select
-                value={selectedYear}
-                label="Year"
-                onChange={handleYearChange}
-              >
+              <Select value={selectedYear} label="Year" onChange={handleYearChange}>
                 <MenuItem value="">All</MenuItem>
                 {ethiopianYears.map((year) => (
                   <MenuItem key={year} value={year}>{year}</MenuItem>
@@ -331,8 +337,8 @@ const HPDashboard = () => {
               </Select>
             </FormControl>
             {(selectedMonth || selectedYear) && (
-              <Chip 
-                label="Clear Filter" 
+              <Chip
+                label="Clear Filter"
                 onClick={handleClearFilter}
                 onDelete={handleClearFilter}
                 color="secondary"
@@ -346,7 +352,7 @@ const HPDashboard = () => {
 
       {/* Main Metrics Grid */}
       <Grid container spacing={3} mb={4}>
-        {/* Total Facilities - First and NOT month dependent */}
+        {/* Total Facilities - NOT month dependent */}
         <Grid item xs={12} sm={6} md={4}>
           <MetricCard
             title="HP Facilities"
@@ -358,7 +364,19 @@ const HPDashboard = () => {
           />
         </Grid>
 
-        {/* RRF Sent - Second position */}
+        {/* Expected This Month */}
+        <Grid item xs={12} sm={6} md={4}>
+          <MetricCard
+            title="Expected This Month"
+            value={data.expectedThisMonth ?? data.totalFacilities ?? 0}
+            icon={<TrendingUp />}
+            color="info"
+            subtitle="Facilities due this month (by period)"
+            isMonthDependent={true}
+          />
+        </Grid>
+
+        {/* RRF Sent */}
         <Grid item xs={12} sm={6} md={4}>
           <MetricCard
             title="RRF Sent"
@@ -385,18 +403,6 @@ const HPDashboard = () => {
 
         <Grid item xs={12} sm={6} md={4}>
           <MetricCard
-            title="Dispatched ODNs"
-            value={data.dispatchedODNs || 0}
-            icon={<LocalShipping />}
-            color="warning"
-            subtitle="ODNs ready for delivery"
-            progress={data.totalODNs > 0 ? (data.dispatchedODNs / data.totalODNs) * 100 : 0}
-            isMonthDependent={true}
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={4}>
-          <MetricCard
             title="POD Confirmed"
             value={data.podConfirmed || 0}
             icon={<CheckCircle />}
@@ -409,7 +415,7 @@ const HPDashboard = () => {
 
         <Grid item xs={12} sm={6} md={4}>
           <MetricCard
-            title="Quality Evaluated"
+            title="Completed"
             value={data.qualityEvaluated || 0}
             icon={<Star />}
             color="error"
@@ -444,7 +450,7 @@ const HPDashboard = () => {
                   Expected Facilities
                 </Typography>
                 <Typography variant="h3" fontWeight="bold" color="success.main">
-                  {expectedVsDone.expected || 0}
+                  {data.expectedThisMonth ?? expectedVsDone.expected ?? 0}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Total HP facilities to process
@@ -478,8 +484,8 @@ const HPDashboard = () => {
               Achievement Rate {selectedMonth && selectedYear ? `(${selectedMonth} ${selectedYear})` : '(All Time)'}
             </Typography>
             <Chip 
-              label={`${expectedVsDone.expected > 0 ? ((expectedVsDone.done / expectedVsDone.expected) * 100).toFixed(1) : 0}%`}
-              color={expectedVsDone.done >= expectedVsDone.expected ? 'success' : 'warning'}
+              label={`${(data.expectedThisMonth ?? expectedVsDone.expected) > 0 ? ((expectedVsDone.done / (data.expectedThisMonth ?? expectedVsDone.expected)) * 100).toFixed(1) : 0}%`}
+              color={expectedVsDone.done >= (data.expectedThisMonth ?? expectedVsDone.expected) ? 'success' : 'warning'}
               size="large"
               sx={{ fontWeight: 'bold', fontSize: '1rem' }}
             />
@@ -487,7 +493,7 @@ const HPDashboard = () => {
           <Box mt={2}>
             <LinearProgress 
               variant="determinate" 
-              value={expectedVsDone.expected > 0 ? Math.min((expectedVsDone.done / expectedVsDone.expected) * 100, 100) : 0}
+              value={Math.min((data.expectedThisMonth ?? expectedVsDone.expected) > 0 ? (expectedVsDone.done / (data.expectedThisMonth ?? expectedVsDone.expected)) * 100 : 0, 100)}
               sx={{ 
                 height: 12, 
                 borderRadius: 6,

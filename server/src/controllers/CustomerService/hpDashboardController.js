@@ -6,33 +6,31 @@ const { Op } = require('sequelize');
 
 const getHPDashboardData = async (req, res) => {
   try {
-    const { month, year } = req.query;
+    const { month, year, process_type } = req.query;
     const reportingMonth = month && year ? `${month} ${year}` : null;
 
     // Get total HP facilities (only facilities that have routes) - NOT month dependent
-    const totalFacilities = await Facility.count({
-      where: {
-        route: { [Op.ne]: null },
-        route: { [Op.ne]: '' }
-      }
-    });
+    const totalFacilities = process_type === 'vaccine'
+      ? await Facility.count({ where: { is_vaccine_site: true } })
+      : await Facility.count({
+          where: { route: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] } }
+        });
 
-    // For month-dependent metrics, filter by reporting month
+    // For month-dependent metrics, filter by reporting month and process_type
+    const processWhere = {};
+    if (reportingMonth) processWhere.reporting_month = reportingMonth;
+    if (process_type) processWhere.process_type = process_type;
+
     const odnWhere = {
-      odn_number: { [Op.ne]: 'RRF not sent' } // Exclude "RRF not sent" from ODN count
+      odn_number: { [Op.ne]: 'RRF not sent' }
     };
-    if (reportingMonth) {
-      // Find processes for the specific month/year and get their ODNs
+    if (reportingMonth || process_type) {
       const processes = await Process.findAll({
-        where: { reporting_month: reportingMonth },
+        where: Object.keys(processWhere).length > 0 ? processWhere : {},
         attributes: ['id']
       });
       const processIds = processes.map(p => p.id);
-      if (processIds.length > 0) {
-        odnWhere.process_id = { [Op.in]: processIds };
-      } else {
-        odnWhere.process_id = -1; // No processes found, return 0 ODNs
-      }
+      odnWhere.process_id = processIds.length > 0 ? { [Op.in]: processIds } : -1;
     }
 
     // Get total ODNs (month dependent if filter applied, excluding "RRF not sent")
@@ -49,14 +47,22 @@ const getHPDashboardData = async (req, res) => {
     
     const rrfQueryParams = [];
     if (reportingMonth) {
-      rrfSentQuery += ` AND p.reporting_month = ?
+      rrfSentQuery += ` AND p.reporting_month = ?`;
+      rrfQueryParams.push(reportingMonth);
+    }
+    if (process_type) {
+      rrfSentQuery += ` AND p.process_type = ?`;
+      rrfQueryParams.push(process_type);
+    }
+    if (reportingMonth) {
+      rrfSentQuery += `
         AND p.facility_id NOT IN (
           SELECT DISTINCT p2.facility_id 
           FROM processes p2 
           INNER JOIN odns o ON p2.id = o.process_id 
           WHERE o.odn_number = 'RRF not sent' AND p2.reporting_month = ?
         )`;
-      rrfQueryParams.push(reportingMonth, reportingMonth);
+      rrfQueryParams.push(reportingMonth);
     } else {
       rrfSentQuery += `
         AND p.facility_id NOT IN (
@@ -99,9 +105,30 @@ const getHPDashboardData = async (req, res) => {
       }
     });
 
+    // Expected This Month: depends on process type
+    // - vaccine: count facilities with is_vaccine_site = true
+    // - regular: count by period (Monthly always, Odd/Even alternating)
+    const ethiopianMonths = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
+    let expectedThisMonth = totalFacilities;
+    if (process_type === 'vaccine') {
+      expectedThisMonth = await Facility.count({
+        where: { is_vaccine_site: true }
+      });
+    } else if (month) {
+      const monthIndex = ethiopianMonths.indexOf(month) + 1; // 1-based
+      const isOddMonth = monthIndex % 2 !== 0;
+      const periodFilter = isOddMonth
+        ? { [Op.in]: ['Monthly', 'Odd'] }
+        : { [Op.in]: ['Monthly', 'Even'] };
+      expectedThisMonth = await Facility.count({
+        where: {
+          route: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] },
+          period: periodFilter
+        }
+      });
+    }
+
     // Expected vs Done calculation
-    // Expected: All HP facilities should process
-    // Done: HP facilities that have completed processes (filtered by month if specified)
     const expected = totalFacilities;
     
     // Count HP facilities with completed processes (quality evaluated means process is finished)
@@ -121,6 +148,10 @@ const getHPDashboardData = async (req, res) => {
       completedFacilitiesQuery += ' AND p.reporting_month = ?';
       queryParams.push(reportingMonth);
     }
+    if (process_type) {
+      completedFacilitiesQuery += ' AND p.process_type = ?';
+      queryParams.push(process_type);
+    }
 
     const [completedResult] = await db.sequelize.query(completedFacilitiesQuery, {
       replacements: queryParams,
@@ -131,6 +162,7 @@ const getHPDashboardData = async (req, res) => {
     const dashboardData = {
       totalODNs,
       totalFacilities,
+      expectedThisMonth,
       rrfSent,
       dispatchedODNs,
       podConfirmed,

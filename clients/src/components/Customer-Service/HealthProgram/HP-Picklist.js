@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../../utils/toast';
 import {
   Box,
   Paper,
@@ -252,7 +253,7 @@ const HPPickListDetail = () => {
 
     try {
       await axios.delete(`${api_url}/api/deletePicklist/${id}`, { data: { fileUrl } });
-      Swal.fire({ icon: 'success', title: 'Deleted', text: 'Picklist deleted.' });
+      successToast('Deleted');
       setSubmittedPicklists(prev => prev.filter(p => p.id !== id));
     } catch (err) {
       console.error('delete error', err);
@@ -275,11 +276,7 @@ const HPPickListDetail = () => {
     try {
       const response = await axios.put(`${api_url}/api/completePicklist/${id}`);
       
-      Swal.fire({ 
-        icon: 'success', 
-        title: 'Completed', 
-        text: 'Picklist marked as completed.' 
-      });
+      successToast('Completed');
       
       // Remove from list since we filter out completed picklists
       setSubmittedPicklists(prev => prev.filter(p => p.id !== id));

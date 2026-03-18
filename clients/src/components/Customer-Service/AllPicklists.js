@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../utils/toast';
 import {
   Box,
   Paper,
@@ -291,7 +292,7 @@ const AllPicklists = () => {
         console.error('Error details:', err.response?.data);
       }
 
-      Swal.fire({ icon: 'success', title: 'Picklist marked as completed' });
+      successToast('Picklist marked as completed');
       fetchData();
     } catch (err) {
       console.error(err);
@@ -363,8 +364,9 @@ const AllPicklists = () => {
             box-shadow: 0 8px 32px rgba(0,0,0,0.12);
           }
           .header-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 32px;
             border-radius: 20px 20px 0 0;
             position: relative;

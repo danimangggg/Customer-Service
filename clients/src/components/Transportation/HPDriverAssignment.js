@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import { successToast } from '../../utils/toast';
 
 const HPDriverAssignment = () => {
   const [processes, setProcesses] = useState([]);
@@ -156,7 +157,7 @@ const HPDriverAssignment = () => {
         tm_officer_name: loggedInUserName
       });
 
-      Swal.fire('Success!', 'Driver and deliverer assigned successfully', 'success');
+      successToast('Driver and deliverer assigned successfully');
       setOpenDialog(false);
       fetchProcesses();
     } catch (err) {

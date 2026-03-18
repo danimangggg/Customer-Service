@@ -202,8 +202,9 @@ const CompletedPicklists = () => {
             box-shadow: 0 8px 32px rgba(0,0,0,0.12);
           }
           .header-gradient {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 32px;
             border-radius: 20px 20px 0 0;
             position: relative;

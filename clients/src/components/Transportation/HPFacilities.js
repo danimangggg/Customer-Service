@@ -25,6 +25,7 @@ const HPFacilities = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterHP, setFilterHP] = useState(""); // Filter for HP facilities
   const [filterRoute, setFilterRoute] = useState(""); // Filter by route
+  const [filterPeriod, setFilterPeriod] = useState(""); // Filter by period
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openEdit, setOpenEdit] = useState(false);
@@ -127,9 +128,10 @@ const HPFacilities = () => {
       return;
     }
     try {
+      const isHpOrVaccine = selectedFacility.is_hp_site || selectedFacility.is_vaccine_site;
       const res = await axios.put(`${api_url}/api/update-facilities/${selectedFacility.id}`, {
         route: selectedFacility.route,
-        period: selectedFacility.period,
+        period: isHpOrVaccine ? selectedFacility.period : null,
         is_vaccine_site: selectedFacility.is_vaccine_site ? 1 : 0,
         is_hp_site: selectedFacility.is_hp_site ? 1 : 0
       });
@@ -192,8 +194,9 @@ const HPFacilities = () => {
                          (filterHP === "None" && !f.is_hp_site && !f.is_vaccine_site);
     
     const matchesRoute = filterRoute === "" || f.route === filterRoute;
+    const matchesPeriod = filterPeriod === "" || f.period === filterPeriod;
     
-    return matchesSearch && matchesFilter && matchesRoute;
+    return matchesSearch && matchesFilter && matchesRoute && matchesPeriod;
   });
 
   return (
@@ -225,8 +228,9 @@ const HPFacilities = () => {
             box-shadow: 0 8px 32px rgba(0,0,0,0.12);
           }
           .header-gradient {
-            background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
             padding: 32px;
             border-radius: 16px 16px 0 0;
             position: relative;
@@ -313,6 +317,21 @@ const HPFacilities = () => {
                       {route.route_name}
                     </MenuItem>
                   ))}
+                </Select>
+              </FormControl>
+
+              {/* Period Filter */}
+              <FormControl sx={{ minWidth: 160 }}>
+                <InputLabel>Period</InputLabel>
+                <Select
+                  value={filterPeriod}
+                  label="Period"
+                  onChange={(e) => {setFilterPeriod(e.target.value); setPage(0);}}
+                >
+                  <MenuItem value="">All Periods</MenuItem>
+                  <MenuItem value="Monthly">Monthly</MenuItem>
+                  <MenuItem value="Odd">Odd</MenuItem>
+                  <MenuItem value="Even">Even</MenuItem>
                 </Select>
               </FormControl>
 

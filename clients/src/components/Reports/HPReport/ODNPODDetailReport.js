@@ -99,9 +99,11 @@ const ODNPODDetailReport = () => {
   const fetchODNData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${api_url}/api/hp-odn-pod-details`, {
-        params: { reporting_month: `${selectedMonth} ${selectedYear}`, process_type: processType }
-      });
+      const params = { process_type: processType };
+      if (processType !== 'vaccine') {
+        params.reporting_month = `${selectedMonth} ${selectedYear}`;
+      }
+      const response = await axios.get(`${api_url}/api/hp-odn-pod-details`, { params });
       setOdnData(response.data.odnDetails || []);
     } catch (err) {
       console.error('Error fetching ODN data:', err);
@@ -156,10 +158,10 @@ const ODNPODDetailReport = () => {
             <AssignmentTurnedInIcon sx={{ fontSize: 56, color: 'white' }} />
             <Box>
               <Typography variant="h4" fontWeight="bold" color="white">
-                ODN & POD Detail Report
+                RRF/VRF Detail Report
               </Typography>
               <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                Health Program - ODN Dispatch & POD Confirmation
+                Health Program - RRF/VRF Dispatch & POD Confirmation
               </Typography>
             </Box>
           </Stack>
@@ -215,8 +217,6 @@ const ODNPODDetailReport = () => {
               <Select value={processType} label="Type" onChange={e => { setProcessType(e.target.value); setPage(0); }}>
                 <MenuItem value="regular">HP Regular</MenuItem>
                 <MenuItem value="vaccine">Vaccine</MenuItem>
-                <MenuItem value="breakdown">Breakdown</MenuItem>
-                <MenuItem value="emergency">Emergency</MenuItem>
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 110 }}>

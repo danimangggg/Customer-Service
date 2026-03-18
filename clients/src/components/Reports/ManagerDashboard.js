@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   Box, Grid, Card, CardContent, Typography, Stack, Chip, Avatar,
-  CircularProgress, LinearProgress, Tabs, Tab, Divider, Tooltip,
-  TextField, MenuItem, Button, IconButton, Fade
+  CircularProgress, LinearProgress, Divider, Tooltip, IconButton, Fade,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -17,7 +17,6 @@ import PeopleIcon from '@mui/icons-material/People';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CancelIcon from '@mui/icons-material/Cancel';
-import RouteIcon from '@mui/icons-material/Route';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InventoryIcon from '@mui/icons-material/Inventory';
@@ -29,7 +28,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const ethiopianMonths = [
   'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit',
-  'Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
+  'Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume',
 ];
 
 const getCurrentEthiopianMonth = () => {
@@ -51,7 +50,6 @@ const getCurrentEthiopianMonth = () => {
   return { year: ethYear, monthIndex: Math.max(0, Math.min(ethMonthIndex, 12)) };
 };
 
-// ─── Gradient palette ────────────────────────────────────────────────────────
 const G = {
   hp:    'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
   rdf:   'linear-gradient(135deg,#f093fb 0%,#f5576c 100%)',
@@ -59,70 +57,50 @@ const G = {
   blue:  'linear-gradient(135deg,#4facfe 0%,#00f2fe 100%)',
   amber: 'linear-gradient(135deg,#f6d365 0%,#fda085 100%)',
   red:   'linear-gradient(135deg,#f5576c 0%,#f093fb 100%)',
-  dark:  'linear-gradient(135deg,#0f0c29 0%,#302b63 50%,#24243e 100%)',
   card:  'linear-gradient(145deg,#1e1e3a 0%,#252550 100%)',
 };
-
 const CHART_COLORS = ['#667eea','#43e97b','#f6d365','#f5576c','#4facfe','#f093fb','#38f9d7','#fda085'];
+const tooltipStyle = { background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' };
 
-// ─── Reusable KPI card ────────────────────────────────────────────────────────
 const KpiCard = ({ title, value, subtitle, icon, gradient, loading }) => (
   <Card sx={{
-    background: G.card, border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 3, overflow: 'hidden', position: 'relative',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-    transition: 'transform 0.2s,box-shadow 0.2s',
-    '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }
+    background: G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3,
+    overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,0.3)',
+    transition:'transform 0.2s,box-shadow 0.2s',
+    '&:hover':{ transform:'translateY(-4px)', boxShadow:'0 16px 48px rgba(0,0,0,0.4)' }
   }}>
-    {/* top accent bar */}
-    <Box sx={{ height: 4, background: gradient }} />
-    <CardContent sx={{ p: 2.5 }}>
+    <Box sx={{ height:4, background:gradient }} />
+    <CardContent sx={{ p:2.5 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Box>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.7rem' }}>
+        <Box sx={{ flex:1, minWidth:0 }}>
+          <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:1, fontSize:'0.68rem' }}>
             {title}
           </Typography>
           {loading
-            ? <CircularProgress size={28} sx={{ mt: 1, color: '#667eea' }} />
-            : <Typography variant="h3" fontWeight={800} sx={{ color: '#fff', lineHeight: 1.1, mt: 0.5 }}>
-                {value ?? '—'}
-              </Typography>
+            ? <CircularProgress size={26} sx={{ mt:1, color:'#667eea' }} />
+            : <Typography variant="h3" fontWeight={800} sx={{ color:'#fff', lineHeight:1.1, mt:0.5 }}>{value ?? '—'}</Typography>
           }
-          {subtitle && (
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)', mt: 0.5, display: 'block' }}>
-              {subtitle}
-            </Typography>
-          )}
+          {subtitle && <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.4)', mt:0.5, display:'block' }}>{subtitle}</Typography>}
         </Box>
-        <Box sx={{ background: gradient, borderRadius: 2, p: 1.2, opacity: 0.9 }}>
-          {icon}
-        </Box>
+        <Box sx={{ background:gradient, borderRadius:2, p:1.2, opacity:0.9, ml:1, flexShrink:0 }}>{icon}</Box>
       </Stack>
     </CardContent>
   </Card>
 );
 
-// ─── Section header ───────────────────────────────────────────────────────────
-const SectionHeader = ({ title, subtitle, gradient }) => (
-  <Box sx={{ mb: 2.5 }}>
-    <Stack direction="row" alignItems="center" spacing={1.5}>
-      <Box sx={{ width: 4, height: 28, background: gradient, borderRadius: 2 }} />
-      <Box>
-        <Typography variant="h6" fontWeight={700} sx={{ color: '#fff', lineHeight: 1 }}>{title}</Typography>
-        {subtitle && <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.45)' }}>{subtitle}</Typography>}
-      </Box>
-    </Stack>
-  </Box>
+const SectionLabel = ({ label, gradient }) => (
+  <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb:2 }}>
+    <Box sx={{ width:4, height:26, background:gradient, borderRadius:2 }} />
+    <Typography variant="subtitle1" fontWeight={700} sx={{ color:'rgba(255,255,255,0.85)', textTransform:'uppercase', letterSpacing:1, fontSize:'0.78rem' }}>
+      {label}
+    </Typography>
+  </Stack>
 );
 
-// ─── Chart wrapper card ───────────────────────────────────────────────────────
-const ChartCard = ({ title, children, height = 260 }) => (
-  <Card sx={{
-    background: G.card, border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 3, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', overflow: 'hidden'
-  }}>
-    <CardContent sx={{ p: 2.5 }}>
-      <Typography variant="subtitle2" fontWeight={600} sx={{ color: 'rgba(255,255,255,0.7)', mb: 2, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.72rem' }}>
+const ChartCard = ({ title, children, height=260 }) => (
+  <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', overflow:'hidden', height:'100%' }}>
+    <CardContent sx={{ p:2.5 }}>
+      <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem', display:'block', mb:1.5 }}>
         {title}
       </Typography>
       <Box sx={{ height }}>{children}</Box>
@@ -130,12 +108,11 @@ const ChartCard = ({ title, children, height = 260 }) => (
   </Card>
 );
 
-// ─── Main component ───────────────────────────────────────────────────────────
 const ManagerDashboard = () => {
   const eth = getCurrentEthiopianMonth();
-  const [tab, setTab] = useState(0);
   const [month, setMonth] = useState(ethiopianMonths[eth.monthIndex]);
   const [year, setYear] = useState(eth.year);
+  const [processType, setProcessType] = useState('regular');
   const [hpData, setHpData] = useState(null);
   const [rdfStats, setRdfStats] = useState(null);
   const [bestOf, setBestOf] = useState(null);
@@ -147,18 +124,18 @@ const ManagerDashboard = () => {
   const fetchHP = useCallback(async () => {
     try {
       setHpLoading(true);
-      const r = await axios.get(`${API_URL}/api/hp-comprehensive-report`, { params: { month, year } });
+      const r = await axios.get(`${API_URL}/api/hp-comprehensive-report`, { params: { month, year, process_type: processType } });
       setHpData(r.data);
     } catch (e) { console.error(e); }
     finally { setHpLoading(false); }
-  }, [month, year]);
+  }, [month, year, processType]);
 
   const fetchRDF = useCallback(async () => {
     try {
       setRdfLoading(true);
       const [statsRes, bestRes] = await Promise.all([
         axios.get(`${API_URL}/api/rdf-dashboard-stats`),
-        axios.get(`${API_URL}/api/best-of-week`)
+        axios.get(`${API_URL}/api/best-of-week`),
       ]);
       if (statsRes.data.success) setRdfStats(statsRes.data.stats);
       if (bestRes.data.success) setBestOf(bestRes.data.data);
@@ -176,429 +153,347 @@ const ManagerDashboard = () => {
   useEffect(() => { fetchHP(); fetchTrend(); }, [fetchHP, fetchTrend]);
   useEffect(() => { fetchRDF(); }, [fetchRDF]);
 
-  const handleRefresh = () => {
-    fetchHP(); fetchRDF(); fetchTrend();
-    setLastRefresh(new Date());
-  };
+  const handleRefresh = () => { fetchHP(); fetchRDF(); fetchTrend(); setLastRefresh(new Date()); };
 
-  // ── derived HP values ──
+  // ── derived HP ──
   const hp = hpData?.summary || {};
-  const hpRrfPct = hp.expectedFacilities > 0 ? ((hp.rrfSent / hp.expectedFacilities) * 100).toFixed(1) : 0;
-  const hpPodPct = hp.totalODNs > 0 ? ((hp.podConfirmed / hp.totalODNs) * 100).toFixed(1) : 0;
+  const wp = hpData?.workflowProgress || {};
+  const hpRrfPct  = hp.expectedFacilities > 0 ? ((hp.rrfSent / hp.expectedFacilities) * 100).toFixed(1) : 0;
+  const hpPodPct  = hp.totalODNs > 0 ? ((hp.podConfirmed / hp.totalODNs) * 100).toFixed(1) : 0;
   const hpQualPct = hp.totalODNs > 0 ? ((hp.qualityEvaluated / hp.totalODNs) * 100).toFixed(1) : 0;
 
-  // ── derived RDF values ──
-  const rdfTotal = rdfStats?.totalRegistrations || 0;
+  // ── derived RDF ──
+  const rdfTotal   = rdfStats?.totalRegistrations || 0;
   const rdfCompPct = rdfTotal > 0 ? ((rdfStats?.completedCount / rdfTotal) * 100).toFixed(1) : 0;
 
-  // ── HP workflow funnel data ──
-  const wp = hpData?.workflowProgress || {};
+  // ── chart data ──
   const funnelData = [
-    { stage: 'O2C', count: wp.o2cCompleted || 0 },
-    { stage: 'EWM', count: wp.ewmCompleted || 0 },
-    { stage: 'PI', count: wp.piCompleted || 0 },
-    { stage: 'TM', count: wp.tmCompleted || 0 },
-    { stage: 'Dispatch', count: wp.dispatched || 0 },
-    { stage: 'Doc', count: wp.documentationCompleted || 0 },
-    { stage: 'Quality', count: wp.qualityEvaluated || 0 },
+    { stage:'O2C',      count: wp.o2cCompleted || 0 },
+    { stage:'EWM',      count: wp.ewmCompleted || 0 },
+    { stage:'PI',       count: wp.piCompleted || 0 },
+    { stage:'TM',       count: wp.tmCompleted || 0 },
+    { stage:'Dispatch', count: wp.dispatched || 0 },
+    { stage:'Doc',      count: wp.documentationCompleted || 0 },
+    { stage:'Quality',  count: wp.qualityEvaluated || 0 },
   ].filter(d => d.count > 0);
 
-  // ── HP RRF pie ──
   const rrfPie = [
-    { name: 'RRF Sent', value: hp.rrfSent || 0, color: '#43e97b' },
-    { name: 'Not Sent', value: hp.rrfNotSent || 0, color: '#f5576c' },
+    { name:'RRF Sent',  value: hp.rrfSent || 0,    color:'#43e97b' },
+    { name:'Not Sent',  value: hp.rrfNotSent || 0,  color:'#f5576c' },
   ];
 
-  // ── RDF status pie ──
   const rdfPie = [
-    { name: 'Completed', value: rdfStats?.completedCount || 0, color: '#43e97b' },
-    { name: 'In Progress', value: rdfStats?.inProgressCount || 0, color: '#f6d365' },
-    { name: 'Cancelled', value: (rdfStats?.cancelledCount || 0) + (rdfStats?.autoCancelledCount || 0), color: '#f5576c' },
+    { name:'Completed',     value: rdfStats?.completedCount || 0,                                                color:'#43e97b' },
+    { name:'In Progress',   value: rdfStats?.inProgressCount || 0,                                               color:'#f6d365' },
+    { name:'Cancelled',     value: (rdfStats?.cancelledCount || 0) + (rdfStats?.autoCancelledCount || 0),        color:'#f5576c' },
   ].filter(d => d.value > 0);
 
-  // ── Top routes ──
   const topRoutes = (hpData?.routeStats || [])
     .sort((a, b) => parseInt(b.facilities_count) - parseInt(a.facilities_count))
     .slice(0, 8)
     .map(r => ({ name: r.route_name, facilities: parseInt(r.facilities_count || 0), odns: parseInt(r.odns_count || 0) }));
 
-  const years = Array.from({ length: 10 }, (_, i) => eth.year - 5 + i);
+  const years = Array.from({ length: 8 }, (_, i) => eth.year - 4 + i);
 
   return (
-    <Box sx={{ minHeight: '100vh', background: 'linear-gradient(160deg,#0d0d1a 0%,#0f0f2e 50%,#0a0a1f 100%)', p: 3 }}>
+    <Box sx={{ minHeight:'100vh', background:'linear-gradient(160deg,#0d0d1a 0%,#0f0f2e 50%,#0a0a1f 100%)', p:3 }}>
 
-      {/* ── HERO HEADER ── */}
-      <Box sx={{
-        background: G.dark, borderRadius: 4, p: 3, mb: 3,
-        border: '1px solid rgba(255,255,255,0.07)',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-        position: 'relative', overflow: 'hidden'
-      }}>
-        {/* decorative blobs */}
-        <Box sx={{ position:'absolute', top:-60, right:-60, width:200, height:200, borderRadius:'50%', background:'rgba(102,126,234,0.15)', filter:'blur(40px)' }} />
-        <Box sx={{ position:'absolute', bottom:-40, left:100, width:150, height:150, borderRadius:'50%', background:'rgba(240,147,251,0.1)', filter:'blur(30px)' }} />
+      {/* ── HEADER ── */}
+      <Box sx={{ background:G.card, borderRadius:4, p:3, mb:3, border:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 20px 60px rgba(0,0,0,0.5)', position:'relative', overflow:'hidden' }}>
+        <Box sx={{ position:'absolute', top:-60, right:-60, width:200, height:200, borderRadius:'50%', background:'rgba(102,126,234,0.15)', filter:'blur(40px)', pointerEvents:'none' }} />
+        <Box sx={{ position:'absolute', bottom:-40, left:100, width:150, height:150, borderRadius:'50%', background:'rgba(240,147,251,0.1)', filter:'blur(30px)', pointerEvents:'none' }} />
 
-        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs:'flex-start', md:'center' }} spacing={2}>
+        <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ xs:'flex-start', md:'center' }} spacing={2}>
           <Stack direction="row" alignItems="center" spacing={2}>
-            <Box sx={{ background: G.hp, borderRadius: 3, p: 1.5 }}>
-              <SpeedIcon sx={{ color: '#fff', fontSize: 36 }} />
+            <Box sx={{ background:G.hp, borderRadius:3, p:1.5 }}>
+              <SpeedIcon sx={{ color:'#fff', fontSize:36 }} />
             </Box>
             <Box>
-              <Typography variant="h4" fontWeight={900} sx={{ color: '#fff', letterSpacing: -0.5 }}>
-                Operations Dashboard
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 0.3 }}>
-                Unified HP & RDF performance overview · Last updated {lastRefresh.toLocaleTimeString()}
+              <Typography variant="h4" fontWeight={900} sx={{ color:'#fff', letterSpacing:-0.5 }}>Operations Dashboard</Typography>
+              <Typography variant="body2" sx={{ color:'rgba(255,255,255,0.45)', mt:0.3 }}>
+                Unified HP & RDF overview · Updated {lastRefresh.toLocaleTimeString()}
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-            <Tooltip title="Refresh data">
-              <IconButton onClick={handleRefresh} sx={{ background:'rgba(255,255,255,0.07)', color:'#fff', '&:hover':{background:'rgba(102,126,234,0.3)'} }}>
+            {/* Month filter for HP */}
+            <FormControl size="small" sx={{ minWidth:130 }}>
+              <InputLabel sx={{ color:'rgba(255,255,255,0.5)', '&.Mui-focused':{ color:'#667eea' } }}>Month</InputLabel>
+              <Select value={month} label="Month" onChange={e => setMonth(e.target.value)}
+                sx={{ color:'#fff', '.MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.15)' }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.3)' }, '.MuiSvgIcon-root':{ color:'rgba(255,255,255,0.5)' } }}>
+                {ethiopianMonths.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth:90 }}>
+              <InputLabel sx={{ color:'rgba(255,255,255,0.5)', '&.Mui-focused':{ color:'#667eea' } }}>Year</InputLabel>
+              <Select value={year} label="Year" onChange={e => setYear(e.target.value)}
+                sx={{ color:'#fff', '.MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.15)' }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.3)' }, '.MuiSvgIcon-root':{ color:'rgba(255,255,255,0.5)' } }}>
+                {years.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth:120 }}>
+              <InputLabel sx={{ color:'rgba(255,255,255,0.5)', '&.Mui-focused':{ color:'#667eea' } }}>Type</InputLabel>
+              <Select value={processType} label="Type" onChange={e => setProcessType(e.target.value)}
+                sx={{ color:'#fff', '.MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.15)' }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.3)' }, '.MuiSvgIcon-root':{ color:'rgba(255,255,255,0.5)' } }}>
+                <MenuItem value="regular">HP Regular</MenuItem>
+                <MenuItem value="vaccine">Vaccine</MenuItem>
+              </Select>
+            </FormControl>
+            <Tooltip title="Refresh">
+              <IconButton onClick={handleRefresh} sx={{ background:'rgba(255,255,255,0.07)', color:'#fff', '&:hover':{ background:'rgba(102,126,234,0.3)' } }}>
                 <RefreshIcon />
               </IconButton>
             </Tooltip>
           </Stack>
         </Stack>
-
-        {/* Tab switcher */}
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mt: 2.5,
-          '& .MuiTab-root': { color:'rgba(255,255,255,0.45)', fontWeight:600, textTransform:'none', fontSize:'0.9rem', minHeight:40 },
-          '& .Mui-selected': { color:'#fff' },
-          '& .MuiTabs-indicator': { background: G.hp, height:3, borderRadius:2 }
-        }}>
-          <Tab label="Overview" />
-          <Tab label="HP Program" />
-          <Tab label="RDF Program" />
-        </Tabs>
       </Box>
 
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 0 — OVERVIEW
-      ══════════════════════════════════════════════════════════════════════ */}
-      {tab === 0 && (
-        <Fade in>
-          <Box>
-            {/* Combined KPI row */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {[
-                { title:'HP Facilities', value: hp.expectedFacilities, subtitle:'Expected this month', icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.hp, loading:hpLoading },
-                { title:'RRF Sent', value: hp.rrfSent, subtitle:`${hpRrfPct}% of expected`, icon:<AssignmentIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.green, loading:hpLoading },
-                { title:'ODNs Dispatched', value: hp.dispatched, subtitle:`of ${hp.totalODNs} total ODNs`, icon:<LocalShippingIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.blue, loading:hpLoading },
-                { title:'POD Confirmed', value: hp.podConfirmed, subtitle:`${hpPodPct}% confirmation rate`, icon:<VerifiedIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.amber, loading:hpLoading },
-                { title:'RDF Registrations', value: rdfStats?.totalRegistrations, subtitle:'All time', icon:<PeopleIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.rdf, loading:rdfLoading },
-                { title:'RDF Completed', value: rdfStats?.completedCount, subtitle:`${rdfCompPct}% completion rate`, icon:<CheckCircleIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.green, loading:rdfLoading },
-                { title:'Avg Wait Time', value: rdfStats?.averageWaitingTime ? `${Math.round(rdfStats.averageWaitingTime)}m` : '—', subtitle:'RDF service time', icon:<AccessTimeIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.amber, loading:rdfLoading },
-                { title:'Quality Evaluated', value: hp.qualityEvaluated, subtitle:`${hpQualPct}% of ODNs`, icon:<StarIcon sx={{color:'#fff',fontSize:28}}/>, gradient:G.red, loading:hpLoading },
-              ].map((k, i) => (
-                <Grid item xs={6} sm={4} md={3} key={i}>
-                  <KpiCard {...k} />
-                </Grid>
-              ))}
-            </Grid>
+      <Fade in>
+        <Box>
 
-            {/* Charts row */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {/* HP Trend */}
-              <Grid item xs={12} md={8}>
-                <ChartCard title="HP Monthly Trend — RRF Sent vs ODNs" height={280}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={timeTrend} margin={{ top:5, right:10, left:-20, bottom:5 }}>
-                      <defs>
-                        <linearGradient id="gRRF" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#667eea" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#667eea" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="gODN" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#43e97b" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#43e97b" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                      <XAxis dataKey="month" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
-                      <RTooltip contentStyle={{ background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' }} />
-                      <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
-                      <Area type="monotone" dataKey="rrf_sent" name="RRF Sent" stroke="#667eea" fill="url(#gRRF)" strokeWidth={2} dot={false} />
-                      <Area type="monotone" dataKey="total_odns" name="Total ODNs" stroke="#43e97b" fill="url(#gODN)" strokeWidth={2} dot={false} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
+          {/* ══ SECTION 1: HP KPIs ══ */}
+          <SectionLabel label={`Health Program — ${month} ${year} · ${processType === 'vaccine' ? 'Vaccine' : 'HP Regular'}`} gradient={G.hp} />
+          <Grid container spacing={2} sx={{ mb:3 }}>
+            {[
+              { title:'Expected Facilities', value:hp.expectedFacilities,  subtitle:'This period',              icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp,    loading:hpLoading },
+              { title:'RRF Sent',            value:hp.rrfSent,             subtitle:`${hpRrfPct}% of expected`, icon:<AssignmentIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.green,  loading:hpLoading },
+              { title:'RRF Not Sent',        value:hp.rrfNotSent,          subtitle:'Pending facilities',       icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,        gradient:G.red,    loading:hpLoading },
+              { title:'Total ODNs',          value:hp.totalODNs,           subtitle:'Orders generated',         icon:<InventoryIcon sx={{color:'#fff',fontSize:26}}/>,     gradient:G.blue,   loading:hpLoading },
+              { title:'Dispatched',          value:hp.dispatched,          subtitle:'ODNs dispatched',          icon:<LocalShippingIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.amber,  loading:hpLoading },
+              { title:'POD Confirmed',       value:hp.podConfirmed,        subtitle:`${hpPodPct}% rate`,        icon:<VerifiedIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.green,  loading:hpLoading },
+              { title:'Quality Evaluated',   value:hp.qualityEvaluated,    subtitle:`${hpQualPct}% of ODNs`,   icon:<StarIcon sx={{color:'#fff',fontSize:26}}/>,          gradient:G.rdf,    loading:hpLoading },
+              { title:'RRF Rate',            value:`${hpRrfPct}%`,         subtitle:'Facility coverage',        icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.hp,     loading:hpLoading },
+            ].map((k, i) => (
+              <Grid item xs={6} sm={4} md={3} key={i}><KpiCard {...k} /></Grid>
+            ))}
+          </Grid>
 
-              {/* RDF Status Pie */}
-              <Grid item xs={12} md={4}>
-                <ChartCard title="RDF Status Distribution" height={280}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={rdfPie} cx="50%" cy="45%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value">
-                        {rdfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
-                      </Pie>
-                      <RTooltip contentStyle={{ background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' }} />
-                      <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-            </Grid>
-
-            {/* HP Workflow funnel + RRF pie */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={8}>
-                <ChartCard title="HP Workflow Stage Completion" height={240}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={funnelData} margin={{ top:5, right:10, left:-20, bottom:5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                      <XAxis dataKey="stage" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
-                      <RTooltip contentStyle={{ background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' }} />
-                      <Bar dataKey="count" name="Completed" radius={[6,6,0,0]}>
-                        {funnelData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <ChartCard title="HP RRF Status" height={240}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={rrfPie} cx="50%" cy="45%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value">
-                        {rrfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
-                      </Pie>
-                      <RTooltip contentStyle={{ background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' }} />
-                      <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-            </Grid>
-          </Box>
-        </Fade>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 1 — HP PROGRAM
-      ══════════════════════════════════════════════════════════════════════ */}
-      {tab === 1 && (
-        <Fade in>
-          <Box>
-            <SectionHeader title="Health Program Analytics" subtitle={`${month} ${year}`} gradient={G.hp} />
-
-            {/* HP KPIs */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {[
-                { title:'Expected Facilities', value:hp.expectedFacilities, icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp },
-                { title:'RRF Sent', value:hp.rrfSent, icon:<AssignmentIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.green },
-                { title:'RRF Not Sent', value:hp.rrfNotSent, icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.red },
-                { title:'Total ODNs', value:hp.totalODNs, icon:<InventoryIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.blue },
-                { title:'Dispatched', value:hp.dispatched, icon:<LocalShippingIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.amber },
-                { title:'POD Confirmed', value:hp.podConfirmed, icon:<VerifiedIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.green },
-                { title:'Quality Evaluated', value:hp.qualityEvaluated, icon:<StarIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.rdf },
-                { title:'RRF Rate', value:`${hpRrfPct}%`, icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp },
-              ].map((k, i) => (
-                <Grid item xs={6} sm={4} md={3} key={i}>
-                  <KpiCard {...k} loading={hpLoading} />
-                </Grid>
-              ))}
-            </Grid>
-
-            {/* Workflow progress bars */}
-            <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, mb:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
-              <CardContent sx={{ p:3 }}>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ color:'rgba(255,255,255,0.6)', mb:2.5, textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.72rem' }}>
-                  Workflow Stage Progress
-                </Typography>
-                <Grid container spacing={2}>
-                  {[
-                    { label:'O2C', val:wp.o2cCompleted, total:hp.totalODNs, color:'#667eea' },
-                    { label:'EWM', val:wp.ewmCompleted, total:hp.totalODNs, color:'#43e97b' },
-                    { label:'PI', val:wp.piCompleted, total:hp.totalODNs, color:'#4facfe' },
-                    { label:'TM', val:wp.tmCompleted, total:hp.totalODNs, color:'#f6d365' },
-                    { label:'Dispatch', val:wp.dispatched, total:hp.totalODNs, color:'#fda085' },
-                    { label:'Documentation', val:wp.documentationCompleted, total:hp.totalODNs, color:'#f093fb' },
-                    { label:'Quality', val:wp.qualityEvaluated, total:hp.totalODNs, color:'#38f9d7' },
-                  ].map(({ label, val, total, color }) => {
-                    const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-                    return (
-                      <Grid item xs={12} sm={6} key={label}>
-                        <Stack direction="row" justifyContent="space-between" sx={{ mb:0.5 }}>
-                          <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.6)', fontWeight:600 }}>{label}</Typography>
-                          <Typography variant="caption" sx={{ color, fontWeight:700 }}>{val ?? 0} <span style={{color:'rgba(255,255,255,0.3)'}}>/ {total ?? 0}</span> ({pct}%)</Typography>
-                        </Stack>
-                        <LinearProgress variant="determinate" value={pct}
-                          sx={{ height:8, borderRadius:4, bgcolor:'rgba(255,255,255,0.07)', '& .MuiLinearProgress-bar':{ background:color, borderRadius:4 } }} />
-                      </Grid>
-                    );
-                  })}
-                </Grid>
-              </CardContent>
-            </Card>
-
-            {/* Top routes chart */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={8}>
-                <ChartCard title="Top Routes by Facilities & ODNs" height={300}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={topRoutes} margin={{ top:5, right:10, left:-20, bottom:40 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                      <XAxis dataKey="name" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:10 }} angle={-35} textAnchor="end" axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
-                      <RTooltip contentStyle={{ background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' }} />
-                      <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
-                      <Bar dataKey="facilities" name="Facilities" fill="#667eea" radius={[4,4,0,0]} />
-                      <Bar dataKey="odns" name="ODNs" fill="#43e97b" radius={[4,4,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <ChartCard title="HP Monthly Trend" height={300}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={timeTrend} margin={{ top:5, right:10, left:-20, bottom:5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                      <XAxis dataKey="month" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:10 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
-                      <RTooltip contentStyle={{ background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' }} />
-                      <Line type="monotone" dataKey="rrf_sent" name="RRF Sent" stroke="#667eea" strokeWidth={2} dot={{ fill:'#667eea', r:3 }} />
-                      <Line type="monotone" dataKey="pod_confirmed" name="POD" stroke="#43e97b" strokeWidth={2} dot={{ fill:'#43e97b', r:3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-            </Grid>
-          </Box>
-        </Fade>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          TAB 2 — RDF PROGRAM
-      ══════════════════════════════════════════════════════════════════════ */}
-      {tab === 2 && (
-        <Fade in>
-          <Box>
-            <SectionHeader title="RDF Program Analytics" subtitle="All-time customer service metrics" gradient={G.rdf} />
-
-            {/* RDF KPIs */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              {[
-                { title:'Total Registrations', value:rdfStats?.totalRegistrations, icon:<PeopleIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.rdf },
-                { title:'Completed', value:rdfStats?.completedCount, icon:<CheckCircleIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.green },
-                { title:'In Progress', value:rdfStats?.inProgressCount, icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.blue },
-                { title:'Cancelled', value:rdfStats?.cancelledCount, icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.red },
-                { title:'Auto-Cancelled', value:rdfStats?.autoCancelledCount, icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.amber },
-                { title:'Avg Wait Time', value:rdfStats?.averageWaitingTime ? `${Math.round(rdfStats.averageWaitingTime)}m` : '—', icon:<AccessTimeIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp },
-                { title:'Completion Rate', value:`${rdfCompPct}%`, icon:<SpeedIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.green },
-                { title:'Cancellation Rate', value: rdfTotal > 0 ? `${(((rdfStats?.cancelledCount||0)+(rdfStats?.autoCancelledCount||0))/rdfTotal*100).toFixed(1)}%` : '—', icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.red },
-              ].map((k, i) => (
-                <Grid item xs={6} sm={4} md={3} key={i}>
-                  <KpiCard {...k} loading={rdfLoading} />
-                </Grid>
-              ))}
-            </Grid>
-
-            {/* RDF charts */}
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12} md={5}>
-                <ChartCard title="Customer Status Breakdown" height={300}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie data={rdfPie} cx="50%" cy="45%" innerRadius={70} outerRadius={105} paddingAngle={5} dataKey="value" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>
-                        {rdfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
-                      </Pie>
-                      <RTooltip contentStyle={{ background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              </Grid>
-              <Grid item xs={12} md={7}>
-                {/* Best of Week */}
-                <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, height:'100%', boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
-                  <CardContent sx={{ p:3 }}>
-                    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb:2.5 }}>
-                      <EmojiEventsIcon sx={{ color:'#f6d365', fontSize:22 }} />
-                      <Typography variant="subtitle2" fontWeight={600} sx={{ color:'rgba(255,255,255,0.7)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.72rem' }}>
-                        Best of Last Week
-                      </Typography>
-                    </Stack>
-                    {rdfLoading
-                      ? <CircularProgress size={24} sx={{ color:'#667eea' }} />
-                      : bestOf && Object.keys(bestOf).length > 0
-                        ? (
-                          <Grid container spacing={1.5}>
-                            {Object.entries(bestOf).map(([role, person]) => person && (
-                              <Grid item xs={12} sm={6} key={role}>
-                                <Box sx={{ background:'rgba(255,255,255,0.04)', borderRadius:2, p:1.5, border:'1px solid rgba(255,255,255,0.06)' }}>
-                                  <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:0.5, fontSize:'0.65rem' }}>{role}</Typography>
-                                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt:0.5 }}>
-                                    <Avatar sx={{ width:28, height:28, background:G.hp, fontSize:'0.75rem' }}>
-                                      {(person.full_name||'?')[0]}
-                                    </Avatar>
-                                    <Box>
-                                      <Typography variant="body2" fontWeight={700} sx={{ color:'#fff', lineHeight:1.2 }}>{person.full_name}</Typography>
-                                      <Chip label={`${person.process_count} tasks`} size="small"
-                                        sx={{ height:18, fontSize:'0.65rem', background:'rgba(102,126,234,0.25)', color:'#667eea', mt:0.3 }} />
-                                    </Box>
-                                  </Stack>
-                                </Box>
-                              </Grid>
-                            ))}
-                          </Grid>
-                        )
-                        : <Typography variant="body2" sx={{ color:'rgba(255,255,255,0.3)' }}>No data available for last week.</Typography>
-                    }
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-
-            {/* Completion rate visual */}
-            <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
-              <CardContent sx={{ p:3 }}>
-                <Typography variant="subtitle2" fontWeight={600} sx={{ color:'rgba(255,255,255,0.6)', mb:2, textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.72rem' }}>
-                  Service Completion Overview
-                </Typography>
-                <Grid container spacing={3} alignItems="center">
-                  <Grid item xs={12} md={4}>
-                    <Box sx={{ textAlign:'center' }}>
-                      <Box sx={{ position:'relative', display:'inline-flex' }}>
-                        <CircularProgress variant="determinate" value={parseFloat(rdfCompPct)} size={120} thickness={6}
-                          sx={{ color:'#43e97b', '& .MuiCircularProgress-circle':{ strokeLinecap:'round' } }} />
-                        <Box sx={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                          <Typography variant="h5" fontWeight={800} sx={{ color:'#fff' }}>{rdfCompPct}%</Typography>
-                        </Box>
-                      </Box>
-                      <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.4)', display:'block', mt:1 }}>Completion Rate</Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={8}>
+          {/* ══ HP WORKFLOW PROGRESS ══ */}
+          <Grid container spacing={2} sx={{ mb:3 }}>
+            <Grid item xs={12} md={7}>
+              <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', height:'100%' }}>
+                <CardContent sx={{ p:3 }}>
+                  <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem', display:'block', mb:2 }}>
+                    HP Workflow Stage Progress
+                  </Typography>
+                  <Grid container spacing={1.5}>
                     {[
-                      { label:'Completed', val:rdfStats?.completedCount||0, color:'#43e97b' },
-                      { label:'In Progress', val:rdfStats?.inProgressCount||0, color:'#f6d365' },
-                      { label:'Cancelled', val:rdfStats?.cancelledCount||0, color:'#f5576c' },
-                      { label:'Auto-Cancelled', val:rdfStats?.autoCancelledCount||0, color:'#fda085' },
+                      { label:'O2C',           val:wp.o2cCompleted,           color:'#667eea' },
+                      { label:'EWM',           val:wp.ewmCompleted,           color:'#43e97b' },
+                      { label:'PI',            val:wp.piCompleted,            color:'#4facfe' },
+                      { label:'TM',            val:wp.tmCompleted,            color:'#f6d365' },
+                      { label:'Dispatch',      val:wp.dispatched,             color:'#fda085' },
+                      { label:'Documentation', val:wp.documentationCompleted, color:'#f093fb' },
+                      { label:'Quality',       val:wp.qualityEvaluated,       color:'#38f9d7' },
+                    ].map(({ label, val, color }) => {
+                      const pct = hp.totalODNs > 0 ? Math.round(((val||0) / hp.totalODNs) * 100) : 0;
+                      return (
+                        <Grid item xs={12} sm={6} key={label}>
+                          <Stack direction="row" justifyContent="space-between" sx={{ mb:0.4 }}>
+                            <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.6)', fontWeight:600 }}>{label}</Typography>
+                            <Typography variant="caption" sx={{ color, fontWeight:700 }}>
+                              {val ?? 0} <span style={{ color:'rgba(255,255,255,0.3)' }}>/ {hp.totalODNs ?? 0}</span> ({pct}%)
+                            </Typography>
+                          </Stack>
+                          <LinearProgress variant="determinate" value={pct}
+                            sx={{ height:7, borderRadius:4, bgcolor:'rgba(255,255,255,0.07)', '& .MuiLinearProgress-bar':{ background:color, borderRadius:4 } }} />
+                        </Grid>
+                      );
+                    })}
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} md={5}>
+              <ChartCard title="HP RRF Status" height={220}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={rrfPie} cx="50%" cy="45%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value">
+                      {rrfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <RTooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Grid>
+          </Grid>
+
+          {/* ══ HP CHARTS ══ */}
+          <Grid container spacing={2} sx={{ mb:3 }}>
+            <Grid item xs={12} md={8}>
+              <ChartCard title="HP Monthly Trend — RRF Sent vs ODNs" height={260}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={timeTrend} margin={{ top:5, right:10, left:-20, bottom:5 }}>
+                    <defs>
+                      <linearGradient id="gRRF" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#667eea" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#667eea" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="gODN" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#43e97b" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#43e97b" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="month" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
+                    <RTooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
+                    <Area type="monotone" dataKey="rrf_sent" name="RRF Sent" stroke="#667eea" fill="url(#gRRF)" strokeWidth={2} dot={false} />
+                    <Area type="monotone" dataKey="total_odns" name="Total ODNs" stroke="#43e97b" fill="url(#gODN)" strokeWidth={2} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <ChartCard title="HP Workflow Completion" height={260}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={funnelData} margin={{ top:5, right:10, left:-20, bottom:5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="stage" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:10 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
+                    <RTooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="count" name="Completed" radius={[6,6,0,0]}>
+                      {funnelData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Grid>
+          </Grid>
+
+          {/* Top routes */}
+          {topRoutes.length > 0 && (
+            <Box sx={{ mb:3 }}>
+              <ChartCard title="Top Routes by Facilities & ODNs" height={240}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topRoutes} margin={{ top:5, right:10, left:-20, bottom:40 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="name" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:10 }} angle={-35} textAnchor="end" axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
+                    <RTooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
+                    <Bar dataKey="facilities" name="Facilities" fill="#667eea" radius={[4,4,0,0]} />
+                    <Bar dataKey="odns" name="ODNs" fill="#43e97b" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Box>
+          )}
+
+          <Divider sx={{ borderColor:'rgba(255,255,255,0.07)', my:3 }} />
+
+          {/* ══ SECTION 2: RDF KPIs ══ */}
+          <SectionLabel label="RDF Customer Service — All Time" gradient={G.rdf} />
+          <Grid container spacing={2} sx={{ mb:3 }}>
+            {[
+              { title:'Total Registrations', value:rdfStats?.totalRegistrations,  subtitle:'All time',              icon:<PeopleIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.rdf,   loading:rdfLoading },
+              { title:'Completed',           value:rdfStats?.completedCount,       subtitle:`${rdfCompPct}% rate`,   icon:<CheckCircleIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.green, loading:rdfLoading },
+              { title:'In Progress',         value:rdfStats?.inProgressCount,      subtitle:'Active customers',      icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,  gradient:G.blue,  loading:rdfLoading },
+              { title:'Cancelled',           value:rdfStats?.cancelledCount,       subtitle:'Manual cancellations',  icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.red,   loading:rdfLoading },
+              { title:'Auto-Cancelled',      value:rdfStats?.autoCancelledCount,   subtitle:'System cancellations',  icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.amber, loading:rdfLoading },
+              { title:'Avg Wait Time',       value:rdfStats?.averageWaitingTime ? `${Math.round(rdfStats.averageWaitingTime)}m` : '—', subtitle:'Service time', icon:<AccessTimeIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp, loading:rdfLoading },
+              { title:'Completion Rate',     value:`${rdfCompPct}%`,               subtitle:'Overall',               icon:<SpeedIcon sx={{color:'#fff',fontSize:26}}/>,       gradient:G.green, loading:rdfLoading },
+              { title:'Cancel Rate',         value: rdfTotal > 0 ? `${(((rdfStats?.cancelledCount||0)+(rdfStats?.autoCancelledCount||0))/rdfTotal*100).toFixed(1)}%` : '—', subtitle:'Combined', icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.red, loading:rdfLoading },
+            ].map((k, i) => (
+              <Grid item xs={6} sm={4} md={3} key={i}><KpiCard {...k} /></Grid>
+            ))}
+          </Grid>
+
+          {/* ══ RDF CHARTS + BEST OF WEEK ══ */}
+          <Grid container spacing={2} sx={{ mb:3 }}>
+            {/* Status pie */}
+            <Grid item xs={12} md={4}>
+              <ChartCard title="RDF Customer Status" height={260}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={rdfPie} cx="50%" cy="45%" innerRadius={65} outerRadius={100} paddingAngle={4} dataKey="value">
+                      {rdfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <RTooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </Grid>
+
+            {/* Completion bars */}
+            <Grid item xs={12} md={4}>
+              <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', height:'100%' }}>
+                <CardContent sx={{ p:3 }}>
+                  <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem', display:'block', mb:2 }}>
+                    Service Completion Breakdown
+                  </Typography>
+                  <Box sx={{ display:'flex', flexDirection:'column', justifyContent:'center', height:220 }}>
+                    {[
+                      { label:'Completed',     val:rdfStats?.completedCount||0,     color:'#43e97b' },
+                      { label:'In Progress',   val:rdfStats?.inProgressCount||0,    color:'#f6d365' },
+                      { label:'Cancelled',     val:rdfStats?.cancelledCount||0,     color:'#f5576c' },
+                      { label:'Auto-Cancelled',val:rdfStats?.autoCancelledCount||0, color:'#fda085' },
                     ].map(({ label, val, color }) => {
                       const pct = rdfTotal > 0 ? Math.round((val / rdfTotal) * 100) : 0;
                       return (
-                        <Box key={label} sx={{ mb:1.5 }}>
+                        <Box key={label} sx={{ mb:2 }}>
                           <Stack direction="row" justifyContent="space-between" sx={{ mb:0.4 }}>
                             <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.6)', fontWeight:600 }}>{label}</Typography>
                             <Typography variant="caption" sx={{ color, fontWeight:700 }}>{val.toLocaleString()} ({pct}%)</Typography>
                           </Stack>
                           <LinearProgress variant="determinate" value={pct}
-                            sx={{ height:7, borderRadius:4, bgcolor:'rgba(255,255,255,0.07)', '& .MuiLinearProgress-bar':{ background:color, borderRadius:4 } }} />
+                            sx={{ height:8, borderRadius:4, bgcolor:'rgba(255,255,255,0.07)', '& .MuiLinearProgress-bar':{ background:color, borderRadius:4 } }} />
                         </Box>
                       );
                     })}
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Box>
-        </Fade>
-      )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
 
+            {/* Best of week */}
+            <Grid item xs={12} md={4}>
+              <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', height:'100%' }}>
+                <CardContent sx={{ p:3 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb:2 }}>
+                    <EmojiEventsIcon sx={{ color:'#f6d365', fontSize:20 }} />
+                    <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem' }}>
+                      Best of Last Week
+                    </Typography>
+                  </Stack>
+                  {rdfLoading
+                    ? <CircularProgress size={24} sx={{ color:'#667eea' }} />
+                    : bestOf && Object.keys(bestOf).length > 0
+                      ? (
+                        <Grid container spacing={1}>
+                          {Object.entries(bestOf).map(([role, person]) => person && (
+                            <Grid item xs={12} key={role}>
+                              <Box sx={{ background:'rgba(255,255,255,0.04)', borderRadius:2, p:1.5, border:'1px solid rgba(255,255,255,0.06)' }}>
+                                <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:0.5, fontSize:'0.62rem' }}>{role}</Typography>
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt:0.5 }}>
+                                  <Avatar sx={{ width:26, height:26, background:G.hp, fontSize:'0.72rem' }}>
+                                    {(person.full_name||'?')[0]}
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant="body2" fontWeight={700} sx={{ color:'#fff', lineHeight:1.2, fontSize:'0.82rem' }}>{person.full_name}</Typography>
+                                    <Chip label={`${person.process_count} tasks`} size="small"
+                                      sx={{ height:16, fontSize:'0.62rem', background:'rgba(102,126,234,0.25)', color:'#667eea', mt:0.2 }} />
+                                  </Box>
+                                </Stack>
+                              </Box>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      )
+                      : <Typography variant="body2" sx={{ color:'rgba(255,255,255,0.3)' }}>No data for last week.</Typography>
+                  }
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+
+        </Box>
+      </Fade>
     </Box>
   );
 };
