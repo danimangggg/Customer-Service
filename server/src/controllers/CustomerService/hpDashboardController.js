@@ -9,10 +9,17 @@ const getHPDashboardData = async (req, res) => {
     const { month, year, process_type } = req.query;
     const reportingMonth = month && year ? `${month} ${year}` : null;
 
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchWhere  = branchCode ? { branch_code: branchCode } : {};
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
     // Get total HP facilities - NOT month dependent
     const totalFacilities = process_type === 'vaccine'
-      ? await Facility.count({ where: { is_vaccine_site: true } })
-      : await Facility.count({ where: { is_hp_site: true } });
+      ? await Facility.count({ where: { is_vaccine_site: true, ...branchWhere } })
+      : await Facility.count({ where: { is_hp_site: true, ...branchWhere } });
 
     // For month-dependent metrics, filter by reporting month and process_type
     const processWhere = {};
@@ -25,24 +32,41 @@ const getHPDashboardData = async (req, res) => {
     if (reportingMonth || process_type) {
       const processes = await Process.findAll({
         where: Object.keys(processWhere).length > 0 ? processWhere : {},
-        attributes: ['id']
+        attributes: ['id'],
+        include: branchCode ? [{
+          model: Facility,
+          as: 'facility',
+          where: { branch_code: branchCode },
+          attributes: []
+        }] : []
+      });
+      const processIds = processes.map(p => p.id);
+      odnWhere.process_id = processIds.length > 0 ? { [Op.in]: processIds } : -1;
+    } else if (branchCode) {
+      // No month filter but branch filter needed
+      const processes = await Process.findAll({
+        attributes: ['id'],
+        include: [{
+          model: Facility,
+          as: 'facility',
+          where: { branch_code: branchCode },
+          attributes: []
+        }]
       });
       const processIds = processes.map(p => p.id);
       odnWhere.process_id = processIds.length > 0 ? { [Op.in]: processIds } : -1;
     }
 
-    // Get total ODNs (month dependent if filter applied, excluding "RRF not sent")
     const totalODNs = await ODN.count({ where: odnWhere });
 
-    // Get RRF Sent count (facilities that have processes but NOT "RRF not sent" ODN)
-    // Only count HP facilities (those with routes) and filter by month if specified
     let rrfSentQuery = `
       SELECT COUNT(DISTINCT p.facility_id) as count
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id
       WHERE f.is_hp_site = 1
+      ${branchFilter}
     `;
-    
+
     const rrfQueryParams = [];
     if (reportingMonth) {
       rrfSentQuery += ` AND p.reporting_month = ?`;
@@ -55,18 +79,20 @@ const getHPDashboardData = async (req, res) => {
     if (reportingMonth) {
       rrfSentQuery += `
         AND p.facility_id NOT IN (
-          SELECT DISTINCT p2.facility_id 
-          FROM processes p2 
-          INNER JOIN odns o ON p2.id = o.process_id 
+          SELECT DISTINCT p2.facility_id
+          FROM processes p2
+          INNER JOIN odns o ON p2.id = o.process_id
+          INNER JOIN facilities f2 ON p2.facility_id = f2.id
           WHERE o.odn_number = 'RRF not sent' AND p2.reporting_month = ?
+          ${branchFilter.replace('f.', 'f2.')}
         )`;
       rrfQueryParams.push(reportingMonth);
     } else {
       rrfSentQuery += `
         AND p.facility_id NOT IN (
-          SELECT DISTINCT p2.facility_id 
-          FROM processes p2 
-          INNER JOIN odns o ON p2.id = o.process_id 
+          SELECT DISTINCT p2.facility_id
+          FROM processes p2
+          INNER JOIN odns o ON p2.id = o.process_id
           WHERE o.odn_number = 'RRF not sent'
         )`;
     }
@@ -77,64 +103,35 @@ const getHPDashboardData = async (req, res) => {
     });
     const rrfSent = rrfResult.count;
 
-    // Get dispatched ODNs - use pod_confirmed as the dispatch indicator
-    // pod_confirmed is set when the facility receives the goods (after physical dispatch)
-    // This ensures dispatched >= quality_evaluated always holds true
-    const dispatchedODNs = await ODN.count({
-      where: {
-        ...odnWhere,
-        pod_confirmed: true
-      }
-    });
+    const dispatchedODNs   = await ODN.count({ where: { ...odnWhere, pod_confirmed: true } });
+    const podConfirmed     = await ODN.count({ where: { ...odnWhere, pod_confirmed: true } });
+    const qualityEvaluated = await ODN.count({ where: { ...odnWhere, quality_confirmed: true } });
 
-    // Get POD confirmed ODNs (have pod_confirmed = true)
-    const podConfirmed = await ODN.count({
-      where: {
-        ...odnWhere,
-        pod_confirmed: true
-      }
-    });
-
-    // Get quality evaluated ODNs (have quality_confirmed = true)
-    const qualityEvaluated = await ODN.count({
-      where: {
-        ...odnWhere,
-        quality_confirmed: true
-      }
-    });
-
-    // Expected This Month: depends on process type and period
-    // - vaccine: all vaccine sites
-    // - regular: HP sites filtered by period (Monthly always, Odd/Even alternating by month)
     const ethiopianMonths = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
     let expectedThisMonth = totalFacilities;
     if (process_type === 'vaccine') {
-      expectedThisMonth = await Facility.count({ where: { is_vaccine_site: true } });
+      expectedThisMonth = await Facility.count({ where: { is_vaccine_site: true, ...branchWhere } });
     } else if (month) {
-      const monthIndex = ethiopianMonths.indexOf(month) + 1; // 1-based
+      const monthIndex = ethiopianMonths.indexOf(month) + 1;
       const isOddMonth = monthIndex % 2 !== 0;
-      const periodFilter = isOddMonth
-        ? { [Op.in]: ['Monthly', 'Odd'] }
-        : { [Op.in]: ['Monthly', 'Even'] };
+      const periodFilter = isOddMonth ? { [Op.in]: ['Monthly', 'Odd'] } : { [Op.in]: ['Monthly', 'Even'] };
       expectedThisMonth = await Facility.count({
-        where: { is_hp_site: true, period: periodFilter }
+        where: { is_hp_site: true, period: periodFilter, ...branchWhere }
       });
     }
 
-    // Expected vs Done calculation
     const expected = totalFacilities;
-    
-    // Count HP facilities with completed processes (quality evaluated means process is finished)
-    // Use raw query to count distinct facilities with quality evaluated ODNs
+
     let completedFacilitiesQuery = `
       SELECT COUNT(DISTINCT p.facility_id) as count
       FROM processes p
-      INNER JOIN facilities f ON p.facility_id = f.id 
+      INNER JOIN facilities f ON p.facility_id = f.id
       INNER JOIN odns o ON p.id = o.process_id
       WHERE f.is_hp_site = 1
         AND o.quality_confirmed = true
+        ${branchFilter}
     `;
-    
+
     const queryParams = [];
     if (reportingMonth) {
       completedFacilitiesQuery += ' AND p.reporting_month = ?';
@@ -151,32 +148,17 @@ const getHPDashboardData = async (req, res) => {
     });
     const done = completedResult.count;
 
-    const dashboardData = {
-      totalODNs,
-      totalFacilities,
-      expectedThisMonth,
-      rrfSent,
-      dispatchedODNs,
-      podConfirmed,
-      qualityEvaluated,
-      expectedVsDone: {
-        expected,
-        done
-      },
+    res.status(200).json({
+      totalODNs, totalFacilities, expectedThisMonth,
+      rrfSent, dispatchedODNs, podConfirmed, qualityEvaluated,
+      expectedVsDone: { expected, done },
       reportingPeriod: reportingMonth || 'All Time'
-    };
-
-    res.status(200).json(dashboardData);
+    });
 
   } catch (error) {
     console.error('Error fetching HP dashboard data:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch HP dashboard data', 
-      error: error.message 
-    });
+    res.status(500).json({ message: 'Failed to fetch HP dashboard data', error: error.message });
   }
 };
 
-module.exports = {
-  getHPDashboardData
-};
+module.exports = { getHPDashboardData };

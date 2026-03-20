@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { 
     Box, Typography, CircularProgress, Paper, Table, TableBody, 
@@ -85,7 +86,7 @@ const DispatcherAccount = () => {
         const fetchFacilities = async () => {
             try {
                 console.log('Fetching facilities from:', `${API_URL}/api/facilities`);
-                const response = await axios.get(`${API_URL}/api/facilities`);
+                const response = await api.get(`${API_URL}/api/facilities`);
                 console.log('Facilities response:', response.data);
                 const map = response.data.reduce((acc, facility) => {
                     acc[facility.id] = facility;

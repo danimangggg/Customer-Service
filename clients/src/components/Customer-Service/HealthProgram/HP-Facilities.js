@@ -869,7 +869,7 @@ const HpFacilities = () => {
     facilities.forEach(f => {
       const matchesSearch = (f.facility_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (f.route || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRoute = isSpecialType || filterRoute === "All" || f.route === filterRoute || f.route2 === filterRoute;
+      const matchesRoute = isSpecialType || filterRoute === "All" || f.route === filterRoute;
       const shouldShow = shouldShowFacility(f);
       
       if (matchesSearch && matchesRoute && shouldShow) {
@@ -924,7 +924,7 @@ const HpFacilities = () => {
     filteredData = facilities.filter(f => {
       const matchesSearch = (f.facility_name || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (f.route || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRoute = isSpecialType || filterRoute === "All" || f.route === filterRoute || f.route2 === filterRoute;
+      const matchesRoute = isSpecialType || filterRoute === "All" || f.route === filterRoute;
       const shouldShow = shouldShowFacility(f);
       
       if (isSpecialType) {

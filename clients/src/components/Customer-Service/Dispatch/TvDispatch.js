@@ -1,11 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import axios from 'axios';
+import api from '../../../axiosInstance';
+import { useSearchParams } from 'react-router-dom';
 import { Box, Typography, Button } from '@mui/material';
 import dayjs from 'dayjs';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const TvCustomer = () => {
+  const [searchParams] = useSearchParams();
+  const branchParam = searchParams.get('branch_code') || '';
   const [customers, setCustomers] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [audioStarted, setAudioStarted] = useState(false);
@@ -45,13 +48,13 @@ const TvCustomer = () => {
   const fetchData = useCallback(async () => {
     try {
       const [custRes, facRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`),
-        axios.get(`${API_URL}/api/facilities`)
+        api.get(`${API_URL}/api/tv-display-customers`, { params: branchParam ? { branch_code: branchParam } : {} }),
+        api.get(`${API_URL}/api/facilities`, { params: branchParam ? { branch_code: branchParam } : {} })
       ]);
       setCustomers(custRes.data);
       setFacilities(facRes.data);
     } catch (error) { console.error("API Error"); }
-  }, []);
+  }, [branchParam]);
 
   useEffect(() => {
     fetchData();

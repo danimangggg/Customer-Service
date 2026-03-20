@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import { recordServiceTimeAuto, formatTimestamp } from '../../../utils/serviceTimeHelper';
 import { 
   Box, Typography, Button, Table, TableBody, TableCell, 
@@ -120,7 +121,7 @@ const GateKeeper = () => {
           console.log('No active sessions, fetching available stores...');
           
           // Fetch available stores
-          const storesResponse = await axios.get(`${API_URL}/api/stores`);
+          const storesResponse = await api.get(`${API_URL}/api/stores`);
           console.log('Stores API response:', storesResponse.data);
           
           const storeNames = storesResponse.data.map(store => store.store_name);

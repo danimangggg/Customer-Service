@@ -14,8 +14,14 @@ const getCustomersDetailReport = async (req, res) => {
       sortOrder = 'DESC',
       statusFilter = '',
       dateFrom = '',
-      dateTo = ''
+      dateTo = '',
+      branch_code: queryBranch = ''
     } = req.query;
+
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchCondition = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
@@ -87,6 +93,7 @@ const getCustomersDetailReport = async (req, res) => {
       ${searchCondition}
       ${statusFilterCondition}
       ${periodCondition}
+      ${branchCondition}
     `;
 
     const totalResult = await db.sequelize.query(countQuery, {
@@ -126,6 +133,7 @@ const getCustomersDetailReport = async (req, res) => {
       ${searchCondition}
       ${statusFilterCondition}
       ${periodCondition}
+      ${branchCondition}
       ORDER BY ${validSortBy === 'facility_name' ? 'COALESCE(f.facility_name, cq.delegate)' : validSortBy === 'started_at' ? 'cq.started_at' : 'cq.' + validSortBy} ${validSortOrder}
       LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;

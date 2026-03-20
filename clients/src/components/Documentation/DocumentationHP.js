@@ -16,6 +16,7 @@ import {
   Edit as EditIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { formatTimestamp } from '../../utils/serviceTimeHelper';
@@ -89,6 +90,22 @@ const DocumentationHP = () => {
     }
   }, [selectedMonth, selectedYear, searchTerm, page, rowsPerPage, filterType]);
 
+  // Silent background polling every 5s (only when no dialog is open)
+  useEffect(() => {
+    if (!selectedMonth || !selectedYear) return;
+    const silentFetch = async () => {
+      if (openEditDialog) return; // don't refresh while user is editing
+      try {
+        const res = await api.get(`${api_url}/api/dispatched-odns`, {
+          params: { month: selectedMonth, year: selectedYear, page: page + 1, limit: rowsPerPage, search: searchTerm, process_type: filterType.toLowerCase() }
+        });
+        if (res.data.facilities) setFacilityData(res.data.facilities);
+      } catch (_) {}
+    };
+    const interval = setInterval(silentFetch, 5000);
+    return () => clearInterval(interval);
+  }, [selectedMonth, selectedYear, searchTerm, page, rowsPerPage, filterType, openEditDialog]);
+
   const fetchDispatchedFacilities = async () => {
     try {
       setLoading(true);
@@ -99,7 +116,7 @@ const DocumentationHP = () => {
         return;
       }
       
-      const response = await axios.get(`${api_url}/api/dispatched-odns`, {
+      const response = await api.get(`${api_url}/api/dispatched-odns`, {
         params: {
           month: selectedMonth,
           year: selectedYear,

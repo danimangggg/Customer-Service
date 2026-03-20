@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, CircularProgress, Card, CardContent,
@@ -23,7 +24,7 @@ const ServiceTimeTracking = () => {
   const fetchServiceTimeData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/service-time-tracking`);
+      const response = await api.get(`${API_URL}/api/service-time-tracking`);
       setData(response.data);
     } catch (err) {
       console.error('Error fetching service time data:', err);

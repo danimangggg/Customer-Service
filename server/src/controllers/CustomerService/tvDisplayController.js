@@ -4,12 +4,16 @@ const { Sequelize } = require('sequelize');
 // Get customers for TV display with ODN-based store assignments
 const getTvDisplayCustomers = async (req, res) => {
   try {
-    // Check if we should include completed customers
     const includeCompleted = req.query.includeCompleted === 'true';
-    
-    // For documentation report (completed), show exit history if available, otherwise fall back to customer_queue data
+
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND s.branch_code = '${branchCode}'` : '';
+    const branchFilterActive = branchCode ? `AND s.branch_code = '${branchCode}'` : '';
+
     if (includeCompleted) {
-      // Get data from exit_history (new records with exit tracking)
       const exitHistoryQuery = `
         SELECT 
           eh.id as exit_history_id,
@@ -37,6 +41,7 @@ const getTvDisplayCustomers = async (req, res) => {
         INNER JOIN odns_rdf odn ON cq.id = odn.process_id
         INNER JOIN stores s ON odn.store_id = s.id AND s.store_name = eh.store_id
         LEFT JOIN facilities f ON cq.facility_id = f.id
+        WHERE 1=1 ${branchFilter}
         GROUP BY eh.id, eh.process_id, eh.store_id, eh.exit_number,
                  eh.vehicle_plate, eh.total_amount, eh.measurement_unit,
                  eh.receipt_count, eh.receipt_number, eh.gate_keeper_name,
@@ -47,7 +52,6 @@ const getTvDisplayCustomers = async (req, res) => {
 
       const [exitHistoryResults] = await db.sequelize.query(exitHistoryQuery);
 
-      // Get old completed records that don't have exit_history (for backward compatibility)
       const fallbackQuery = `
         SELECT 
           cq.id,
@@ -72,6 +76,7 @@ const getTvDisplayCustomers = async (req, res) => {
         INNER JOIN stores s ON odn.store_id = s.id
         LEFT JOIN facilities f ON cq.facility_id = f.id
         WHERE cq.status = 'completed'
+          ${branchFilter}
           AND NOT EXISTS (
             SELECT 1 FROM exit_history eh 
             WHERE eh.process_id = cq.id AND eh.store_id = s.store_name
@@ -140,10 +145,6 @@ const getTvDisplayCustomers = async (req, res) => {
     }
     
     // For active customers (TV display), group by customer
-    const whereClause = `WHERE cq.status != 'completed' 
-         AND cq.status != 'canceled'
-         AND cq.status != 'rejected'`;
-    
     const query = `
       SELECT 
         cq.*,
@@ -164,7 +165,10 @@ const getTvDisplayCustomers = async (req, res) => {
       FROM customer_queue cq
       LEFT JOIN odns_rdf odn ON cq.id = odn.process_id
       LEFT JOIN stores s ON odn.store_id = s.id
-      ${whereClause}
+      WHERE cq.status != 'completed' 
+         AND cq.status != 'canceled'
+         AND cq.status != 'rejected'
+         ${branchFilterActive}
       GROUP BY cq.id
       ORDER BY cq.started_at ASC
     `;

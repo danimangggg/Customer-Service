@@ -4,7 +4,13 @@ const db = require('../../models');
 const getSetting = async (req, res) => {
   try {
     const { key } = req.params;
-    
+
+    // For youtube_playlist, scope by branch if provided
+    const branchCode = req.query.branch_code || req.headers['x-branch-code'] || null;
+    const resolvedKey = (key === 'youtube_playlist' && branchCode)
+      ? `youtube_playlist_${branchCode}`
+      : key;
+
     const query = `
       SELECT setting_key, setting_value, description
       FROM app_settings
@@ -12,15 +18,16 @@ const getSetting = async (req, res) => {
     `;
     
     const [results] = await db.sequelize.query(query, {
-      replacements: [key],
+      replacements: [resolvedKey],
       type: db.sequelize.QueryTypes.SELECT
     });
-    
+
     if (!results) {
-      return res.status(404).json({
-        success: false,
-        message: 'Setting not found'
-      });
+      // For youtube_playlist with a branch, return empty array instead of 404
+      if (key === 'youtube_playlist' && branchCode) {
+        return res.json({ success: true, key: resolvedKey, value: [], description: null });
+      }
+      return res.status(404).json({ success: false, message: 'Setting not found' });
     }
     
     // Parse JSON if it's the youtube_playlist
@@ -55,7 +62,13 @@ const updateSetting = async (req, res) => {
   try {
     const { key } = req.params;
     const { value, description } = req.body;
-    
+
+    // For youtube_playlist, scope by branch if provided
+    const branchCode = req.query.branch_code || req.headers['x-branch-code'] || null;
+    const resolvedKey = (key === 'youtube_playlist' && branchCode)
+      ? `youtube_playlist_${branchCode}`
+      : key;
+
     // Convert value to JSON string if it's an object/array
     let settingValue = value;
     if (typeof value === 'object') {
@@ -72,13 +85,13 @@ const updateSetting = async (req, res) => {
     `;
     
     await db.sequelize.query(query, {
-      replacements: [key, settingValue, description || null]
+      replacements: [resolvedKey, settingValue, description || null]
     });
     
     res.json({
       success: true,
       message: 'Setting updated successfully',
-      key: key
+      key: resolvedKey
     });
     
   } catch (error) {

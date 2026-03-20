@@ -4,7 +4,14 @@ const Employee = db.employee;
 
 const retriveUsers = async (req, res) => {
   try {
-    // Use raw query to join with stores table
+    const accountType  = req.headers['x-account-type'] || null;
+    const branchCode   = req.headers['x-branch-code'] || null;
+
+    // Branch isolation: non-Super Admin only sees their own branch
+    // Also exclude Super Admin accounts from the list
+    const branchCondition = (accountType !== 'Super Admin' && branchCode)
+      ? `AND e.branch_code = '${branchCode}'` : '';
+
     const [data] = await db.sequelize.query(`
       SELECT 
         e.id, 
@@ -16,9 +23,10 @@ const retriveUsers = async (req, res) => {
         s.store_name as store
       FROM employees e
       LEFT JOIN stores s ON e.store_id = s.id
+      WHERE e.account_type != 'Super Admin'
+      ${branchCondition}
     `);
-    
-    // Map to match expected frontend format
+
     const jsonArray = data.map(emp => ({
       id: emp.id,
       user_name: emp.user_name,
@@ -27,16 +35,11 @@ const retriveUsers = async (req, res) => {
       JobTitle: emp.jobTitle,
       store: emp.store
     }));
-    
-    console.log('Employees fetched:', jsonArray.length);
-    
+
     res.status(200).json(jsonArray);
   } catch (error) {
     console.error('Error fetching employees:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch employees',
-      message: error.message 
-    });
+    res.status(500).json({ error: 'Failed to fetch employees', message: error.message });
   }
 }
 

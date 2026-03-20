@@ -17,6 +17,12 @@ const getHPCustomersDetailReport = async (req, res) => {
       process_type = ''
     } = req.query;
 
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchCondition = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
     // Build process_type filter
@@ -79,6 +85,7 @@ const getHPCustomersDetailReport = async (req, res) => {
       ${processTypeCondition}
       ${searchCondition}
       ${statusFilterCondition}
+      ${branchCondition}
     `;
 
     const totalResult = await db.sequelize.query(countQuery, {
@@ -156,6 +163,7 @@ const getHPCustomersDetailReport = async (req, res) => {
       ${processTypeCondition}
       ${searchCondition}
       ${statusFilterCondition}
+      ${branchCondition}
       ORDER BY ${validSortBy === 'facility_name' ? 'f.facility_name' : 'p.' + validSortBy} ${validSortOrder}
       LIMIT ${parseInt(limit)} OFFSET ${offset}
     `;

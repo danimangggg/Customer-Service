@@ -4,8 +4,14 @@ const { Op } = require('sequelize');
 // Get comprehensive HP report data
 const getComprehensiveHPReport = async (req, res) => {
   try {
-    const { month, year, process_type = '' } = req.query;
+    const { month, year, process_type = '', branch_code: queryBranch } = req.query;
     const reportingMonth = month && year ? `${month} ${year}` : null;
+
+    // Branch filtering: use query param (Super Admin picks a branch) or header (regular users)
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
 
     if (!reportingMonth) {
       return res.status(400).json({ error: 'Month and year are required' });
@@ -37,12 +43,13 @@ const getComprehensiveHPReport = async (req, res) => {
     // For HP regular: expected = facilities marked as HP sites matching the current period
     // For others (emergency/breakdown): expected = HP sites (route+period)
     const totalFacilitiesQuery = process_type === 'vaccine'
-      ? `SELECT COUNT(DISTINCT f.id) as total FROM facilities f WHERE f.is_vaccine_site = 1`
+      ? `SELECT COUNT(DISTINCT f.id) as total FROM facilities f WHERE f.is_vaccine_site = 1 ${branchFilter}`
       : `
       SELECT COUNT(DISTINCT f.id) as total
       FROM facilities f
       WHERE f.is_hp_site = 1
         ${periodFilter}
+        ${branchFilter}
       `;
     const [totalFacilitiesResult] = await db.sequelize.query(totalFacilitiesQuery, {
       type: db.sequelize.QueryTypes.SELECT
@@ -58,14 +65,17 @@ const getComprehensiveHPReport = async (req, res) => {
       WHERE 1=1
         ${monthFilter}
         AND f.route IS NOT NULL AND f.route != ''
+        ${branchFilter}
         ${ptFilter}
         AND p.facility_id NOT IN (
           SELECT DISTINCT p2.facility_id 
           FROM processes p2 
           INNER JOIN odns o ON p2.id = o.process_id 
+          INNER JOIN facilities f2 ON p2.facility_id = f2.id
           WHERE o.odn_number = 'RRF not sent'
           ${monthFilter2}
           ${ptFilter2}
+          ${branchCode ? `AND f2.branch_code = '${branchCode}'` : ''}
         )
     `;
     const rrfSentReplacements = [];
@@ -96,14 +106,17 @@ const getComprehensiveHPReport = async (req, res) => {
       WHERE 1=1
         ${monthFilter}
         AND f.route IS NOT NULL AND f.route != ''
+        ${branchFilter}
         ${ptFilter}
         AND p.facility_id NOT IN (
           SELECT DISTINCT p2.facility_id 
           FROM processes p2 
           INNER JOIN odns o ON p2.id = o.process_id 
+          INNER JOIN facilities f2 ON p2.facility_id = f2.id
           WHERE o.odn_number = 'RRF not sent'
           ${monthFilter2}
           ${ptFilter2}
+          ${branchCode ? `AND f2.branch_code = '${branchCode}'` : ''}
         )
       ORDER BY f.route, f.facility_name
     `;
@@ -130,6 +143,7 @@ const getComprehensiveHPReport = async (req, res) => {
         f.route
       FROM facilities f
       WHERE ${vaccineFacilityFilter}
+        ${branchFilter}
         AND (
           -- Facilities with no processes at all
           f.id NOT IN (
@@ -169,9 +183,11 @@ const getComprehensiveHPReport = async (req, res) => {
         COUNT(DISTINCT CASE WHEN o.quality_confirmed = 1 THEN o.id END) as quality_evaluated_odns
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id
+      INNER JOIN facilities f ON p.facility_id = f.id
       WHERE 1=1
         ${monthFilter}
         AND o.odn_number != 'RRF not sent'
+        ${branchFilter}
         ${ptFilter}
     `;
     const [odnStats] = await db.sequelize.query(odnStatsQuery, {
@@ -184,6 +200,7 @@ const getComprehensiveHPReport = async (req, res) => {
     const routeFacilityFilter = process_type === 'vaccine'
       ? `AND f.is_vaccine_site = 1`
       : `AND f.is_hp_site = 1`;
+    const routeBranchFilter = branchCode ? `AND r.branch_code = '${branchCode}'` : '';
 
     const routeStatsQuery = `
       SELECT 
@@ -221,7 +238,7 @@ const getComprehensiveHPReport = async (req, res) => {
          ${skipMonthFilter ? (process_type ? `AND p5.process_type = '${process_type}'` : '') : `AND p5.reporting_month = ?`}
          ORDER BY p5.created_at DESC LIMIT 1) as vehicle_name
       FROM routes r
-      LEFT JOIN facilities f ON f.route = r.route_name ${routeFacilityFilter}
+      LEFT JOIN facilities f ON f.route = r.route_name ${routeFacilityFilter} ${branchFilter}
       LEFT JOIN processes p ON p.facility_id = f.id ${skipMonthFilter ? (process_type ? `AND p.process_type = '${process_type}'` : '') : `AND p.reporting_month = ? ${process_type ? `AND p.process_type = '${process_type}'` : ''}`}
       LEFT JOIN odns o ON o.process_id = p.id
       GROUP BY r.id, r.route_name
@@ -330,6 +347,7 @@ const getComprehensiveHPReport = async (req, res) => {
       WHERE 1=1
         ${monthFilter}
         AND f.route IS NOT NULL AND f.route != ''
+        ${branchFilter}
         ${ptFilter}
     `;
     const workflowReplacements = [];
@@ -349,6 +367,7 @@ const getComprehensiveHPReport = async (req, res) => {
         AND (o.quality_confirmed = 1 OR o.quality_confirmed = true)
         AND o.odn_number != 'RRF not sent'
         ${monthFilter}
+        ${branchFilter}
         ${ptFilter}
     `;
     const doneFacilitiesReplacements = [];
@@ -394,6 +413,12 @@ const getTimeTrendData = async (req, res) => {
   try {
     const { startMonth, startYear, endMonth, endYear } = req.query;
 
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
     // For simplicity, get last 6 months of data (excluding "RRF not sent")
     const trendQuery = `
       SELECT 
@@ -407,6 +432,7 @@ const getTimeTrendData = async (req, res) => {
       INNER JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN odns o ON o.process_id = p.id
       WHERE f.route IS NOT NULL AND f.route != ''
+        ${branchFilter}
       GROUP BY p.reporting_month
       ORDER BY p.reporting_month
     `;
@@ -436,6 +462,12 @@ const getODNPODDetails = async (req, res) => {
     if (!reporting_month && !process_type) {
       return res.status(400).json({ error: 'Reporting month is required' });
     }
+
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
 
     const skipMonthFilter = process_type === 'emergency' || process_type === 'breakdown' || process_type === 'vaccine';
     const ptFilter = process_type ? `AND p.process_type = '${process_type}'` : '';
@@ -467,6 +499,7 @@ const getODNPODDetails = async (req, res) => {
         ${vaccineFilter}
         ${monthFilter}
         ${ptFilter}
+        ${branchFilter}
       ORDER BY f.route, f.facility_name, o.odn_number
     `;
 
@@ -491,6 +524,12 @@ const getODNPODDetails = async (req, res) => {
 // Get all ODN and POD information (no month filter)
 const getAllODNPODDetails = async (req, res) => {
   try {
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
     const odnDetailsQuery = `
       SELECT 
         o.id,
@@ -514,6 +553,7 @@ const getAllODNPODDetails = async (req, res) => {
       INNER JOIN facilities f ON p.facility_id = f.id
       WHERE f.route IS NOT NULL AND f.route != ''
         AND o.odn_number != 'RRF not sent'
+        ${branchFilter}
       ORDER BY p.reporting_month DESC, f.route, f.facility_name, o.odn_number
     `;
 

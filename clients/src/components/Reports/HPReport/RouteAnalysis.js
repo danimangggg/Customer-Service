@@ -12,6 +12,7 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import SpeedIcon from '@mui/icons-material/Speed';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 
 const ethiopianMonths = [
   'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
@@ -64,7 +65,7 @@ const RouteAnalysis = () => {
       setError(null);
       const params = { month: selectedMonth, year: selectedYear };
       if (processType) params.process_type = processType;
-      const response = await axios.get(`${api_url}/api/hp-comprehensive-report`, { params });
+      const response = await api.get(`${api_url}/api/hp-comprehensive-report`, { params });
       setRouteStats(response.data.routeStats || []);
       setExpectedFacilities(response.data.expectedFacilities || 0);
     } catch (err) {

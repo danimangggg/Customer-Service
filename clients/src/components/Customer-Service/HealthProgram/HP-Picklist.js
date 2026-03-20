@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
 import {
@@ -71,7 +72,7 @@ const HPPickListDetail = () => {
       console.log('HP Process Item:', processItem); // Debug log to see what data we have
 
       // Fetch facility details
-      const facilitiesRes = await axios.get(`${api_url}/api/facilities`);
+      const facilitiesRes = await api.get(`${api_url}/api/facilities`);
       const facilities = Array.isArray(facilitiesRes.data) ? facilitiesRes.data : [];
       const facilityItem = facilities.find(f => String(f.id) === String(processItem.facility_id));
       setFacility(facilityItem || null);
@@ -129,7 +130,7 @@ const HPPickListDetail = () => {
       setSubmittedPicklists(filtered);
 
       // Fetch WIM Operators with store information
-      const empRes = await axios.get(`${api_url}/api/get-employee`);
+      const empRes = await api.get(`${api_url}/api/get-employee`);
       const employees = Array.isArray(empRes.data) ? empRes.data : [];
       
       console.log('=== WIM OPERATOR DEBUG ===');

@@ -17,6 +17,7 @@ import {
   Route as RouteIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { formatTimestamp } from '../../utils/serviceTimeHelper';
@@ -121,7 +122,7 @@ const DocumentationManagement = () => {
         search: searchTerm
       });
       
-      const response = await axios.get(`${api_url}/api/dispatched-odns`, {
+      const response = await api.get(`${api_url}/api/dispatched-odns`, {
         params: {
           month: selectedMonth,
           year: selectedYear,

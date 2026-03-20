@@ -44,6 +44,7 @@ import {
   Cancel as InactiveIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
@@ -85,7 +86,7 @@ const VehicleManagement = () => {
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/vehicles`, {
+      const response = await api.get(`${API_URL}/api/vehicles`, {
         params: {
           page: page + 1,
           limit: rowsPerPage,

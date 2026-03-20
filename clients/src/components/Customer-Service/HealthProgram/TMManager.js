@@ -14,6 +14,7 @@ import {
   Groups as GroupsIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
 import * as XLSX from 'xlsx';
@@ -73,6 +74,22 @@ const TMManager = () => {
     fetchDriversAndDeliverers();
   }, [processType]);
 
+  // Silent background polling every 5s
+  useEffect(() => {
+    const silentFetch = async () => {
+      try {
+        const [r1, r2] = await Promise.all([
+          axios.get(`${api_url}/api/tm-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } }),
+          axios.get(`${api_url}/api/tm-vehicle-assignment-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } })
+        ]);
+        setPhase1Processes(r1.data.processes || []);
+        setPhase2Processes(r2.data.processes || []);
+      } catch (_) {}
+    };
+    const interval = setInterval(silentFetch, 5000);
+    return () => clearInterval(interval);
+  }, [processType]);
+
   const fetchPhase1Processes = async () => {
     try {
       setLoading(true); setError(null);
@@ -89,12 +106,12 @@ const TMManager = () => {
   };
 
   const fetchVehicles = async () => {
-    try { const res = await axios.get(`${api_url}/api/vehicles/available`); setVehicles(res.data || []); } catch (err) { console.error(err); }
+    try { const res = await api.get(`${api_url}/api/vehicles/available`); setVehicles(res.data || []); } catch (err) { console.error(err); }
   };
 
   const fetchDriversAndDeliverers = async () => {
     try {
-      const res = await axios.get(`${api_url}/api/get-employee`);
+      const res = await api.get(`${api_url}/api/get-employee`);
       const all = Array.isArray(res.data) ? res.data : [];
       const drv = all.filter(e => e.jobTitle?.toLowerCase().includes('driver'));
       const dlv = all.filter(e => e.jobTitle?.toLowerCase().includes('deliverer'));

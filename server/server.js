@@ -22,6 +22,10 @@ app.use(cors({
 app.use(express.json())
 global.__basedir = __dirname;
 
+// Branch middleware — attaches req.branchCode from X-Branch-Code header
+const branchMiddleware = require('./src/middleware/branchMiddleware');
+app.use(branchMiddleware);
+
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static assets BEFORE routes

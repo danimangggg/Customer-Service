@@ -1,18 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Typography, Chip, IconButton, Box, TextField, InputAdornment, Card,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, MenuItem, 
-  Container, TablePagination, FormControlLabel, Checkbox
+  Container, TablePagination, FormControlLabel, Checkbox, CircularProgress
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BusinessIcon from '@mui/icons-material/Business';
 import VaccinesIcon from '@mui/icons-material/Vaccines';
+import DownloadIcon from '@mui/icons-material/Download';
+import UploadIcon from '@mui/icons-material/Upload';
+import * as XLSX from 'xlsx';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import BranchSelect from '../../Settings/BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -24,15 +28,17 @@ const FacilityManager = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openEdit, setOpenEdit] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef();
   
   // Value Taker State
   const [selectedFacility, setSelectedFacility] = useState({ 
     id: '', 
     facility_name: '', 
     route: '', 
-    route2: '',
     period: '',
-    is_vaccine_site: false
+    is_vaccine_site: false,
+    branch_code: ''
   });
 
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -61,9 +67,9 @@ const FacilityManager = () => {
       id: f.id,
       facility_name: f.facility_name,
       route: f.route || '', 
-      route2: f.route2 || '',
       period: f.period || '',
-      is_vaccine_site: !!f.is_vaccine_site
+      is_vaccine_site: !!f.is_vaccine_site,
+      branch_code: f.branch_code || ''
     });
     setOpenEdit(true);
   };
@@ -72,9 +78,10 @@ const FacilityManager = () => {
     try {
       const payload = {
         route: selectedFacility.route,
-        route2: selectedFacility.period === 'Monthly' ? (selectedFacility.route2 || null) : null,
+        route2: null,
         period: selectedFacility.period,
-        is_vaccine_site: selectedFacility.is_vaccine_site ? 1 : 0
+        is_vaccine_site: selectedFacility.is_vaccine_site ? 1 : 0,
+        branch_code: selectedFacility.branch_code || null
       };
       const res = await axios.put(`${api_url}/api/update-facilities/${selectedFacility.id}`, payload);
       
@@ -216,6 +223,68 @@ const FacilityManager = () => {
     }
   };
 
+  // --- EXCEL TEMPLATE DOWNLOAD ---
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        facility_name: 'Example Health Center',
+        facility_type: 'Health Center',
+        region_name: 'Addis Ababa',
+        zone_name: 'Zone 1',
+        woreda_name: 'Woreda 1',
+        route: 'Route A',
+        period: 'Odd',
+        is_hp_site: 1,
+        is_vaccine_site: 0
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Facilities');
+    XLSX.writeFile(wb, 'facilities_template.xlsx');
+  };
+
+  // --- EXCEL IMPORT ---
+  const handleImportExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+
+      if (rows.length === 0) {
+        MySwal.fire('Empty File', 'No rows found in the Excel file.', 'warning');
+        return;
+      }
+
+      const res = await axios.post(`${api_url}/api/facilities/bulk-import`, rows);
+      const { created, updated, errors } = res.data;
+
+      await MySwal.fire({
+        title: 'Import Complete',
+        html: `
+          <div style="text-align:center;padding:10px">
+            <p>✅ Created: <strong>${created}</strong></p>
+            <p>🔄 Updated: <strong>${updated}</strong></p>
+            ${errors.length > 0 ? `<p>❌ Errors: <strong>${errors.length}</strong></p><p style="font-size:12px;color:#999">${errors.map(e => `Row ${e.row}: ${e.message}`).join('<br/>')}</p>` : ''}
+          </div>
+        `,
+        icon: errors.length > 0 ? 'warning' : 'success',
+        confirmButtonColor: '#4caf50',
+      });
+      fetchFacilities();
+    } catch (err) {
+      MySwal.fire('Error', err.response?.data?.message || 'Import failed', 'error');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   // --- SEARCH FILTER ---
   const filtered = facilities.filter(f => 
     f.facility_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -227,6 +296,9 @@ const FacilityManager = () => {
       <style>
         {`
           /* Custom SweetAlert Styles */
+          .swal2-container {
+            z-index: 99999 !important;
+          }
           .swal-custom-popup {
             border-radius: 20px !important;
             box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
@@ -284,6 +356,27 @@ const FacilityManager = () => {
             sx={{ width: 320, bgcolor: 'white' }}
             InputProps={{ startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} /> }}
           />
+          <Box display="flex" gap={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownloadTemplate}
+            >
+              Template
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              color="success"
+              startIcon={importing ? <CircularProgress size={16} /> : <UploadIcon />}
+              onClick={() => importRef.current.click()}
+              disabled={importing}
+            >
+              Import Excel
+            </Button>
+            <input ref={importRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportExcel} />
+          </Box>
         </Box>
       </Card>
 
@@ -316,7 +409,6 @@ const FacilityManager = () => {
                 {/* 2. Route Column (Displays symbols/numbers) */}
                 <TableCell>
                   {f.route || "---"}
-                  {f.route2 && <><br/><span style={{ color: '#666', fontSize: '0.8em' }}>{f.route2}</span></>}
                 </TableCell>
 
                 <TableCell>
@@ -372,7 +464,7 @@ const FacilityManager = () => {
             label="Period"
             fullWidth
             value={selectedFacility.period}
-            onChange={(e) => setSelectedFacility({...selectedFacility, period: e.target.value, route2: ''})}
+            onChange={(e) => setSelectedFacility({...selectedFacility, period: e.target.value})}
           >
             <MenuItem value="Odd">Odd</MenuItem>
             <MenuItem value="Even">Even</MenuItem>
@@ -381,7 +473,7 @@ const FacilityManager = () => {
 
           <TextField
             select
-            label={selectedFacility.period === 'Monthly' ? 'Route 1' : 'Route'}
+            label="Route"
             fullWidth
             value={selectedFacility.route}
             onChange={(e) => setSelectedFacility({...selectedFacility, route: e.target.value})}
@@ -391,21 +483,6 @@ const FacilityManager = () => {
               <MenuItem key={r.id} value={r.route_name}>{r.route_name}</MenuItem>
             ))}
           </TextField>
-
-          {selectedFacility.period === 'Monthly' && (
-            <TextField
-              select
-              label="Route 2 (optional)"
-              fullWidth
-              value={selectedFacility.route2}
-              onChange={(e) => setSelectedFacility({...selectedFacility, route2: e.target.value})}
-            >
-              <MenuItem value="">-- None --</MenuItem>
-              {routes.map(r => (
-                <MenuItem key={r.id} value={r.route_name}>{r.route_name}</MenuItem>
-              ))}
-            </TextField>
-          )}
 
           <FormControlLabel
             control={
@@ -423,6 +500,10 @@ const FacilityManager = () => {
                 <Typography variant="caption" color="text.secondary">Register this facility as a vaccine distribution site</Typography>
               </Box>
             }
+          />
+          <BranchSelect
+            value={selectedFacility.branch_code}
+            onChange={(val) => setSelectedFacility({...selectedFacility, branch_code: val})}
           />
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid #eee' }}>

@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -33,7 +34,7 @@ const CreateUserForm = () => {
 
   const fetchStores = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/stores`);
+      const response = await api.get(`${api_url}/api/stores`);
       setStores(response.data);
     } catch (error) {
       console.error('Error fetching stores:', error);

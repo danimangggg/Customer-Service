@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import {
   Box,
   Typography,
@@ -123,11 +124,11 @@ const OrganizationProfile = () => {
     setLoading(true);
     try {
       // Fetch facilities from the actual facilities table
-      const facilitiesRes = await axios.get(`${api_url}/api/facilities`);
+      const facilitiesRes = await api.get(`${api_url}/api/facilities`);
       setFacilities(facilitiesRes.data);
 
       // Fetch employees data
-      const employeesRes = await axios.get(`${api_url}/api/get-employee`);
+      const employeesRes = await api.get(`${api_url}/api/get-employee`);
       setEmployees(employeesRes.data);
 
       // For now, we'll extract unique regions, zones, and woredas from facilities
@@ -290,10 +291,10 @@ const OrganizationProfile = () => {
 
         if (selectedItem) {
           // Update existing facility
-          await axios.put(`${api_url}/api/facilities/${selectedItem.id}`, facilityData);
+          await api.put(`${api_url}/api/facilities/${selectedItem.id}`, facilityData);
         } else {
           // Add new facility
-          await axios.post(`${api_url}/api/facilities`, facilityData);
+          await api.post(`${api_url}/api/facilities`, facilityData);
         }
         
         // Refresh facilities data
@@ -441,7 +442,7 @@ const OrganizationProfile = () => {
     if (result.isConfirmed) {
       try {
         if (type === 'facility') {
-          await axios.delete(`${api_url}/api/facilities/${id}`);
+          await api.delete(`${api_url}/api/facilities/${id}`);
           await fetchAllData(); // Refresh data
         } else {
           // Handle local deletion for regions, zones, woredas

@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import api from '../../../axiosInstance';
+import * as XLSX from 'xlsx';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Typography, IconButton, Box, Container, Select, MenuItem,
   TablePagination, Avatar, Chip, Tooltip, CircularProgress, FormControl,
-  Snackbar, Alert, Divider
+  Snackbar, Alert, Divider, Button
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Check as CheckIcon,
   Close as CloseIcon,
   BusinessCenter,
-  AccountCircle
+  AccountCircle,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -33,11 +37,13 @@ const EmployeeManager = () => {
   const [tempJobTitle, setTempJobTitle] = useState("");
   const [tempStore, setTempStore] = useState("");
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef();
 
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/get-employee`);
+      const response = await api.get(`${API_URL}/api/get-employee`);
       setEmployees(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       showSnackbar("Error fetching employee list", "error");
@@ -48,7 +54,7 @@ const EmployeeManager = () => {
 
   const fetchStores = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/stores`);
+      const response = await api.get(`${API_URL}/api/stores`);
       setStores(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.error("Error fetching stores:", err);
@@ -66,7 +72,7 @@ const EmployeeManager = () => {
 
   const handleSave = async (id) => {
     try {
-      await axios.put(`${API_URL}/api/update-employee/${id}`, {
+      await api.put(`${API_URL}/api/update-employee/${id}`, {
         jobTitle: tempJobTitle,
         store: tempStore
       });
@@ -79,6 +85,44 @@ const EmployeeManager = () => {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const templateData = [{ user_name: '', full_name: '' }];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+    XLSX.writeFile(wb, 'employees_template.xlsx');
+  };
+
+  const handleImportExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+
+      if (rows.length === 0) {
+        showSnackbar('No rows found in the file', 'warning');
+        return;
+      }
+
+      const res = await axios.post(`${API_URL}/api/employees/bulk-import`, rows);
+      const { updated, notFound, errors } = res.data;
+
+      const msg = `Updated: ${updated}${notFound.length ? ` | Not found: ${notFound.length}` : ''}${errors.length ? ` | Errors: ${errors.length}` : ''}`;
+      showSnackbar(msg, errors.length > 0 ? 'warning' : 'success');
+      fetchEmployees();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Import failed', 'error');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 6 }}>
       <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -88,6 +132,27 @@ const EmployeeManager = () => {
         <Box>
           <Typography variant="h4" fontWeight="900">Staff Directory</Typography>
           <Typography variant="body2" color="text.secondary">Update employee designations</Typography>
+        </Box>
+        <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadTemplate}
+          >
+            Template
+            </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            color="success"
+            startIcon={importing ? <CircularProgress size={16} /> : <UploadIcon />}
+            onClick={() => importRef.current.click()}
+            disabled={importing}
+          >
+            Import Excel
+          </Button>
+          <input ref={importRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportExcel} />
         </Box>
       </Box>
 
@@ -177,7 +242,7 @@ const EmployeeManager = () => {
         />
       </TableContainer>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
         <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
       </Snackbar>
     </Container>

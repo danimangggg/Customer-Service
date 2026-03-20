@@ -11,9 +11,23 @@ const DefaultRedirect = () => {
       const jobTitle = localStorage.getItem('JobTitle');
       const accountType = localStorage.getItem('AccountType');
       
-      // Redirect HP Officers, PI Officers, Documentation Officers, Quality Evaluators, HP Dispatchers, TM Managers, and Billers to HP Dashboard
-      if (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") {
-        navigate('/hp-dashboard');
+      // HP roles — each goes directly to their task page
+      if (jobTitle === "O2C Officer - HP") {
+        navigate('/hp-facilities');
+      } else if (jobTitle === "EWM Officer - HP") {
+        navigate('/ewm-outstanding');
+      } else if (jobTitle === "PI Officer-HP") {
+        navigate('/pi-vehicle-requests');
+      } else if (jobTitle === "Biller") {
+        navigate('/biller');
+      } else if (jobTitle === "TM Manager") {
+        navigate('/tm-manager');
+      } else if (jobTitle === "Dispatcher - HP") {
+        navigate('/dispatch-management');
+      } else if (jobTitle === "Documentation Officer - HP") {
+        navigate('/documentation-hp');
+      } else if (jobTitle === "Quality Evaluator") {
+        navigate('/quality-evaluation');
       }
       // EWM-Documentation goes to invoice management
       else if (jobTitle === "EWM-Documentation") {
@@ -23,13 +37,23 @@ const DefaultRedirect = () => {
       else if (jobTitle === "Queue Manager") {
         navigate('/queue-manager');
       }
-      // Customer Service Dispatcher (without HP suffix) goes to Customer Dashboard
-      else if (jobTitle === "Dispatcher") {
-        navigate('/customer-dashboard');
-      }
-      // Redirect WIM Operators to picklists
-      else if (jobTitle === "WIM Operator") {
+      // RDF roles — each goes directly to their task page
+      else if (jobTitle === "O2C Officer") {
+        navigate('/outstandingProcess');
+      } else if (jobTitle === "EWM Officer") {
+        navigate('/outstandingProcess');
+      } else if (jobTitle === "Dispatcher") {
+        navigate('/dispatch');
+      } else if (jobTitle === "Dispatch-Documentation") {
+        navigate('/exit-permit');
+      } else if (jobTitle === "Gate Keeper") {
+        navigate('/gate-keeper');
+      } else if (jobTitle === "WIM Operator") {
         navigate('/all-picklists');
+      } else if (jobTitle === "Customer Service Officer") {
+        navigate('/register-customer');
+      } else if (jobTitle === "Cashier" || jobTitle === "Finance") {
+        navigate('/finance-invoices');
       }
       // Redirect all other authenticated users to customer dashboard
       else if (accountType === "Self Assesment" || accountType === "Admin" || accountType === "Credit Manager") {

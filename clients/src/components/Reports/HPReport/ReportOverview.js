@@ -13,6 +13,7 @@ import ClearIcon from '@mui/icons-material/Clear';
 import DownloadIcon from '@mui/icons-material/Download';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 
 const ethiopianMonths = [
   'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
@@ -60,7 +61,7 @@ const ReportOverview = () => {
 
   const fetchData = useCallback(async () => {    try {
       setLoading(true);
-      const response = await axios.get(`${api_url}/api/hp-comprehensive-report`, {
+      const response = await api.get(`${api_url}/api/hp-comprehensive-report`, {
         params: { month: selectedMonth, year: selectedYear, process_type: processType }
       });
       setData(response.data);

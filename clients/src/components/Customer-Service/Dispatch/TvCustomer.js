@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import axios from 'axios';
+import api from '../../../axiosInstance';
+import { useSearchParams } from 'react-router-dom';
 import { Box, Typography, CircularProgress, Button } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
@@ -12,6 +13,8 @@ import dayjs from 'dayjs';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const TvCustomer = () => {
+  const [searchParams] = useSearchParams();
+  const branchParam = searchParams.get('branch_code') || '';
   const [customers, setCustomers] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,8 +29,8 @@ const TvCustomer = () => {
     try {
       console.log('TvCustomer: Fetching data...', new Date().toLocaleTimeString());
       const [custRes, facRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000 }),
-        axios.get(`${API_URL}/api/facilities`, { timeout: 5000 })
+        api.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} }),
+        api.get(`${API_URL}/api/facilities`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} })
       ]);
       
       console.log('TvCustomer: Received', custRes.data.length, 'customers');
@@ -55,7 +58,7 @@ const TvCustomer = () => {
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, []);
+  }, [branchParam]);
 
   useEffect(() => {
     console.log('TvCustomer: Component mounted, starting fetch cycle');

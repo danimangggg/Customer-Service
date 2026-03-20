@@ -15,7 +15,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PeopleIcon from '@mui/icons-material/People';
-import axios from 'axios';
+import api from '../../axiosInstance';
 
 // Import sub-pages
 import ODNPODDetailReport from './HPReport/ODNPODDetailReport';
@@ -23,9 +23,10 @@ import ReportOverview from './HPReport/ReportOverview';
 import ServiceUnitsDetail from './HPReport/FacilitiesDetail';
 import RouteAnalysis from './HPReport/RouteAnalysis';
 import HPCustomerDetailReport from './HPReport/HPCustomerDetailReport';
-import AllPicklists from '../Customer-Service/AllPicklists';
+import HPPicklistReport from './HPReport/HPPicklistReport';
 import OrganizationProfileView from './OrganizationProfileView';
 import HPDashboard from '../../pages/Customer-Service/HealthProgram/HPDashboard';
+import BranchSelect from '../Settings/BranchSelect';
 
 const HPComprehensiveReport = () => {
   const navigate = useNavigate();
@@ -75,6 +76,12 @@ const HPComprehensiveReport = () => {
   const [selectedYear, setSelectedYear] = useState(initialEth.year);
   const [processType, setProcessType] = useState('regular');
 
+  // Branch filter — Super Admin can pick a branch; others use their own
+  const currentAccountType = localStorage.getItem('AccountType') || '';
+  const isSuperAdmin = currentAccountType === 'Super Admin';
+  const defaultBranch = isSuperAdmin ? '' : (localStorage.getItem('branch_code') || '');
+  const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
+
   // Best Of state — default to This Year so data shows immediately
   const getThisYearRange = () => {
     const y = new Date().getFullYear();
@@ -96,9 +103,9 @@ const HPComprehensiveReport = () => {
     const { from, to } = range || bestOfRange;
     try {
       setBestOfLoading(true);
-      const response = await axios.get(`${api_url}/api/best-of-hp`, {
-        params: { startDate: from, endDate: to }
-      });
+      const params = { startDate: from, endDate: to };
+      if (selectedBranch) params.branch_code = selectedBranch;
+      const response = await api.get(`${api_url}/api/best-of-hp`, { params });
       if (response.data.success) setBestOfData(response.data.data);
     } catch (err) {
       console.error('Error fetching HP best of:', err);
@@ -110,7 +117,7 @@ const HPComprehensiveReport = () => {
 
   useEffect(() => {
     fetchReportData();
-  }, [selectedMonth, selectedYear, processType]);
+  }, [selectedMonth, selectedYear, processType, selectedBranch]);
 
   const fetchReportData = async () => {
     try {
@@ -118,7 +125,8 @@ const HPComprehensiveReport = () => {
       setError(null);
       const params = { month: selectedMonth, year: selectedYear };
       if (processType) params.process_type = processType;
-      const response = await axios.get(`${api_url}/api/hp-comprehensive-report`, { params });
+      if (selectedBranch) params.branch_code = selectedBranch;
+      const response = await api.get(`${api_url}/api/hp-comprehensive-report`, { params });
       setReportData(response.data);
     } catch (err) {
       console.error('Error fetching report:', err);
@@ -152,6 +160,17 @@ const HPComprehensiveReport = () => {
   return (
     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
 
+      {/* Branch filter — Super Admin only */}
+      {isSuperAdmin && (
+        <Box sx={{ mb: 2, maxWidth: 300 }}>
+          <BranchSelect
+            value={selectedBranch}
+            onChange={setSelectedBranch}
+            label="Filter by Branch"
+            helperText="Leave empty to see all branches"
+          />
+        </Box>
+      )}
 
       {/* Error Alert */}
       {error && (
@@ -216,7 +235,7 @@ const HPComprehensiveReport = () => {
             {activeTab === 3 && <ReportOverview />}
             {activeTab === 4 && <ServiceUnitsDetail data={reportData} />}
             {activeTab === 5 && <RouteAnalysis />}
-            {activeTab === 6 && <AllPicklists />}
+            {activeTab === 6 && <HPPicklistReport />}
             {activeTab === 7 && (
               <Box>
                 {/* Date Range Controls */}

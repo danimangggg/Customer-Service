@@ -7,10 +7,14 @@ const getODNsForFollowup = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
 
-    // Build the reporting month string
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
     const reportingMonth = `${month} ${year}`;
 
-    // Query to find ODNs with confirmed POD that need document follow-up
     const query = `
       SELECT DISTINCT 
         o.id as odn_id,
@@ -38,6 +42,7 @@ const getODNsForFollowup = async (req, res) => {
       WHERE ra.status = 'Completed'
         AND p.status = 'vehicle_requested'
         AND o.pod_confirmed = TRUE
+        ${branchFilter}
         ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
       ORDER BY ra.completed_at DESC, f.facility_name, o.odn_number
       LIMIT ? OFFSET ?
@@ -53,6 +58,7 @@ const getODNsForFollowup = async (req, res) => {
       WHERE ra.status = 'Completed'
         AND p.status = 'vehicle_requested'
         AND o.pod_confirmed = TRUE
+        ${branchFilter}
         ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
     `;
 
@@ -98,58 +104,47 @@ const getFollowupStats = async (req, res) => {
     const { month, year } = req.query;
     const reportingMonth = `${month} ${year}`;
 
-    // Get total ODNs with confirmed POD
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
+    const baseWhere = `
+      INNER JOIN facilities f ON p.facility_id = f.id
+      INNER JOIN routes r ON f.route = r.route_name
+      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
+      WHERE ra.status = 'Completed' 
+        AND p.status = 'vehicle_requested'
+        AND o.pod_confirmed = TRUE
+        ${branchFilter}
+    `;
+
     const totalConfirmedQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
-        AND o.pod_confirmed = TRUE
+      ${baseWhere}
     `;
-
-    // Get documents signed count
     const documentsSignedQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
-        AND o.pod_confirmed = TRUE
+      ${baseWhere}
         AND o.documents_signed = TRUE
     `;
-
-    // Get documents handover count
     const documentsHandoverQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
-        AND o.pod_confirmed = TRUE
+      ${baseWhere}
         AND o.documents_handover = TRUE
     `;
-
-    // Get completed follow-up count (both checkboxes checked)
     const completedFollowupQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
-        AND o.pod_confirmed = TRUE
+      ${baseWhere}
         AND o.documents_signed = TRUE
         AND o.documents_handover = TRUE
     `;
@@ -173,7 +168,6 @@ const getFollowupStats = async (req, res) => {
       replacements: [reportingMonth, month],
       type: db.sequelize.QueryTypes.SELECT
     });
-
     res.json({
       totalConfirmed: totalResult[0]?.count || 0,
       documentsSigned: signedResult[0]?.count || 0,

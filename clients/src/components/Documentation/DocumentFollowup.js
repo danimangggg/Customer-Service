@@ -17,6 +17,7 @@ import {
   Save as SaveIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -91,7 +92,7 @@ const DocumentFollowup = () => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`${api_url}/api/followup-odns`, {
+      const response = await api.get(`${api_url}/api/followup-odns`, {
         params: {
           month: selectedMonth,
           year: selectedYear,
@@ -135,7 +136,7 @@ const DocumentFollowup = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/followup/stats`, {
+      const response = await api.get(`${api_url}/api/followup/stats`, {
         params: { month: selectedMonth, year: selectedYear }
       });
       setStats(response.data);

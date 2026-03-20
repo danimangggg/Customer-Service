@@ -12,7 +12,15 @@ const getAllRoutes = async (req, res) => {
     } = req.query;
     
     const offset = (page - 1) * limit;
+
+    const accountType = req.headers['x-account-type'] || null;
+    const branchCode  = req.headers['x-branch-code'] || null;
+
     let whereClause = {};
+
+    if (accountType !== 'Super Admin' && branchCode) {
+      whereClause.branch_code = branchCode;
+    }
     
     // Search functionality
     if (search) {
@@ -74,7 +82,7 @@ const getRouteById = async (req, res) => {
 // Create new route
 const createRoute = async (req, res) => {
   try {
-    const { route_name } = req.body;
+    const { route_name, branch_code } = req.body;
 
     // Validation
     if (!route_name || route_name.trim().length === 0) {
@@ -91,7 +99,8 @@ const createRoute = async (req, res) => {
     }
 
     const route = await Route.create({
-      route_name: route_name.trim()
+      route_name: route_name.trim(),
+      branch_code: branch_code || null
     });
 
     res.status(201).json({
@@ -114,7 +123,7 @@ const createRoute = async (req, res) => {
 const updateRoute = async (req, res) => {
   try {
     const { id } = req.params;
-    const { route_name } = req.body;
+    const { route_name, branch_code } = req.body;
 
     // Validation
     if (!route_name || route_name.trim().length === 0) {
@@ -139,7 +148,8 @@ const updateRoute = async (req, res) => {
     }
 
     await route.update({
-      route_name: route_name.trim()
+      route_name: route_name.trim(),
+      branch_code: branch_code !== undefined ? (branch_code || null) : route.branch_code
     });
 
     res.json({

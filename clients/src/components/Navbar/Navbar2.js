@@ -47,7 +47,8 @@ import {
   ExpandMore,
   Receipt,
   Security,
-  Print
+  Print,
+  AccountTree
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -90,7 +91,12 @@ const Sidebar = () => {
 
   console.log('Navbar Debug:', { accountType, jobTitle, rawAccountType });
 
+  const branchCode = localStorage.getItem("branch_code");
+  const branchName = localStorage.getItem("branch_name");
+
   const isAdmin = accountType === "Admin";
+  const isSuperAdmin = accountType === "Super Admin";
+  const isAdminOrSuperAdmin = isAdmin || isSuperAdmin;
   const isFinance = accountType === "Finance";
 
   // Helper function to check if current path matches the menu item
@@ -203,31 +209,6 @@ const Sidebar = () => {
        <List sx={{ pt: 2, px: 1 }}>
          {/* DASHBOARDS SECTION - AT THE TOP */}
          
-         {/* HP Dashboard - for HP Officers, PI Officers, Documentation Officers, Quality Evaluators, HP Dispatchers, TM Managers, and Admin */}
-         {(jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || isAdmin) && (
-           <MenuTooltip title={"HP Dashboard"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/hp-dashboard"
-               sx={getActiveStyles('/hp-dashboard')}
-             >
-               <ListItemIcon>
-                 <Dashboard sx={{ color: '#c62828' }} />
-               </ListItemIcon>
-               <ListItemText 
-                 primary={"HP Dashboard"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/hp-dashboard') ? 600 : 500,
-                     fontSize: '0.95rem'
-                   } 
-                 }} 
-               />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
          {/* MAIN NAVIGATION ITEMS */}
 
          {/* Outstanding Process - for O2C Officer - HP (goes to hp-facilities) */}
@@ -738,8 +719,8 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Settings Menu - Admin only */}
-         {isAdmin && (
+         {/* Settings Menu - Admin and Super Admin */}
+         {isAdminOrSuperAdmin && (
            <>
              <MenuTooltip title={"Settings"}>
                <ListItem 
@@ -776,7 +757,8 @@ const Sidebar = () => {
              
              <Collapse in={settingsOpen} timeout="auto" unmountOnExit>
                <List component="div" disablePadding>
-                 {/* Organization Profile */}
+                 {/* Organization Profile - Admin only */}
+                 {isAdmin && (
                  <MenuTooltip title={"Organization Profile"}>
                    <ListItem 
                      button 
@@ -806,8 +788,10 @@ const Sidebar = () => {
                      />
                    </ListItem>
                  </MenuTooltip>
+                 )}
 
-                 {/* Store Management */}
+                 {/* Store Management - Admin only */}
+                 {isAdmin && (
                  <MenuTooltip title={"Store Management"}>
                    <ListItem 
                      button 
@@ -837,13 +821,46 @@ const Sidebar = () => {
                      />
                    </ListItem>
                  </MenuTooltip>
+                 )}
+
+                 {/* EPSS Branches - Super Admin only */}
+                 {isSuperAdmin && (
+                 <MenuTooltip title={"EPSS Branches"}>
+                   <ListItem
+                     button
+                     component={Link}
+                     to="/settings/branches"
+                     sx={{
+                       ...getActiveStyles('/settings/branches'),
+                       pl: 4,
+                       ml: 2,
+                       mr: 1
+                     }}
+                   >
+                     <ListItemIcon>
+                       <AccountTree sx={{ color: '#c62828' }} />
+                     </ListItemIcon>
+                     <ListItemText
+                       primary={"EPSS Branches"}
+                       sx={{
+                         '& .MuiListItemText-primary': {
+                           fontWeight: isActivePath('/settings/branches') ? 600 : 500,
+                           fontSize: '0.95rem',
+                           lineHeight: 1.2,
+                           whiteSpace: 'normal',
+                           wordWrap: 'break-word'
+                         }
+                       }}
+                     />
+                   </ListItem>
+                 </MenuTooltip>
+                 )}
 
                  {/* User Management */}
                  <MenuTooltip title={"User Management"}>
                    <ListItem 
                      button 
-                     component={Link} 
-                     to="/settings/user-management"
+                     component={Link}                      to="/settings/user-management"
                      sx={{
                        ...getActiveStyles('/settings/user-management'),
                        pl: 4,
@@ -1053,8 +1070,8 @@ const Sidebar = () => {
 
 
 
-         {/* Reports - for Admin (collapsible) */}
-         {isAdmin && (
+         {/* Reports - for Admin and Super Admin (collapsible) */}
+         {isAdminOrSuperAdmin && (
            <>
              <MenuTooltip title={"Reports"}>
                <ListItem 
@@ -1183,7 +1200,7 @@ const Sidebar = () => {
          )}
 
          {/* HP Report - for HP users only */}
-         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") && (
+         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") && (
            <MenuTooltip title={"HP Report"}>
              <ListItem 
                button 
@@ -1208,7 +1225,7 @@ const Sidebar = () => {
          )}
 
          {/* RDF Report - for RDF users (non-HP users) */}
-         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "O2C Officer - HP" && jobTitle !== "EWM Officer - HP" && jobTitle !== "PI Officer-HP" && jobTitle !== "Documentation Officer - HP" && jobTitle !== "Quality Evaluator" && jobTitle !== "Dispatcher - HP" && jobTitle !== "TM Manager" && jobTitle !== "Biller" && jobTitle && (
+         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "O2C Officer - HP" && jobTitle !== "EWM Officer - HP" && jobTitle !== "PI Officer-HP" && jobTitle !== "Documentation Officer - HP" && jobTitle !== "Quality Evaluator" && jobTitle !== "Dispatcher - HP" && jobTitle !== "TM Manager" && jobTitle !== "Biller" && jobTitle && (
            <MenuTooltip title={"RDF Report"}>
              <ListItem 
                button 
@@ -1257,8 +1274,8 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* TV Main Menu - for Admin, Manager, and Coordinator */}
-         {(isAdmin || jobTitle === "Manager" || jobTitle === "Coordinator") && (
+         {/* TV Main Menu - for Admin, Super Admin, Manager, and Coordinator */}
+         {(isAdminOrSuperAdmin || jobTitle === "Manager" || jobTitle === "Coordinator") && (
            <MenuTooltip title={"TV"}>
              <ListItem 
                button 
@@ -1299,6 +1316,15 @@ const Sidebar = () => {
               <Typography variant="caption" sx={{ opacity: 0.7, fontSize: '0.75rem', color: '#1a1a1a' }}>
                 {jobTitle || accountType || 'User'}
               </Typography>
+              {!isSuperAdmin && branchName && (
+                <Box sx={{ mt: 0.5 }}>
+                  <Chip
+                    label={branchName}
+                    size="small"
+                    sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(198,40,40,0.12)', color: '#c62828', fontWeight: 600 }}
+                  />
+                </Box>
+              )}
             </Box>
           </Stack>
         </Box>

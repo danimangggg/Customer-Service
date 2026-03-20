@@ -88,6 +88,34 @@ const QualityEvaluationHP = () => {
     }
   }, [selectedMonth, selectedYear, searchTerm, page, rowsPerPage, filterType]);
 
+  // Silent background polling every 5s (only when no dialog is open)
+  useEffect(() => {
+    if (!selectedMonth || !selectedYear) return;
+    const silentFetch = async () => {
+      if (openEditDialog) return;
+      try {
+        const res = await axios.get(`${api_url}/api/quality-evaluation-odns`, {
+          params: { month: selectedMonth, year: selectedYear, search: searchTerm, process_type: filterType.toLowerCase() }
+        });
+        const odns = res.data.odns || [];
+        const facilityMap = {};
+        odns.forEach(odn => {
+          const dispatchDate = odn.dispatch_completed_at ? new Date(odn.dispatch_completed_at).toISOString().split('T')[0] : 'unknown';
+          const key = `${odn.facility_name}_${dispatchDate}`;
+          if (!facilityMap[key]) {
+            facilityMap[key] = { facility_name: odn.facility_name, region_name: odn.region_name, route_name: odn.route_name, dispatch_completed_at: odn.dispatch_completed_at, odns: [], total_odns: 0, quality_confirmed_count: 0 };
+          }
+          facilityMap[key].odns.push({ odn_id: odn.odn_id, odn_number: odn.odn_number, pod_number: odn.pod_number, quality_confirmed: odn.quality_confirmed, quality_feedback: odn.quality_feedback });
+          facilityMap[key].total_odns++;
+          if (odn.quality_confirmed) facilityMap[key].quality_confirmed_count++;
+        });
+        setFacilityData(Object.values(facilityMap));
+      } catch (_) {}
+    };
+    const interval = setInterval(silentFetch, 5000);
+    return () => clearInterval(interval);
+  }, [selectedMonth, selectedYear, searchTerm, filterType, openEditDialog]);
+
   const fetchQualityFacilities = async () => {
     try {
       setLoading(true);

@@ -178,34 +178,38 @@ export default function SignIn() {
       localStorage.setItem('UserId', response.data.UserId);
       localStorage.setItem('UserName', user_name);
       localStorage.setItem('store', response.data.store);
+      localStorage.setItem('branch_code', response.data.branch_code || '');
+      localStorage.setItem('branch_name', response.data.branch_name || '');
 
       setTimeout(() => {
         const accountType = response.data.AccountType;
         const jobTitle    = response.data.JobTitle;
-        if (accountType === 'Admin') {
+        if (accountType === 'Super Admin') {
+          navigate('/settings/user-management');
+        } else if (accountType === 'Admin') {
           if (jobTitle === 'WIM Operator') navigate('/all-picklists');
-          else navigate('/hp-dashboard');
+          else navigate('/manager-dashboard');
         } else if (jobTitle === 'Coordinator' || jobTitle === 'Manager') {
-          navigate('/reports/hp-comprehensive');
+          navigate('/manager-dashboard');
         } else if (jobTitle === 'Customer Service Officer') { navigate('/register-customer');
         } else if (jobTitle === 'O2C Officer')              { navigate('/outstandingProcess');
         } else if (jobTitle === 'EWM Officer')              { navigate('/outstandingProcess');
-        } else if (jobTitle === 'O2C Officer - HP')         { navigate('/hp-dashboard');
-        } else if (jobTitle === 'EWM Officer - HP')         { navigate('/hp-dashboard');
-        } else if (jobTitle === 'PI Officer-HP')            { navigate('/hp-dashboard');
-        } else if (jobTitle === 'TM Manager')               { navigate('/hp-dashboard');
-        } else if (jobTitle === 'Biller')                   { navigate('/hp-dashboard');
+        } else if (jobTitle === 'O2C Officer - HP')         { navigate('/hp-facilities');
+        } else if (jobTitle === 'EWM Officer - HP')         { navigate('/ewm-outstanding');
+        } else if (jobTitle === 'PI Officer-HP')            { navigate('/pi-vehicle-requests');
+        } else if (jobTitle === 'TM Manager')               { navigate('/tm-manager');
+        } else if (jobTitle === 'Biller')                   { navigate('/biller');
         } else if (jobTitle === 'Dispatcher')               { navigate('/dispatch');
         } else if (jobTitle === 'Cashier' || jobTitle === 'Finance') { navigate('/finance-invoices');
-        } else if (jobTitle === 'Dispatcher - HP')          { navigate('/hp-dashboard');
+        } else if (jobTitle === 'Dispatcher - HP')          { navigate('/dispatch-management');
         } else if (jobTitle === 'Dispatch-Documentation')   { navigate('/exit-permit');
         } else if (jobTitle === 'EWM-Documentation')        { navigate('/ewm-documentation');
         } else if (jobTitle === 'Gate Keeper')              { navigate('/gate-keeper');
         } else if (jobTitle === 'WIM Operator')             { navigate('/all-picklists');
         } else if (jobTitle === 'Queue Manager')            { navigate('/queue-manager');
-        } else if (jobTitle === 'Documentation Officer')    { navigate('/documentation-management');
+        } else if (jobTitle === 'Documentation Officer')    { navigate('/customer-dashboard');
         } else if (jobTitle === 'Documentation Officer - HP') { navigate('/documentation-hp');
-        } else if (jobTitle === 'Documentation Follower')   { navigate('/document-followup');
+        } else if (jobTitle === 'Documentation Follower')   { navigate('/customer-dashboard');
         } else if (jobTitle === 'Quality Evaluator')        { navigate('/quality-evaluation');
         } else if (accountType === 'Self Assesment') {
           if (jobTitle === 'WIM Operator') navigate('/all-picklists');

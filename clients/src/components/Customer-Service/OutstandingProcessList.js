@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../utils/toast';
 import {
@@ -171,9 +172,9 @@ const OutstandingCustomers = () => {
     const fetchStaticData = async () => {
         try {
             const [facilityRes, employeeRes, storeRes] = await Promise.all([
-                axios.get(`${api_url}/api/facilities`),
-                axios.get(`${api_url}/api/get-employee`),
-                axios.get(`${api_url}/api/stores`),
+                api.get(`${api_url}/api/facilities`),
+                api.get(`${api_url}/api/get-employee`),
+                api.get(`${api_url}/api/stores`),
             ]);
             setFacilities(facilityRes.data);
             setEmployees(employeeRes.data);
@@ -189,7 +190,7 @@ const OutstandingCustomers = () => {
         fetchData();
         
         // Polling interval for near real-time updates and auto-cancellation check
-        const interval = setInterval(fetchData, 60000); // Poll every 60 seconds (reduced from 30)
+        const interval = setInterval(fetchData, 5000); // Poll every 5 seconds
         
         return () => clearInterval(interval);
     }, []);

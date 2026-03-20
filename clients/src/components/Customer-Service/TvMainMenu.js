@@ -1,15 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Grid, Card, CardContent, Avatar, Fade, Stack } from '@mui/material';
+import { Box, Typography, Button, Grid, Card, CardContent, Avatar, Fade, Stack, MenuItem, Select, FormControl, InputLabel } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import EventSeatIcon from '@mui/icons-material/EventSeat';
 import TvIcon from '@mui/icons-material/Tv';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import api from '../../axiosInstance';
 
 const TvMainMenu = () => {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const accountType = localStorage.getItem('AccountType') || '';
+  const isSuperAdmin = accountType === 'Super Admin';
+  const [branches, setBranches] = useState([]);
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const api_url = process.env.REACT_APP_API_URL;
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      api.get(`${api_url}/api/branches`)
+        .then(res => {
+          const list = res.data || [];
+          setBranches(list);
+          if (list.length > 0) setSelectedBranch(list[0].branch_code);
+        })
+        .catch(() => {});
+    }
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -62,7 +81,11 @@ const TvMainMenu = () => {
   ];
 
   const handleMenuClick = (route) => {
-    navigate(route);
+    if (isSuperAdmin && selectedBranch) {
+      navigate(`${route}?branch_code=${selectedBranch}`);
+    } else {
+      navigate(route);
+    }
   };
 
   return (
@@ -277,6 +300,32 @@ const TvMainMenu = () => {
                     </Box>
                   </Stack>
                 </Box>
+
+                {/* Branch selector for Super Admin */}
+                {isSuperAdmin && (
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel sx={{ color: 'rgba(255,255,255,0.8)' }}>Select Branch</InputLabel>
+                    <Select
+                      value={selectedBranch}
+                      label="Select Branch"
+                      onChange={e => setSelectedBranch(e.target.value)}
+                      sx={{
+                        color: 'white',
+                        bgcolor: 'rgba(255,255,255,0.15)',
+                        borderRadius: 2,
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.4)' },
+                        '& .MuiSvgIcon-root': { color: 'white' }
+                      }}
+                    >
+                      {branches.map(b => (
+                        <MenuItem key={b.branch_code} value={b.branch_code}>
+                          {b.branch_name} ({b.branch_code})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+
               </Stack>
             </Box>
           </Box>

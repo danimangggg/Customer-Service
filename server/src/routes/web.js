@@ -58,6 +58,7 @@ let routes =  (app) => {
   // Employee management routes (Performance tracking)
   router.get('/api/get-employee', getEmployee.getEmployees);
   router.put('/api/update-employee/:id', updateEmployee.updateEmployee);
+  router.post('/api/employees/bulk-import', updateEmployee.bulkImportEmployees);
 
   // Customer Service routes
   router.post("/api/customer-queue", addCustomerQueue.AddCustomerQueue)
@@ -135,6 +136,7 @@ let routes =  (app) => {
   router.put('/api/update-facilities/:id', facilityController.updateFacility); // Alternative endpoint for FacilityManager
   router.delete('/api/facilities/:id', facilityController.deleteFacility);
   router.post('/api/facilities/clear-non-hp-routes', facilityController.clearNonHpRoutesPeriods);
+  router.post('/api/facilities/bulk-import', facilityController.bulkImportFacilities);
   router.get('/api/regions', locationController.getRegions);
   router.get('/api/zones', locationController.getZones);
   router.get('/api/woredas', locationController.getWoredas);
@@ -310,6 +312,13 @@ let routes =  (app) => {
   const hpCustomerDetailReportController = require('../controllers/Reports/hpCustomerDetailReportController');
   router.get('/api/hp-customers-detail-report', hpCustomerDetailReportController.getHPCustomersDetailReport);
   router.get('/api/hp-customers/:customerId/service-details', hpCustomerDetailReportController.getHPCustomerServiceDetails);
+
+  // Branch (EPSS Branches) routes
+  const branchController = require('../controllers/Settings/branchController');
+  router.get('/api/branches', branchController.getAllBranches);
+  router.post('/api/branches', branchController.createBranch);
+  router.put('/api/branches/:id', branchController.updateBranch);
+  router.delete('/api/branches/:id', branchController.deleteBranch);
 
   // App Settings routes (YouTube playlist, etc.)
   const appSettingsController = require('../controllers/Settings/appSettingsController');

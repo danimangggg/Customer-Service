@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import Swal from 'sweetalert2';
+import api from '../../axiosInstance';
 import { successToast } from '../../utils/toast';
 import {
   Dialog,
@@ -63,7 +63,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
   useEffect(() => {
     const fetchStores = async () => {
       try {
-        const response = await axios.get(`${api_url}/api/stores`);
+        const response = await api.get(`${api_url}/api/stores`);
         const storeData = response.data.map(store => ({
           value: store.store_name,
           label: store.store_name

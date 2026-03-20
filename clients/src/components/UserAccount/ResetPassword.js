@@ -12,6 +12,7 @@ import {
   Alert,
 } from '@mui/material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -24,12 +25,15 @@ const ResetPasswordForm = () => {
   const [error, setError] = useState(null);
   const api_url = process.env.REACT_APP_API_URL;
 
+  const currentAccountType = localStorage.getItem('AccountType') || '';
+  const isSuperAdmin = currentAccountType === 'Super Admin';
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await axios.get(`${api_url}/api/users`);
+        const response = await api.get(`${api_url}/api/users`);
         console.log('Raw API response:', response);
         console.log('Response data:', response.data);
         console.log('Response data type:', typeof response.data);
@@ -39,25 +43,16 @@ const ResetPasswordForm = () => {
         
         // Handle different response formats
         if (Array.isArray(data)) {
-          console.log('Setting users - array format, count:', data.length);
-          setUsers(data);
+          const filtered = isSuperAdmin ? data.filter(u => u.AccountType === 'Admin') : data;
+          setUsers(filtered);
         } else if (typeof data === 'string') {
           console.error('Received string instead of array:', data);
           setError('Server returned invalid data format (string)');
           setUsers([]);
         } else if (data && typeof data === 'object') {
-          console.log('Received object, keys:', Object.keys(data));
-          if (data.users && Array.isArray(data.users)) {
-            console.log('Setting users from nested array');
-            setUsers(data.users);
-          } else if (data.data && Array.isArray(data.data)) {
-            console.log('Setting users from data property');
-            setUsers(data.data);
-          } else {
-            console.error('Object does not contain users array');
-            setError('Invalid data structure received from server');
-            setUsers([]);
-          }
+          const arr = data.users || data.data || [];
+          const filtered = isSuperAdmin ? arr.filter(u => u.AccountType === 'Admin') : arr;
+          setUsers(filtered);
         } else {
           console.error('Unexpected data type:', typeof data);
           setError('Invalid data format received');

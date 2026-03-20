@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../utils/toast';
 import { recordServiceTimeAuto, formatTimestamp } from '../../utils/serviceTimeHelper';
@@ -95,7 +96,7 @@ const PickListDetail = () => {
         setOdnOptions([]);
       }
 
-      const facilitiesRes = await axios.get(`${api_url}/api/facilities`);
+      const facilitiesRes = await api.get(`${api_url}/api/facilities`);
       const facilities = Array.isArray(facilitiesRes.data) ? facilitiesRes.data : [];
       const fac = processItem ? facilities.find(f => String(f.id) === String(processItem.facility_id)) : null;
       setFacility(fac || null);
@@ -122,7 +123,7 @@ const PickListDetail = () => {
       setSubmittedPicklists(filtered);
 
       // ✅ Fetch WIM Operators filtered by store
-      const empRes = await axios.get(`${api_url}/api/get-employee`);
+      const empRes = await api.get(`${api_url}/api/get-employee`);
       const employees = Array.isArray(empRes.data) ? empRes.data : [];
       const wimOps = employees.filter(
         emp => {

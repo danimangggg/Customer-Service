@@ -58,6 +58,9 @@ db.store = require("./Settings/store.js")(sequelize, Sequelize);
 db.route = require("./Transportation/route.js")(sequelize, Sequelize);
 db.routeAssignment = require("./Transportation/routeAssignment.js")(sequelize, Sequelize);
 
+// Branch model
+db.epssBranch = require("./EpssBranch.js")(sequelize, Sequelize);
+
 // Define associations
 db.picklist.belongsTo(db.employee, { 
   foreignKey: 'operator_id', 

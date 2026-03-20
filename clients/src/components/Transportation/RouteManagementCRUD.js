@@ -35,9 +35,11 @@ import {
   Assignment as AssignmentIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import dayjs from 'dayjs';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import BranchSelect from '../Settings/BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -57,7 +59,8 @@ const RouteManagementCRUD = () => {
 
   // Form state
   const [formData, setFormData] = useState({
-    route_name: ''
+    route_name: '',
+    branch_code: ''
   });
 
   useEffect(() => {
@@ -70,7 +73,7 @@ const RouteManagementCRUD = () => {
 
   const fetchRoutes = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/routes-crud`, {
+      const response = await api.get(`${API_URL}/api/routes-crud`, {
         params: {
           page: page + 1,
           limit: rowsPerPage,
@@ -105,7 +108,8 @@ const RouteManagementCRUD = () => {
   const handleEdit = (route) => {
     setEditingRoute(route);
     setFormData({
-      route_name: route.route_name
+      route_name: route.route_name,
+      branch_code: route.branch_code || ''
     });
     setOpenDialog(true);
   };
@@ -198,7 +202,8 @@ const RouteManagementCRUD = () => {
   const handleOpenDialog = () => {
     setEditingRoute(null);
     setFormData({
-      route_name: ''
+      route_name: '',
+      branch_code: ''
     });
     setOpenDialog(true);
   };
@@ -589,6 +594,12 @@ const RouteManagementCRUD = () => {
               sx={{ mt: 2 }}
               placeholder="Enter route name (e.g., City Center Route)"
             />
+            <Box sx={{ mt: 2 }}>
+              <BranchSelect
+                value={formData.branch_code}
+                onChange={(val) => setFormData({ ...formData, branch_code: val })}
+              />
+            </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Cancel</Button>

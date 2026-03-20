@@ -4,7 +4,16 @@ const Store = db.store;
 // Get all stores
 const getAllStores = async (req, res) => {
   try {
+    const accountType = req.headers['x-account-type'] || null;
+    const branchCode  = req.headers['x-branch-code'] || null;
+
+    const where = {};
+    if (accountType !== 'Super Admin' && branchCode) {
+      where.branch_code = branchCode;
+    }
+
     const stores = await Store.findAll({
+      where,
       order: [['store_name', 'ASC']]
     });
     res.status(200).json(stores);

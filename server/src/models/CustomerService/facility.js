@@ -47,6 +47,10 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: true,
       defaultValue: false,
     },
+    branch_code: {
+      type: Sequelize.STRING(20),
+      allowNull: true,
+    },
   }, {
     tableName: 'facilities',
     timestamps: true,

@@ -18,6 +18,9 @@ const getAllRoutes = async (req, res) => {
     
     const routes = await Route.findAll({
       attributes: ['id', 'route_name'],
+      where: (req.headers['x-account-type'] !== 'Super Admin' && req.headers['x-branch-code'])
+        ? { branch_code: req.headers['x-branch-code'] }
+        : {},
       order: [['route_name', 'ASC']]
     });
 
@@ -62,10 +65,12 @@ const getAllRoutes = async (req, res) => {
 // Get all available drivers
 const getAvailableDrivers = async (req, res) => {
   try {
+    const driverWhere = { jobTitle: 'Driver' };
+    if (req.headers['x-account-type'] !== 'Super Admin' && req.headers['x-branch-code']) {
+      driverWhere.branch_code = req.headers['x-branch-code'];
+    }
     const drivers = await Employee.findAll({
-      where: { 
-        jobTitle: 'Driver'
-      },
+      where: driverWhere,
       attributes: ['id', 'full_name', 'user_name'],
       order: [['full_name', 'ASC']]
     });
@@ -81,10 +86,12 @@ const getAvailableDrivers = async (req, res) => {
 // Get all available deliverers
 const getAvailableDeliverers = async (req, res) => {
   try {
+    const delivererWhere = { jobTitle: 'Deliverer' };
+    if (req.headers['x-account-type'] !== 'Super Admin' && req.headers['x-branch-code']) {
+      delivererWhere.branch_code = req.headers['x-branch-code'];
+    }
     const deliverers = await Employee.findAll({
-      where: { 
-        jobTitle: 'Deliverer'
-      },
+      where: delivererWhere,
       attributes: ['id', 'full_name', 'user_name'],
       order: [['full_name', 'ASC']]
     });
@@ -103,10 +110,16 @@ const getAvailableVehicles = async (req, res) => {
     console.log('Fetching available vehicles...');
     console.log('Vehicle model available:', !!Vehicle);
     
+    const accountType = req.headers['x-account-type'] || null;
+    const branchCode  = req.headers['x-branch-code'] || null;
+
+    const where = { status: 'Active' };
+    if (accountType !== 'Super Admin' && branchCode) {
+      where.branch_code = branchCode;
+    }
+
     const vehicles = await Vehicle.findAll({
-      where: { 
-        status: 'Active'
-      },
+      where,
       attributes: ['id', 'vehicle_name', 'plate_number', 'vehicle_type', 'description'],
       order: [['vehicle_name', 'ASC']]
     });

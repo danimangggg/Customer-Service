@@ -27,7 +27,7 @@ import {
   TrendingUp,
   FilterList
 } from '@mui/icons-material';
-import axios from 'axios';
+import api from '../../../axiosInstance';
 
 const HPDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -134,7 +134,7 @@ const HPDashboard = () => {
       }
       if (type) params.process_type = type;
       
-      const response = await axios.get(`${api_url}/api/hp-dashboard-data`, { params });
+      const response = await api.get(`${api_url}/api/hp-dashboard-data`, { params });
       setDashboardData(response.data);
       setError(null);
     } catch (err) {

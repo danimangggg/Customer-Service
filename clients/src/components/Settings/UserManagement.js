@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Box,
   Typography,
@@ -36,7 +37,8 @@ import {
   ListItemText,
   Divider,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  CircularProgress
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -56,11 +58,15 @@ import {
   VisibilityOff as HideIcon,
   Visibility,
   VisibilityOff,
-  Work as JobIcon
+  Work as JobIcon,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import BranchSelect from './BranchSelect';
+import api from '../../axiosInstance';
 
 const MySwal = withReactContent(Swal);
 
@@ -79,6 +85,13 @@ const UserManagement = ({ viewOnly = false }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef();
+
+  // Current logged-in user context
+  const currentAccountType = localStorage.getItem('AccountType') || '';
+  const currentBranchCode = localStorage.getItem('branch_code') || '';
+  const isSuperAdmin = currentAccountType === 'Super Admin';
   
   // Pagination and filtering
   const [page, setPage] = useState(0);
@@ -95,7 +108,8 @@ const UserManagement = ({ viewOnly = false }) => {
     jobTitle: '',
     account_type: 'Standard',
     account_status: 'Active',
-    store: ''
+    store: '',
+    branch_code: ''
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -103,7 +117,9 @@ const UserManagement = ({ viewOnly = false }) => {
     confirmPassword: ''
   });
 
-  const accountTypes = ['Admin', 'Manager', 'Standard', 'Coordinator'];
+  const accountTypes = isSuperAdmin
+    ? ['Admin']
+    : ['Admin', 'Manager', 'Standard', 'Coordinator'];
   const statusOptions = ['Active', 'Inactive', 'Suspended'];
   const jobTitles = ['Admin', 'O2C Officer', 'EWM Officer', 'Customer Service Officer', 'Finance Officer', 'O2C Officer - HP', 'EWM Officer - HP', 'PI Officer-HP', 'Biller', 'Documentation Officer - HP', 'Dispatcher - HP', 'Quality Evaluator', 'WIM Operator', 'Queue Manager', 'Driver', 'Deliverer', 'TM Manager', 'Dispatcher', 'Coordinator', 'Manager', 'TV Operator', 'Dispatch-Documentation', 'EWM-Documentation', 'Gate Keeper', 'Cashier'];
 
@@ -122,7 +138,7 @@ const UserManagement = ({ viewOnly = false }) => {
 
   const fetchStores = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/stores`);
+      const response = await api.get(`/api/stores`);
       setStores(response.data);
     } catch (error) {
       console.error('Error fetching stores:', error);
@@ -132,8 +148,7 @@ const UserManagement = ({ viewOnly = false }) => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      console.log('Fetching users with search term:', searchTerm); // Debug log
-      const response = await axios.get(`${API_URL}/api/users-management`, {
+      const response = await api.get(`/api/users-management`, {
         params: {
           page: page + 1,
           limit: rowsPerPage,
@@ -141,7 +156,6 @@ const UserManagement = ({ viewOnly = false }) => {
           jobTitle: filterJobTitle
         }
       });
-      console.log('API Response:', response.data); // Debug log
       setUsers(response.data.users);
       setTotalCount(response.data.totalCount);
     } catch (error) {
@@ -154,7 +168,7 @@ const UserManagement = ({ viewOnly = false }) => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users-management/stats`);
+      const response = await api.get(`/api/users-management/stats`);
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -195,10 +209,10 @@ const UserManagement = ({ viewOnly = false }) => {
       }
       
       if (editingUser) {
-        await axios.put(`${API_URL}/api/users-management/${editingUser.id}`, formData);
+        await api.put(`/api/users-management/${editingUser.id}`, formData);
         showSnackbar('User updated successfully', 'success');
       } else {
-        await axios.post(`${API_URL}/api/users-management`, formData);
+        await api.post(`/api/users-management`, formData);
         showSnackbar('User created successfully', 'success');
       }
       handleCloseDialog();
@@ -253,7 +267,7 @@ const UserManagement = ({ viewOnly = false }) => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`${API_URL}/api/users-management/${user.id}`);
+        await api.delete(`/api/users-management/${user.id}`);
         
         // Success animation
         await MySwal.fire({
@@ -313,7 +327,7 @@ const UserManagement = ({ viewOnly = false }) => {
     }
 
     try {
-      await axios.patch(`${API_URL}/api/users-management/${userForPassword.id}/reset-password`, {
+      await api.patch(`/api/users-management/${userForPassword.id}/reset-password`, {
         newPassword: passwordData.newPassword
       });
       showSnackbar('Password reset successfully', 'success');
@@ -328,7 +342,7 @@ const UserManagement = ({ viewOnly = false }) => {
 
   const handleStatusToggle = async (user, newStatus) => {
     try {
-      await axios.patch(`${API_URL}/api/users-management/${user.id}/status`, {
+      await api.patch(`/api/users-management/${user.id}/status`, {
         status: newStatus
       });
       showSnackbar(`User status updated to ${newStatus}`, 'success');
@@ -351,7 +365,8 @@ const UserManagement = ({ viewOnly = false }) => {
         jobTitle: user.jobTitle || '',
         account_type: user.account_type || 'Standard',
         account_status: user.account_status || 'Active',
-        store: user.store || ''
+        store: user.store || '',
+        branch_code: user.branch_code || ''
       });
     } else {
       setEditingUser(null);
@@ -360,9 +375,11 @@ const UserManagement = ({ viewOnly = false }) => {
         user_name: '',
         password: '',
         jobTitle: '',
-        account_type: 'Standard',
+        account_type: isSuperAdmin ? 'Admin' : 'Standard',
         account_status: 'Active',
-        store: ''
+        store: '',
+        // Non-Super Admins auto-inherit their own branch
+        branch_code: isSuperAdmin ? '' : currentBranchCode
       });
     }
     setOpenDialog(true);
@@ -412,6 +429,37 @@ const UserManagement = ({ viewOnly = false }) => {
       case 'inactive': return <InactiveIcon />;
       case 'suspended': return <SuspendedIcon />;
       default: return <PersonIcon />;
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [{ user_name: '', full_name: '' }];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+    XLSX.writeFile(wb, 'employees_template.xlsx');
+  };
+
+  const handleImportExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      if (rows.length === 0) { showSnackbar('No rows found in the file', 'warning'); return; }
+      const res = await api.post(`${API_URL}/api/employees/bulk-import`, rows);
+      const { created, updated, notFound, errors } = res.data;
+      const msg = `Created: ${created || 0} | Updated: ${updated}${notFound?.length ? ` | Not found: ${notFound.length}` : ''}${errors?.length ? ` | Errors: ${errors.length}` : ''}`;
+      showSnackbar(msg, errors?.length > 0 ? 'warning' : 'success');
+      fetchUsers();
+    } catch (err) {
+      showSnackbar(err.response?.data?.message || 'Import failed', 'error');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -542,22 +590,45 @@ const UserManagement = ({ viewOnly = false }) => {
                 </Stack>
                 
                 {!viewOnly && (
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => handleOpenDialog()}
-                  sx={{
-                    bgcolor: '#d32f2f',
-                    color: 'white',
-                    px: 3,
-                    py: 1,
-                    borderRadius: 2,
-                    fontWeight: 'bold',
-                    '&:hover': { bgcolor: '#b71c1c' }
-                  }}
-                >
-                  Add User
-                </Button>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<DownloadIcon />}
+                    onClick={handleDownloadTemplate}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Template
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="success"
+                    startIcon={importing ? <CircularProgress size={16} /> : <UploadIcon />}
+                    onClick={() => importRef.current.click()}
+                    disabled={importing}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Import Excel
+                  </Button>
+                  <input ref={importRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportExcel} />
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => handleOpenDialog()}
+                    sx={{
+                      bgcolor: '#d32f2f',
+                      color: 'white',
+                      px: 3,
+                      py: 1,
+                      borderRadius: 2,
+                      fontWeight: 'bold',
+                      '&:hover': { bgcolor: '#b71c1c' }
+                    }}
+                  >
+                    Add User
+                  </Button>
+                </Stack>
                 )}
               </Stack>
             </Box>
@@ -860,6 +931,23 @@ const UserManagement = ({ viewOnly = false }) => {
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={12} md={6}>
+                {isSuperAdmin ? (
+                  <BranchSelect
+                    value={formData.branch_code}
+                    onChange={(val) => setFormData({ ...formData, branch_code: val })}
+                    helperText="Assign this user to a branch"
+                  />
+                ) : (
+                  <TextField
+                    fullWidth
+                    label="Branch"
+                    value={formData.branch_code || 'No branch assigned'}
+                    disabled
+                    helperText="Inherited from your account"
+                  />
+                )}
+              </Grid>
             </Grid>
           </DialogContent>
           <DialogActions>
@@ -906,6 +994,8 @@ const UserManagement = ({ viewOnly = false }) => {
           open={snackbar.open}
           autoHideDuration={6000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          sx={{ zIndex: 99999 }}
         >
           <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
             {snackbar.message}

@@ -433,20 +433,6 @@ const AllPicklists = () => {
                   Manage and track picklist submissions
                 </Typography>
               </Box>
-              <Button
-                variant="contained"
-                onClick={() => navigate('/completed-picklists')}
-                className="action-button"
-                sx={{
-                  bgcolor: '#1565c0',
-                  color: 'white',
-                  '&:hover': {
-                    bgcolor: '#0d47a1',
-                  }
-                }}
-              >
-                Completed Picklists
-              </Button>
             </Stack>
           </Box>
 

@@ -54,7 +54,7 @@ const ServiceUnitsDetail = ({ data }) => {
     tm2:      Math.max(0, cumulative.tm2     - cumulative.dispatch),
     dispatch: Math.max(0, cumulative.dispatch- cumulative.doc),
     doc:      Math.max(0, cumulative.doc     - cumulative.quality),
-    quality:  cumulative.quality,
+    quality:  0,
   };
 
   const totalODNs = cumulative.o2c || summary?.totalODNs || 0;

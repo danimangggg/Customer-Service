@@ -55,6 +55,7 @@ import RouteManagementPage from './pages/Transportation/RouteManagementPage';
 import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
 import VehicleManagement from './components/Transportation/VehicleManagement';
 import StoreManagementPage from './pages/Settings/StoreManagementPage';
+import BranchManagement from './components/Settings/BranchManagement';
 import HPComprehensiveReport from './components/Reports/HPComprehensiveReport';
 import RDFReport from './components/Reports/RDFReport';
 import ManagerDashboard from './components/Reports/ManagerDashboard';
@@ -141,6 +142,7 @@ const AppContent = () => {
             <Route path = '/transportation/routes' Component={RouteManagementCRUDPage} />
             <Route path = '/transportation/vehicle-management' Component={VehicleManagement} />
             <Route path = '/settings/store-management' Component={StoreManagementPage} />
+            <Route path = '/settings/branches' Component={BranchManagement} />
         </Route>
         
       </Routes>

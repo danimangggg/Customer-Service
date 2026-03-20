@@ -45,7 +45,22 @@ const login =  async (req, res) => {
         }
       } catch (storeError) {
         console.error('Store query error:', storeError.message);
-        // Continue without store name
+      }
+    }
+
+    // Get branch name from branches table if branch_code exists
+    let branchName = null;
+    if (user.branch_code) {
+      try {
+        const [branchResult] = await db.sequelize.query(
+          'SELECT branch_name FROM epss_branches WHERE branch_code = ?',
+          { replacements: [user.branch_code] }
+        );
+        if (branchResult && branchResult.length > 0) {
+          branchName = branchResult[0].branch_name;
+        }
+      } catch (branchError) {
+        console.error('Branch query error:', branchError.message);
       }
     }
     
@@ -61,7 +76,9 @@ const login =  async (req, res) => {
       FullName: user.full_name, 
       AccountType: user.account_type, 
       JobTitle: user.jobTitle, 
-      store: storeName
+      store: storeName,
+      branch_code: user.branch_code || null,
+      branch_name: branchName || null
     });
     
   } catch (error) {

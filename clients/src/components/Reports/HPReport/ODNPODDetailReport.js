@@ -14,6 +14,7 @@ import ClearIcon from '@mui/icons-material/Clear';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 
 const ethiopianMonths = [
   'Meskerem', 'Tikimt', 'Hidar', 'Tahsas', 'Tir', 'Yekatit',
@@ -89,7 +90,7 @@ const ODNPODDetailReport = () => {
   const fetchAllODNData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${api_url}/api/hp-odn-pod-details-all`);
+      const response = await api.get(`${api_url}/api/hp-odn-pod-details-all`);
       setOdnData(response.data.odnDetails || []);
     } catch (err) {
       console.error('Error fetching all ODN data:', err);
@@ -103,7 +104,7 @@ const ODNPODDetailReport = () => {
       if (processType !== 'vaccine') {
         params.reporting_month = `${selectedMonth} ${selectedYear}`;
       }
-      const response = await axios.get(`${api_url}/api/hp-odn-pod-details`, { params });
+      const response = await api.get(`${api_url}/api/hp-odn-pod-details`, { params });
       setOdnData(response.data.odnDetails || []);
     } catch (err) {
       console.error('Error fetching ODN data:', err);
@@ -112,7 +113,7 @@ const ODNPODDetailReport = () => {
 
   const fetchRoutes = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/routes`);
+      const response = await api.get(`${api_url}/api/routes`);
       setRoutes(['All', ...response.data.map(r => r.route_name)]);
     } catch (err) { console.error('Error fetching routes:', err); }
   };

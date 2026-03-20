@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, CircularProgress, Card, CardContent,
@@ -78,7 +79,7 @@ const HPCustomerDetailReport = () => {
         month: selectedMonth,
         year: selectedYear
       };
-      const response = await axios.get(`${API_URL}/api/hp-customers-detail-report`, { params });
+      const response = await api.get(`${API_URL}/api/hp-customers-detail-report`, { params });
       if (response.data.success && response.data.customers) {
         setCustomers(response.data.customers);
         setTotalCount(response.data.pagination?.total || 0);
@@ -167,7 +168,7 @@ const HPCustomerDetailReport = () => {
 
   const fetchCustomerServiceDetails = async (customerId) => {
     try {
-      const response = await axios.get(`${API_URL}/api/hp-customers/${customerId}/service-details`);
+      const response = await api.get(`${API_URL}/api/hp-customers/${customerId}/service-details`);
       const serviceDetails = response.data.serviceDetails || [];
       setCustomerServiceDetails(serviceDetails);
       

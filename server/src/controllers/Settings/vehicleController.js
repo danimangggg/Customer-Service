@@ -8,14 +8,22 @@ const getAllVehicles = async (req, res) => {
     const { page = 1, limit = 100, search = '', type = '', status = '' } = req.query;
     const offset = (page - 1) * limit;
 
+    const accountType = req.headers['x-account-type'] || null;
+    const branchCode  = req.headers['x-branch-code'] || null;
+
     const whereClause = {};
+
+    // Branch filtering
+    if (accountType !== 'Super Admin' && branchCode) {
+      whereClause.branch_code = branchCode;
+    }
     
     // Search functionality
     if (search) {
       whereClause[Op.or] = [
-        { vehicle_name: { [Op.iLike]: `%${search}%` } },
-        { plate_number: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } }
+        { vehicle_name: { [Op.like]: `%${search}%` } },
+        { plate_number: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } }
       ];
     }
 
@@ -68,7 +76,7 @@ const getVehicleById = async (req, res) => {
 // Create new vehicle
 const createVehicle = async (req, res) => {
   try {
-    const { vehicle_name, plate_number, vehicle_type, status, description } = req.body;
+    const { vehicle_name, plate_number, vehicle_type, status, description, branch_code } = req.body;
 
     // Validation
     if (!vehicle_name || !plate_number) {
@@ -86,7 +94,8 @@ const createVehicle = async (req, res) => {
       plate_number: plate_number.trim().toUpperCase(),
       vehicle_type: vehicle_type || 'Truck',
       status: status || 'Active',
-      description: description?.trim() || null
+      description: description?.trim() || null,
+      branch_code: branch_code || null
     });
 
     res.status(201).json({
@@ -109,7 +118,7 @@ const createVehicle = async (req, res) => {
 const updateVehicle = async (req, res) => {
   try {
     const { id } = req.params;
-    const { vehicle_name, plate_number, vehicle_type, status, description } = req.body;
+    const { vehicle_name, plate_number, vehicle_type, status, description, branch_code } = req.body;
 
     const vehicle = await Vehicle.findByPk(id);
     if (!vehicle) {
@@ -134,7 +143,8 @@ const updateVehicle = async (req, res) => {
       plate_number: plate_number?.trim().toUpperCase() || vehicle.plate_number,
       vehicle_type: vehicle_type || vehicle.vehicle_type,
       status: status || vehicle.status,
-      description: description?.trim() || vehicle.description
+      description: description?.trim() || vehicle.description,
+      branch_code: branch_code !== undefined ? (branch_code || null) : vehicle.branch_code
     });
 
     res.json({

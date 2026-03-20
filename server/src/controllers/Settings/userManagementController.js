@@ -48,6 +48,16 @@ const getAllUsers = async (req, res) => {
       replacements.push(store);
     }
 
+    // Super Admin sees only Admin accounts; others see only their own branch
+    const requesterAccountType = req.headers['x-account-type'] || null;
+    const requesterBranchCode = req.headers['x-branch-code'] || null;
+    if (requesterAccountType === 'Super Admin') {
+      whereConditions.push("e.account_type = 'Admin'");
+    } else if (requesterBranchCode) {
+      whereConditions.push('e.branch_code = ?');
+      replacements.push(requesterBranchCode);
+    }
+
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
     console.log('WHERE clause:', whereClause);
@@ -164,7 +174,8 @@ const createUser = async (req, res) => {
       account_status,
       store,
       email,
-      phone
+      phone,
+      branch_code: bodyBranchCode
     } = req.body;
 
     // Validation
@@ -190,6 +201,17 @@ const createUser = async (req, res) => {
       }
     }
 
+    // Branch inheritance: if requester is not Super Admin, force their own branch_code
+    const requesterAccountType = req.headers['x-account-type'] || null;
+    const requesterBranchCode = req.headers['x-branch-code'] || null;
+    let branch_code;
+    if (requesterAccountType === 'Super Admin') {
+      branch_code = bodyBranchCode || null;
+    } else {
+      // Admin or any other role — inherit their branch
+      branch_code = requesterBranchCode || bodyBranchCode || null;
+    }
+
     // Hash password
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
@@ -203,7 +225,8 @@ const createUser = async (req, res) => {
       account_status: account_status || 'Active',
       store_id: store_id,
       email: email?.trim() || null,
-      phone: phone?.trim() || null
+      phone: phone?.trim() || null,
+      branch_code: branch_code,
     });
 
     // Return user without password
@@ -238,7 +261,8 @@ const updateUser = async (req, res) => {
       account_status,
       store,
       email,
-      phone
+      phone,
+      branch_code
     } = req.body;
 
     const user = await Employee.findByPk(id);
@@ -284,7 +308,8 @@ const updateUser = async (req, res) => {
       account_status: account_status || user.account_status,
       store_id: store_id,
       email: email !== undefined ? email?.trim() : user.email,
-      phone: phone !== undefined ? phone?.trim() : user.phone
+      phone: phone !== undefined ? phone?.trim() : user.phone,
+      branch_code: (branch_code !== undefined && branch_code !== '') ? branch_code : user.branch_code,
     };
 
     // Hash new password if provided

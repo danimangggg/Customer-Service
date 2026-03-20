@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import {
   Box, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, CircularProgress, Card, CardContent,
@@ -16,6 +17,7 @@ import {
 import MUIDataTable from 'mui-datatables';
 import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
+import BranchSelect from '../Settings/BranchSelect';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -64,6 +66,12 @@ const RDFReport = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerDetailOpen, setCustomerDetailOpen] = useState(false);
   const [customerServiceDetails, setCustomerServiceDetails] = useState([]);
+
+  // Branch filter — Super Admin can pick a branch; others use their own
+  const currentAccountType = localStorage.getItem('AccountType') || '';
+  const isSuperAdmin = currentAccountType === 'Super Admin';
+  const defaultBranch = isSuperAdmin ? '' : (localStorage.getItem('branch_code') || '');
+  const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
   
   // Dashboard stats
   const [dashboardStats, setDashboardStats] = useState({
@@ -150,12 +158,14 @@ const RDFReport = () => {
     } else if (activeTab === 4) {
       fetchBestOfWeek();
     }
-  }, [activeTab, page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter, dateFrom, dateTo, picklistPage, picklistRowsPerPage]);
+  }, [activeTab, page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter, dateFrom, dateTo, picklistPage, picklistRowsPerPage, selectedBranch]);
 
   const fetchDashboardStats = async () => {
     try {
       setDashboardStats(prev => ({ ...prev, loading: true }));
-      const response = await axios.get(`${API_URL}/api/rdf-dashboard-stats`);
+      const params = {};
+      if (selectedBranch) params.branch_code = selectedBranch;
+      const response = await api.get(`${API_URL}/api/rdf-dashboard-stats`, { params });
       
       if (response.data.success) {
         setDashboardStats({
@@ -186,10 +196,11 @@ const RDFReport = () => {
         dateFrom: dateFrom,
         dateTo: dateTo
       };
+      if (selectedBranch) params.branch_code = selectedBranch;
       
       console.log('Fetching customers with params:', params);
       
-      const response = await axios.get(`${API_URL}/api/customers-detail-report`, { params });
+      const response = await api.get(`${API_URL}/api/customers-detail-report`, { params });
       console.log('Response status:', response.status);
       console.log('Response data:', response.data);
       
@@ -218,7 +229,7 @@ const RDFReport = () => {
     try {
       setPicklistsLoading(true);
       // Fetch with pagination
-      const pickRes = await axios.get(`${API_URL}/api/getPicklists`, {
+      const pickRes = await api.get(`${API_URL}/api/getPicklists`, {
         params: { 
           page: picklistPage + 1, 
           limit: picklistRowsPerPage 
@@ -255,7 +266,7 @@ const RDFReport = () => {
   const fetchCompletedPicklists = async () => {
     try {
       setCompletedPicklistsLoading(true);
-      const response = await axios.get(`${API_URL}/api/picklist-history`, { params: { page: 1, limit: 10000 } });
+      const response = await api.get(`${API_URL}/api/picklist-history`, { params: { page: 1, limit: 10000 } });
       if (response.data.success && response.data.picklists) {
         const rows = response.data.picklists
           .filter(p => p.store && p.store !== 'HP' && p.store !== 'CR')
@@ -291,10 +302,10 @@ const RDFReport = () => {
       
       // Fetch completed customers with includeCompleted parameter
       const [customersRes, facilitiesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`, {
+        api.get(`${API_URL}/api/tv-display-customers`, {
           params: { includeCompleted: 'true' }
         }),
-        axios.get(`${API_URL}/api/facilities`)
+        api.get(`${API_URL}/api/facilities`)
       ]);
       
       console.log('Completed customers fetched:', customersRes.data.length);
@@ -316,9 +327,10 @@ const RDFReport = () => {
     const { from, to } = range || bestOfRange;
     try {
       setBestOfLoading(true);
+      const branchParam = selectedBranch ? { branch_code: selectedBranch } : {};
       const [thisRes, lastRes] = await Promise.all([
-        axios.get(`${API_URL}/api/best-of-week`, { params: { startDate: from, endDate: to } }),
-        axios.get(`${API_URL}/api/best-of-week`, { params: { startDate: getLastWeekRange().from, endDate: getLastWeekRange().to } }),
+        api.get(`${API_URL}/api/best-of-week`, { params: { startDate: from, endDate: to, ...branchParam } }),
+        api.get(`${API_URL}/api/best-of-week`, { params: { startDate: getLastWeekRange().from, endDate: getLastWeekRange().to, ...branchParam } }),
       ]);
       if (thisRes.data.success) setBestOfData(thisRes.data.data);
       if (lastRes.data.success) setBestOfLastWeekData(lastRes.data.data);
@@ -580,7 +592,7 @@ const RDFReport = () => {
 
   const fetchCustomerServiceDetails = async (customerId) => {
     try {
-      const response = await axios.get(`${API_URL}/api/customers/${customerId}/service-details`);
+      const response = await api.get(`${API_URL}/api/customers/${customerId}/service-details`);
       setCustomerServiceDetails(response.data.serviceDetails || []);
     } catch (err) {
       console.error('Error fetching customer service details:', err);
@@ -592,7 +604,7 @@ const RDFReport = () => {
 
   const fetchCustomerOdns = async (customerId) => {
     try {
-      const response = await axios.get(`${API_URL}/api/rdf-odns/${customerId}`);
+      const response = await api.get(`${API_URL}/api/rdf-odns/${customerId}`);
       setCustomerOdns(response.data.odns || []);
     } catch (err) {
       console.error('Error fetching customer ODNs:', err);
@@ -625,6 +637,18 @@ const RDFReport = () => {
           </Stack>
         </CardContent>
       </Card>
+
+      {/* Branch filter — Super Admin only */}
+      {isSuperAdmin && (
+        <Box sx={{ mb: 2, maxWidth: 300 }}>
+          <BranchSelect
+            value={selectedBranch}
+            onChange={setSelectedBranch}
+            label="Filter by Branch"
+            helperText="Leave empty to see all branches"
+          />
+        </Box>
+      )}
 
       {/* Tabs */}
       <Card sx={{ mb: 3 }}>

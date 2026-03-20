@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import {
   Box, Grid, Card, CardContent, Typography, Stack, Chip, Avatar,
   CircularProgress, LinearProgress, Divider, Tooltip, IconButton, Fade,
@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area
+  ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area
 } from 'recharts';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -50,57 +50,87 @@ const getCurrentEthiopianMonth = () => {
   return { year: ethYear, monthIndex: Math.max(0, Math.min(ethMonthIndex, 12)) };
 };
 
-const G = {
-  hp:    'linear-gradient(135deg,#667eea 0%,#764ba2 100%)',
-  rdf:   'linear-gradient(135deg,#f093fb 0%,#f5576c 100%)',
-  green: 'linear-gradient(135deg,#43e97b 0%,#38f9d7 100%)',
-  blue:  'linear-gradient(135deg,#4facfe 0%,#00f2fe 100%)',
-  amber: 'linear-gradient(135deg,#f6d365 0%,#fda085 100%)',
-  red:   'linear-gradient(135deg,#f5576c 0%,#f093fb 100%)',
-  card:  'linear-gradient(145deg,#1e1e3a 0%,#252550 100%)',
+// Professional muted palette — enterprise dark theme
+const C = {
+  bg:        '#0f1117',
+  surface:   '#161b27',
+  surfaceAlt:'#1c2333',
+  border:    'rgba(255,255,255,0.07)',
+  borderHov: 'rgba(255,255,255,0.13)',
+  text:      '#e2e8f0',
+  textMuted: 'rgba(226,232,240,0.45)',
+  textDim:   'rgba(226,232,240,0.25)',
+  indigo:    '#6366f1',
+  indigoSoft:'rgba(99,102,241,0.15)',
+  teal:      '#14b8a6',
+  tealSoft:  'rgba(20,184,166,0.15)',
+  emerald:   '#10b981',
+  emeraldSoft:'rgba(16,185,129,0.15)',
+  amber:     '#f59e0b',
+  amberSoft: 'rgba(245,158,11,0.15)',
+  rose:      '#f43f5e',
+  roseSoft:  'rgba(244,63,94,0.15)',
+  sky:       '#38bdf8',
+  skySoft:   'rgba(56,189,248,0.15)',
+  violet:    '#8b5cf6',
+  violetSoft:'rgba(139,92,246,0.15)',
+  slate:     '#64748b',
 };
-const CHART_COLORS = ['#667eea','#43e97b','#f6d365','#f5576c','#4facfe','#f093fb','#38f9d7','#fda085'];
-const tooltipStyle = { background:'#1e1e3a', border:'1px solid rgba(255,255,255,0.1)', borderRadius:8, color:'#fff' };
+
+const G = {
+  hp:    `linear-gradient(135deg,${C.indigo} 0%,${C.violet} 100%)`,
+  rdf:   `linear-gradient(135deg,${C.rose} 0%,${C.violet} 100%)`,
+  green: `linear-gradient(135deg,${C.emerald} 0%,${C.teal} 100%)`,
+  blue:  `linear-gradient(135deg,${C.sky} 0%,${C.indigo} 100%)`,
+  amber: `linear-gradient(135deg,${C.amber} 0%,#fb923c 100%)`,
+  red:   `linear-gradient(135deg,${C.rose} 0%,#fb7185 100%)`,
+  card:  C.surface,
+};
+const CHART_COLORS = [C.indigo, C.teal, C.amber, C.rose, C.sky, C.violet, C.emerald, '#fb923c'];
+const tooltipStyle = { background: C.surfaceAlt, border:`1px solid ${C.border}`, borderRadius:8, color: C.text, fontSize:12 };
 
 const KpiCard = ({ title, value, subtitle, icon, gradient, loading }) => (
   <Card sx={{
-    background: G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3,
-    overflow:'hidden', boxShadow:'0 8px 32px rgba(0,0,0,0.3)',
-    transition:'transform 0.2s,box-shadow 0.2s',
-    '&:hover':{ transform:'translateY(-4px)', boxShadow:'0 16px 48px rgba(0,0,0,0.4)' }
+    background: C.surface,
+    border: `1px solid ${C.border}`,
+    borderRadius: 2,
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+    '&:hover': { borderColor: C.borderHov, boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }
   }}>
-    <Box sx={{ height:4, background:gradient }} />
-    <CardContent sx={{ p:2.5 }}>
+    <Box sx={{ height: 3, background: gradient }} />
+    <CardContent sx={{ p: 2.5 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Box sx={{ flex:1, minWidth:0 }}>
-          <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.5)', textTransform:'uppercase', letterSpacing:1, fontSize:'0.68rem' }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="caption" sx={{ color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', fontWeight: 600 }}>
             {title}
           </Typography>
           {loading
-            ? <CircularProgress size={26} sx={{ mt:1, color:'#667eea' }} />
-            : <Typography variant="h3" fontWeight={800} sx={{ color:'#fff', lineHeight:1.1, mt:0.5 }}>{value ?? '—'}</Typography>
+            ? <CircularProgress size={24} sx={{ mt: 1, color: C.indigo }} />
+            : <Typography variant="h4" fontWeight={700} sx={{ color: C.text, lineHeight: 1.15, mt: 0.5, letterSpacing: -0.5 }}>{value ?? '—'}</Typography>
           }
-          {subtitle && <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.4)', mt:0.5, display:'block' }}>{subtitle}</Typography>}
+          {subtitle && <Typography variant="caption" sx={{ color: C.textDim, mt: 0.4, display: 'block', fontSize: '0.7rem' }}>{subtitle}</Typography>}
         </Box>
-        <Box sx={{ background:gradient, borderRadius:2, p:1.2, opacity:0.9, ml:1, flexShrink:0 }}>{icon}</Box>
+        <Box sx={{ background: gradient, borderRadius: 1.5, p: 1, opacity: 0.85, ml: 1.5, flexShrink: 0 }}>{icon}</Box>
       </Stack>
     </CardContent>
   </Card>
 );
 
 const SectionLabel = ({ label, gradient }) => (
-  <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb:2 }}>
-    <Box sx={{ width:4, height:26, background:gradient, borderRadius:2 }} />
-    <Typography variant="subtitle1" fontWeight={700} sx={{ color:'rgba(255,255,255,0.85)', textTransform:'uppercase', letterSpacing:1, fontSize:'0.78rem' }}>
+  <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+    <Box sx={{ width: 3, height: 20, background: gradient, borderRadius: 2 }} />
+    <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1.5, fontSize: '0.7rem', lineHeight: 1 }}>
       {label}
     </Typography>
   </Stack>
 );
 
-const ChartCard = ({ title, children, height=260 }) => (
-  <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', overflow:'hidden', height:'100%' }}>
-    <CardContent sx={{ p:2.5 }}>
-      <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem', display:'block', mb:1.5 }}>
+const ChartCard = ({ title, children, height = 260 }) => (
+  <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', overflow: 'hidden', height: '100%' }}>
+    <CardContent sx={{ p: 2.5 }}>
+      <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
         {title}
       </Typography>
       <Box sx={{ height }}>{children}</Box>
@@ -125,7 +155,7 @@ const ManagerDashboard = () => {
   const fetchHP = useCallback(async () => {
     try {
       setHpLoading(true);
-      const r = await axios.get(`${API_URL}/api/hp-comprehensive-report`, { params: { month, year, process_type: processType } });
+      const r = await api.get(`${API_URL}/api/hp-comprehensive-report`, { params: { month, year, process_type: processType } });
       setHpData(r.data);
     } catch (e) { console.error(e); }
     finally { setHpLoading(false); }
@@ -135,24 +165,25 @@ const ManagerDashboard = () => {
     try {
       setRdfLoading(true);
       const [statsRes, bestRes] = await Promise.all([
-        axios.get(`${API_URL}/api/rdf-dashboard-stats`),
-        axios.get(`${API_URL}/api/best-of-week`),
+        api.get(`${API_URL}/api/rdf-dashboard-stats`),
+        api.get(`${API_URL}/api/best-of-week`),
       ]);
       if (statsRes.data.success) setRdfStats(statsRes.data.stats);
       if (bestRes.data.success) setBestOf(bestRes.data.data);
-    } catch (e) { console.error(e); }
+
+    } catch (e) { console.error('[RDF] fetch error:', e?.response?.data || e?.message || e); }
     finally { setRdfLoading(false); }
   }, []);
 
   const fetchBestOfHP = useCallback(async () => {
     try {
-      const r = await axios.get(`${API_URL}/api/best-of-hp`);
+      const r = await api.get(`${API_URL}/api/best-of-hp`);
       if (r.data.success) setBestOfHP(r.data.data);
     } catch (e) { console.error(e); }
   }, []);
 
   const fetchTrend = useCallback(async () => {    try {
-      const r = await axios.get(`${API_URL}/api/hp-report/time-trend`);
+      const r = await api.get(`${API_URL}/api/hp-report/time-trend`);
       if (r.data?.trend) setTimeTrend(r.data.trend.slice(-8));
     } catch (e) { console.error(e); }
   }, []);
@@ -205,53 +236,50 @@ const ManagerDashboard = () => {
   const years = Array.from({ length: 8 }, (_, i) => eth.year - 4 + i);
 
   return (
-    <Box sx={{ minHeight:'100vh', background:'linear-gradient(160deg,#0d0d1a 0%,#0f0f2e 50%,#0a0a1f 100%)', p:3 }}>
+    <Box sx={{ minHeight: '100vh', background: C.bg, p: 3 }}>
 
       {/* ── HEADER ── */}
-      <Box sx={{ background:G.card, borderRadius:4, p:3, mb:3, border:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 20px 60px rgba(0,0,0,0.5)', position:'relative', overflow:'hidden' }}>
-        <Box sx={{ position:'absolute', top:-60, right:-60, width:200, height:200, borderRadius:'50%', background:'rgba(102,126,234,0.15)', filter:'blur(40px)', pointerEvents:'none' }} />
-        <Box sx={{ position:'absolute', bottom:-40, left:100, width:150, height:150, borderRadius:'50%', background:'rgba(240,147,251,0.1)', filter:'blur(30px)', pointerEvents:'none' }} />
+      <Box sx={{ background: C.surface, borderRadius: 2, p: 2.5, mb: 3, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
 
         <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ xs:'flex-start', md:'center' }} spacing={2}>
           <Stack direction="row" alignItems="center" spacing={2}>
-            <Box sx={{ background:G.hp, borderRadius:3, p:1.5 }}>
-              <SpeedIcon sx={{ color:'#fff', fontSize:36 }} />
+            <Box sx={{ background: G.hp, borderRadius: 2, p: 1.2 }}>
+              <SpeedIcon sx={{ color: '#fff', fontSize: 28 }} />
             </Box>
             <Box>
-              <Typography variant="h4" fontWeight={900} sx={{ color:'#fff', letterSpacing:-0.5 }}>Operations Dashboard</Typography>
-              <Typography variant="body2" sx={{ color:'rgba(255,255,255,0.45)', mt:0.3 }}>
+              <Typography variant="h5" fontWeight={700} sx={{ color: C.text, letterSpacing: -0.3 }}>Operations Dashboard</Typography>
+              <Typography variant="caption" sx={{ color: C.textMuted }}>
                 Unified HP & RDF overview · Updated {lastRefresh.toLocaleTimeString()}
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-            {/* Month filter for HP */}
             <FormControl size="small" sx={{ minWidth:130 }}>
-              <InputLabel sx={{ color:'rgba(255,255,255,0.5)', '&.Mui-focused':{ color:'#667eea' } }}>Month</InputLabel>
+              <InputLabel sx={{ color: C.textMuted, '&.Mui-focused':{ color: C.indigo } }}>Month</InputLabel>
               <Select value={month} label="Month" onChange={e => setMonth(e.target.value)}
-                sx={{ color:'#fff', '.MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.15)' }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.3)' }, '.MuiSvgIcon-root':{ color:'rgba(255,255,255,0.5)' } }}>
+                sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline':{ borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor: C.borderHov }, '.MuiSvgIcon-root':{ color: C.textMuted } }}>
                 {ethiopianMonths.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth:90 }}>
-              <InputLabel sx={{ color:'rgba(255,255,255,0.5)', '&.Mui-focused':{ color:'#667eea' } }}>Year</InputLabel>
+              <InputLabel sx={{ color: C.textMuted, '&.Mui-focused':{ color: C.indigo } }}>Year</InputLabel>
               <Select value={year} label="Year" onChange={e => setYear(e.target.value)}
-                sx={{ color:'#fff', '.MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.15)' }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.3)' }, '.MuiSvgIcon-root':{ color:'rgba(255,255,255,0.5)' } }}>
+                sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline':{ borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor: C.borderHov }, '.MuiSvgIcon-root':{ color: C.textMuted } }}>
                 {years.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth:120 }}>
-              <InputLabel sx={{ color:'rgba(255,255,255,0.5)', '&.Mui-focused':{ color:'#667eea' } }}>Type</InputLabel>
+              <InputLabel sx={{ color: C.textMuted, '&.Mui-focused':{ color: C.indigo } }}>Type</InputLabel>
               <Select value={processType} label="Type" onChange={e => setProcessType(e.target.value)}
-                sx={{ color:'#fff', '.MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.15)' }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor:'rgba(255,255,255,0.3)' }, '.MuiSvgIcon-root':{ color:'rgba(255,255,255,0.5)' } }}>
+                sx={{ color: C.text, '.MuiOutlinedInput-notchedOutline':{ borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline':{ borderColor: C.borderHov }, '.MuiSvgIcon-root':{ color: C.textMuted } }}>
                 <MenuItem value="regular">HP Regular</MenuItem>
                 <MenuItem value="vaccine">Vaccine</MenuItem>
               </Select>
             </FormControl>
             <Tooltip title="Refresh">
-              <IconButton onClick={handleRefresh} sx={{ background:'rgba(255,255,255,0.07)', color:'#fff', '&:hover':{ background:'rgba(102,126,234,0.3)' } }}>
-                <RefreshIcon />
+              <IconButton onClick={handleRefresh} sx={{ background: C.surfaceAlt, color: C.textMuted, border: `1px solid ${C.border}`, '&:hover':{ background: C.indigoSoft, color: C.indigo, borderColor: C.indigo } }}>
+                <RefreshIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           </Stack>
@@ -281,32 +309,32 @@ const ManagerDashboard = () => {
           {/* ══ HP WORKFLOW PROGRESS ══ */}
           <Grid container spacing={2} sx={{ mb:3 }}>
             <Grid item xs={12} md={7}>
-              <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', height:'100%' }}>
-                <CardContent sx={{ p:3 }}>
-                  <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem', display:'block', mb:2 }}>
+              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem', display: 'block', mb: 2 }}>
                     HP Workflow Stage Progress
                   </Typography>
                   <Grid container spacing={1.5}>
                     {[
-                      { label:'O2C',           val:wp.o2cCompleted,           color:'#667eea' },
-                      { label:'EWM',           val:wp.ewmCompleted,           color:'#43e97b' },
-                      { label:'PI',            val:wp.piCompleted,            color:'#4facfe' },
-                      { label:'TM',            val:wp.tmCompleted,            color:'#f6d365' },
-                      { label:'Dispatch',      val:wp.dispatched,             color:'#fda085' },
-                      { label:'Documentation', val:wp.documentationCompleted, color:'#f093fb' },
-                      { label:'Quality',       val:wp.qualityEvaluated,       color:'#38f9d7' },
+                      { label:'O2C',           val:wp.o2cCompleted,           color: C.indigo },
+                      { label:'EWM',           val:wp.ewmCompleted,           color: C.emerald },
+                      { label:'PI',            val:wp.piCompleted,            color: C.sky },
+                      { label:'TM',            val:wp.tmCompleted,            color: C.amber },
+                      { label:'Dispatch',      val:wp.dispatched,             color: '#fb923c' },
+                      { label:'Documentation', val:wp.documentationCompleted, color: C.violet },
+                      { label:'Quality',       val:wp.qualityEvaluated,       color: C.teal },
                     ].map(({ label, val, color }) => {
                       const pct = hp.totalODNs > 0 ? Math.round(((val||0) / hp.totalODNs) * 100) : 0;
                       return (
                         <Grid item xs={12} sm={6} key={label}>
-                          <Stack direction="row" justifyContent="space-between" sx={{ mb:0.4 }}>
-                            <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.6)', fontWeight:600 }}>{label}</Typography>
-                            <Typography variant="caption" sx={{ color, fontWeight:700 }}>
-                              {val ?? 0} <span style={{ color:'rgba(255,255,255,0.3)' }}>/ {hp.totalODNs ?? 0}</span> ({pct}%)
+                          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: C.textMuted, fontWeight: 600, fontSize: '0.72rem' }}>{label}</Typography>
+                            <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: '0.72rem' }}>
+                              {val ?? 0} <span style={{ color: C.textDim }}>/ {hp.totalODNs ?? 0}</span> ({pct}%)
                             </Typography>
                           </Stack>
                           <LinearProgress variant="determinate" value={pct}
-                            sx={{ height:7, borderRadius:4, bgcolor:'rgba(255,255,255,0.07)', '& .MuiLinearProgress-bar':{ background:color, borderRadius:4 } }} />
+                            sx={{ height: 5, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.05)', '& .MuiLinearProgress-bar':{ background: color, borderRadius: 4 } }} />
                         </Grid>
                       );
                     })}
@@ -395,16 +423,16 @@ const ManagerDashboard = () => {
 
           {/* ══ HP BEST OF LAST WEEK ══ */}
           <Box sx={{ mb:3 }}>
-            <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
+            <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
               <CardContent sx={{ p:3 }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb:2 }}>
-                  <EmojiEventsIcon sx={{ color:'#f6d365', fontSize:20 }} />
-                  <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem' }}>
+                  <EmojiEventsIcon sx={{ color: C.amber, fontSize:18 }} />
+                  <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem' }}>
                     Best of Last Week — HP
                   </Typography>
                 </Stack>
                 {hpLoading
-                  ? <CircularProgress size={24} sx={{ color:'#667eea' }} />
+                  ? <CircularProgress size={24} sx={{ color: C.indigo }} />
                   : bestOfHP?.employees && Object.values(bestOfHP.employees).some(Boolean)
                     ? (
                       <Grid container spacing={1.5}>
@@ -419,16 +447,16 @@ const ManagerDashboard = () => {
                           { role:'Quality',       person: bestOfHP.employees.quality },
                         ].filter(({ person }) => person).map(({ role, person }) => (
                           <Grid item xs={12} sm={6} md={3} key={role}>
-                            <Box sx={{ background:'rgba(255,255,255,0.04)', borderRadius:2, p:1.5, border:'1px solid rgba(255,255,255,0.06)' }}>
-                              <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:0.5, fontSize:'0.62rem' }}>{role}</Typography>
-                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt:0.5 }}>
-                                <Avatar sx={{ width:26, height:26, background:G.hp, fontSize:'0.72rem' }}>
+                            <Box sx={{ background: C.surfaceAlt, borderRadius: 1.5, p: 1.5, border: `1px solid ${C.border}` }}>
+                              <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.62rem', fontWeight: 600 }}>{role}</Typography>
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                                <Avatar sx={{ width: 28, height: 28, background: G.hp, fontSize: '0.75rem', fontWeight: 700 }}>
                                   {(person.full_name || '?')[0]}
                                 </Avatar>
                                 <Box>
-                                  <Typography variant="body2" fontWeight={700} sx={{ color:'#fff', lineHeight:1.2, fontSize:'0.82rem' }}>{person.full_name}</Typography>
+                                  <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.82rem' }}>{person.full_name}</Typography>
                                   <Chip label={`${person.process_count} tasks`} size="small"
-                                    sx={{ height:16, fontSize:'0.62rem', background:'rgba(102,126,234,0.25)', color:'#667eea', mt:0.2 }} />
+                                    sx={{ height: 16, fontSize: '0.62rem', background: C.indigoSoft, color: C.indigo, mt: 0.2, fontWeight: 600 }} />
                                 </Box>
                               </Stack>
                             </Box>
@@ -436,13 +464,13 @@ const ManagerDashboard = () => {
                         ))}
                       </Grid>
                     )
-                    : <Typography variant="body2" sx={{ color:'rgba(255,255,255,0.3)' }}>No data for last week.</Typography>
+                    : <Typography variant="body2" sx={{ color: C.textDim }}>No data for last week.</Typography>
                 }
               </CardContent>
             </Card>
           </Box>
 
-          <Divider sx={{ borderColor:'rgba(255,255,255,0.07)', my:3 }} />
+          <Divider sx={{ borderColor: C.border, my: 3 }} />
 
           {/* ══ SECTION 2: RDF KPIs ══ */}
           <SectionLabel label="RDF Customer Service — All Time" gradient={G.rdf} />
@@ -472,7 +500,7 @@ const ManagerDashboard = () => {
                       {rdfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                     </Pie>
                     <RTooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
+                    <Legend wrapperStyle={{ color: C.textMuted, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
               </ChartCard>
@@ -480,27 +508,27 @@ const ManagerDashboard = () => {
 
             {/* Completion bars */}
             <Grid item xs={12} md={4}>
-              <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', height:'100%' }}>
-                <CardContent sx={{ p:3 }}>
-                  <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem', display:'block', mb:2 }}>
+              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem', display: 'block', mb: 2 }}>
                     Service Completion Breakdown
                   </Typography>
-                  <Box sx={{ display:'flex', flexDirection:'column', justifyContent:'center', height:220 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: 220 }}>
                     {[
-                      { label:'Completed',     val:rdfStats?.completedCount||0,     color:'#43e97b' },
-                      { label:'In Progress',   val:rdfStats?.inProgressCount||0,    color:'#f6d365' },
-                      { label:'Cancelled',     val:rdfStats?.cancelledCount||0,     color:'#f5576c' },
-                      { label:'Auto-Cancelled',val:rdfStats?.autoCancelledCount||0, color:'#fda085' },
+                      { label: 'Completed',      val: rdfStats?.completedCount||0,     color: C.emerald },
+                      { label: 'In Progress',    val: rdfStats?.inProgressCount||0,    color: C.amber },
+                      { label: 'Cancelled',      val: rdfStats?.cancelledCount||0,     color: C.rose },
+                      { label: 'Auto-Cancelled', val: rdfStats?.autoCancelledCount||0, color: C.slate },
                     ].map(({ label, val, color }) => {
                       const pct = rdfTotal > 0 ? Math.round((val / rdfTotal) * 100) : 0;
                       return (
-                        <Box key={label} sx={{ mb:2 }}>
-                          <Stack direction="row" justifyContent="space-between" sx={{ mb:0.4 }}>
-                            <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.6)', fontWeight:600 }}>{label}</Typography>
-                            <Typography variant="caption" sx={{ color, fontWeight:700 }}>{val.toLocaleString()} ({pct}%)</Typography>
+                        <Box key={label} sx={{ mb: 2 }}>
+                          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: C.textMuted, fontWeight: 600, fontSize: '0.72rem' }}>{label}</Typography>
+                            <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: '0.72rem' }}>{val.toLocaleString()} ({pct}%)</Typography>
                           </Stack>
                           <LinearProgress variant="determinate" value={pct}
-                            sx={{ height:8, borderRadius:4, bgcolor:'rgba(255,255,255,0.07)', '& .MuiLinearProgress-bar':{ background:color, borderRadius:4 } }} />
+                            sx={{ height: 5, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.05)', '& .MuiLinearProgress-bar': { background: color, borderRadius: 4 } }} />
                         </Box>
                       );
                     })}
@@ -511,31 +539,31 @@ const ManagerDashboard = () => {
 
             {/* Best of week */}
             <Grid item xs={12} md={4}>
-              <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)', height:'100%' }}>
-                <CardContent sx={{ p:3 }}>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb:2 }}>
-                    <EmojiEventsIcon sx={{ color:'#f6d365', fontSize:20 }} />
-                    <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem' }}>
+              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', height: '100%' }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                    <EmojiEventsIcon sx={{ color: C.amber, fontSize: 18 }} />
+                    <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem' }}>
                       Best of Last Week
                     </Typography>
                   </Stack>
                   {rdfLoading
-                    ? <CircularProgress size={24} sx={{ color:'#667eea' }} />
-                    : bestOf && Object.keys(bestOf).length > 0
+                    ? <CircularProgress size={24} sx={{ color: C.indigo }} />
+                    : bestOf?.employees && Object.values(bestOf.employees).some(Boolean)
                       ? (
                         <Grid container spacing={1}>
-                          {Object.entries(bestOf).map(([role, person]) => person && (
+                          {Object.entries(bestOf.employees).map(([role, person]) => person && (
                             <Grid item xs={12} key={role}>
-                              <Box sx={{ background:'rgba(255,255,255,0.04)', borderRadius:2, p:1.5, border:'1px solid rgba(255,255,255,0.06)' }}>
-                                <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:0.5, fontSize:'0.62rem' }}>{role}</Typography>
-                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt:0.5 }}>
-                                  <Avatar sx={{ width:26, height:26, background:G.hp, fontSize:'0.72rem' }}>
+                              <Box sx={{ background: C.surfaceAlt, borderRadius: 1.5, p: 1.5, border: `1px solid ${C.border}` }}>
+                                <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.62rem', fontWeight: 600 }}>{role}</Typography>
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                                  <Avatar sx={{ width: 28, height: 28, background: G.rdf, fontSize: '0.75rem', fontWeight: 700 }}>
                                     {(person.full_name||'?')[0]}
                                   </Avatar>
                                   <Box>
-                                    <Typography variant="body2" fontWeight={700} sx={{ color:'#fff', lineHeight:1.2, fontSize:'0.82rem' }}>{person.full_name}</Typography>
+                                    <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.82rem' }}>{person.full_name}</Typography>
                                     <Chip label={`${person.process_count} tasks`} size="small"
-                                      sx={{ height:16, fontSize:'0.62rem', background:'rgba(102,126,234,0.25)', color:'#667eea', mt:0.2 }} />
+                                      sx={{ height: 16, fontSize: '0.62rem', background: C.violetSoft, color: C.violet, mt: 0.2, fontWeight: 600 }} />
                                   </Box>
                                 </Stack>
                               </Box>
@@ -543,7 +571,7 @@ const ManagerDashboard = () => {
                           ))}
                         </Grid>
                       )
-                      : <Typography variant="body2" sx={{ color:'rgba(255,255,255,0.3)' }}>No data for last week.</Typography>
+                      : <Typography variant="body2" sx={{ color: C.textDim }}>No data for last week.</Typography>
                   }
                 </CardContent>
               </Card>

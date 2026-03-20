@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import {
   Box, Typography, Avatar, Stack, Chip, Fade,
   Divider, CircularProgress, Alert, Button,
@@ -35,8 +36,8 @@ const OrganizationProfileView = () => {
     setLoading(true);
     try {
       const [facilitiesRes, employeesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/facilities`),
-        axios.get(`${API_URL}/api/get-employee`),
+        api.get(`${API_URL}/api/facilities`),
+        api.get(`${API_URL}/api/get-employee`),
       ]);
       const facs = facilitiesRes.data;
       setFacilities(facs);

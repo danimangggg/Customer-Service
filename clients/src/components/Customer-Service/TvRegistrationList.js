@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import api from '../../axiosInstance';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import YouTubePlayerIsolated from './YouTubePlayerIsolated';
 import { 
   Box, Typography, CircularProgress, Button, IconButton
@@ -11,6 +11,8 @@ import { useAmharicNumbers } from './useAmharicNumbers';
 
 const TvRegistrationList = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const branchParam = searchParams.get('branch_code') || '';
   const [customers, setCustomers] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -50,7 +52,9 @@ const TvRegistrationList = () => {
   useEffect(() => {
     const loadYoutubePlaylist = async () => {
       try {
-        const response = await axios.get(`${api_url}/api/settings/youtube_playlist`);
+        const response = await api.get(`${api_url}/api/settings/youtube_playlist`, {
+          params: branchParam ? { branch_code: branchParam } : {}
+        });
         if (response.data.success && response.data.value) {
           setYoutubeVideos(response.data.value);
         }
@@ -90,9 +94,9 @@ const TvRegistrationList = () => {
     const fetchData = async () => {
       try {
         const [custRes, facRes, empRes] = await Promise.all([
-          axios.get(`${api_url}/api/serviceList`),
-          axios.get(`${api_url}/api/facilities`),
-          axios.get(`${api_url}/api/get-employee`)
+          api.get(`${api_url}/api/serviceList`, { params: branchParam ? { branch_code: branchParam } : {} }),
+          api.get(`${api_url}/api/facilities`, { params: branchParam ? { branch_code: branchParam } : {} }),
+          api.get(`${api_url}/api/get-employee`, { params: branchParam ? { branch_code: branchParam } : {} })
         ]);
         
         // Only update state if data actually changed to prevent unnecessary re-renders
@@ -130,7 +134,7 @@ const TvRegistrationList = () => {
     fetchData();
     const interval = setInterval(fetchData, 3000);
     return () => clearInterval(interval);
-  }, [api_url]);
+  }, [api_url, branchParam]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -487,7 +491,7 @@ const TvRegistrationList = () => {
 
     const handleSave = async () => {
       try {
-        await axios.put(`${api_url}/api/settings/youtube_playlist`, {
+        await api.put(`${api_url}/api/settings/youtube_playlist`, {
           value: tempVideos,
           description: 'YouTube videos playlist for customer slide'
         });

@@ -37,6 +37,10 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
+    branch_code: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
   }, {
     tableName: 'employees'  // Explicitly use the 'employees' table
   });

@@ -35,8 +35,10 @@ import {
   CheckCircle as ActiveIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import BranchSelect from './BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -55,7 +57,8 @@ const StoreManagement = () => {
 
   const [formData, setFormData] = useState({
     store_name: '',
-    description: ''
+    description: '',
+    branch_code: ''
   });
 
   useEffect(() => {
@@ -65,7 +68,7 @@ const StoreManagement = () => {
   const fetchStores = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/api/stores`);
+      const response = await api.get(`${API_URL}/api/stores`);
       setStores(response.data);
     } catch (error) {
       console.error('Error fetching stores:', error);
@@ -80,13 +83,15 @@ const StoreManagement = () => {
       setEditingStore(store);
       setFormData({
         store_name: store.store_name,
-        description: store.description || ''
+        description: store.description || '',
+        branch_code: store.branch_code || ''
       });
     } else {
       setEditingStore(null);
       setFormData({
         store_name: '',
-        description: ''
+        description: '',
+        branch_code: ''
       });
     }
     setOpenDialog(true);
@@ -395,6 +400,11 @@ const StoreManagement = () => {
               multiline
               rows={3}
               placeholder="Optional description"
+            />
+            <BranchSelect
+              value={formData.branch_code}
+              onChange={(val) => setFormData({ ...formData, branch_code: val })}
+              helperText="Assign this store to a branch"
             />
           </Box>
         </DialogContent>

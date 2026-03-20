@@ -8,12 +8,20 @@ const retriveQueue = async (req, res) => {
     
     // Get user's store from query params if provided (for EWM officers)
     const userStore = req.query.store;
-    
+
+    // Branch filtering — read from header (logged-in users) or query param (TV displays)
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND s.branch_code = '${branchCode}'` : '';
+    const branchFilterCq = branchCode
+      ? `AND EXISTS (SELECT 1 FROM odns_rdf odn2 INNER JOIN stores s2 ON odn2.store_id = s2.id WHERE odn2.process_id = cq.id AND s2.branch_code = '${branchCode}')`
+      : '';
+
     let query, replacements;
     
     if (userStore) {
-      // For EWM officers - join with odns_rdf for their store to get availability
-      // Convert store name to store_id
       const [storeResult] = await db.sequelize.query(
         'SELECT id FROM stores WHERE store_name = ?',
         { replacements: [userStore], type: db.sequelize.QueryTypes.SELECT }
@@ -30,15 +38,16 @@ const retriveQueue = async (req, res) => {
           MAX(odn.available_at) as available_at
         FROM customer_queue cq
         LEFT JOIN odns_rdf odn ON cq.id = odn.process_id AND odn.store_id = ?
+        WHERE 1=1 ${branchFilterCq}
         GROUP BY cq.id
         ORDER BY cq.started_at DESC
       `;
       replacements = [storeId];
     } else {
-      // For other users - just get customer_queue data
       query = `
         SELECT cq.*
         FROM customer_queue cq
+        WHERE 1=1 ${branchFilterCq}
         ORDER BY cq.started_at DESC
       `;
       replacements = [];

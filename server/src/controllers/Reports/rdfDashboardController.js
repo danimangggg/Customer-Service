@@ -4,42 +4,44 @@ const getRDFDashboardStats = async (req, res) => {
   try {
     console.log('=== FETCHING RDF DASHBOARD STATS ===');
 
-    // Get total registrations
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchWhere  = branchCode 
+      ? `AND EXISTS (SELECT 1 FROM odns_rdf o INNER JOIN stores s ON o.store_id = s.id WHERE o.process_id = cq.id AND s.branch_code = '${branchCode}')`
+      : '';
+
     const [totalResult] = await db.sequelize.query(
-      `SELECT COUNT(*) as total FROM customer_queue`,
+      `SELECT COUNT(*) as total FROM customer_queue cq WHERE 1=1 ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 
-    // Get completed count
     const [completedResult] = await db.sequelize.query(
-      `SELECT COUNT(*) as count FROM customer_queue WHERE status = 'Completed'`,
+      `SELECT COUNT(*) as count FROM customer_queue cq WHERE cq.status = 'Completed' ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 
-    // Get in progress count (all statuses except completed and cancelled)
     const [inProgressResult] = await db.sequelize.query(
-      `SELECT COUNT(*) as count FROM customer_queue 
-       WHERE status NOT IN ('Completed', 'Canceled', 'Auto-Canceled')`,
+      `SELECT COUNT(*) as count FROM customer_queue cq
+       WHERE cq.status NOT IN ('Completed', 'Canceled', 'Auto-Canceled') ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 
-    // Get manually cancelled count
     const [cancelledResult] = await db.sequelize.query(
-      `SELECT COUNT(*) as count FROM customer_queue WHERE status = 'Canceled'`,
+      `SELECT COUNT(*) as count FROM customer_queue cq WHERE cq.status = 'Canceled' ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 
-    // Get auto-cancelled count
     const [autoCancelledResult] = await db.sequelize.query(
-      `SELECT COUNT(*) as count FROM customer_queue WHERE status = 'Auto-Canceled'`,
+      `SELECT COUNT(*) as count FROM customer_queue cq WHERE cq.status = 'Auto-Canceled' ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 
-    // Get average waiting time (in minutes)
     const [avgWaitingResult] = await db.sequelize.query(
-      `SELECT AVG(TIMESTAMPDIFF(MINUTE, started_at, COALESCE(completed_at, NOW()))) as avg_time
-       FROM customer_queue
-       WHERE started_at IS NOT NULL`,
+      `SELECT AVG(TIMESTAMPDIFF(MINUTE, cq.started_at, COALESCE(cq.completed_at, NOW()))) as avg_time
+       FROM customer_queue cq
+       WHERE cq.started_at IS NOT NULL ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 

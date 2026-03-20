@@ -14,6 +14,10 @@ module.exports = (sequelize, DataTypes) => {
         len: [1, 200]
       }
     },
+    branch_code: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
     created_at: {
       type: DataTypes.DATE,
       allowNull: false,

@@ -8,7 +8,6 @@ const getBestOfHP = async (req, res) => {
       startDate = req.query.startDate;
       endDate   = req.query.endDate;
     } else {
-      // Default: last week
       const today = new Date();
       const day = today.getDay();
       const diff = day === 0 ? 6 : day - 1;
@@ -22,38 +21,47 @@ const getBestOfHP = async (req, res) => {
       endDate   = lastSunday.toISOString().split('T')[0];
     }
 
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchJoin   = branchCode ? `INNER JOIN processes p2 ON sth.process_id = p2.id INNER JOIN facilities f2 ON p2.facility_id = f2.id` : '';
+    const branchWhere  = branchCode ? `AND f2.branch_code = '${branchCode}'` : '';
+
     console.log('HP Best Of date range:', { startDate, endDate });
 
-    // Query for a single service_unit
     const querySingle = (serviceUnit) => db.sequelize.query(`
       SELECT
-        officer_name as full_name,
-        COUNT(DISTINCT process_id) as process_count
-      FROM service_time_hp
-      WHERE service_unit = :serviceUnit
-        AND DATE(end_time) >= :startDate
-        AND DATE(end_time) <= :endDate
-        AND officer_name IS NOT NULL
-        AND officer_name != ''
-        AND officer_name != 'Unknown Officer'
-      GROUP BY officer_name
+        sth.officer_name as full_name,
+        COUNT(DISTINCT sth.process_id) as process_count
+      FROM service_time_hp sth
+      ${branchJoin}
+      WHERE sth.service_unit = :serviceUnit
+        AND DATE(sth.end_time) >= :startDate
+        AND DATE(sth.end_time) <= :endDate
+        AND sth.officer_name IS NOT NULL
+        AND sth.officer_name != ''
+        AND sth.officer_name != 'Unknown Officer'
+        ${branchWhere}
+      GROUP BY sth.officer_name
       ORDER BY process_count DESC
       LIMIT 1
     `, { replacements: { serviceUnit, startDate, endDate }, type: db.sequelize.QueryTypes.SELECT });
 
-    // Query across multiple service_units (e.g. TM has two phases)
     const queryMultiple = (serviceUnits) => db.sequelize.query(`
       SELECT
-        officer_name as full_name,
-        COUNT(DISTINCT process_id) as process_count
-      FROM service_time_hp
-      WHERE service_unit IN (:serviceUnits)
-        AND DATE(end_time) >= :startDate
-        AND DATE(end_time) <= :endDate
-        AND officer_name IS NOT NULL
-        AND officer_name != ''
-        AND officer_name != 'Unknown Officer'
-      GROUP BY officer_name
+        sth.officer_name as full_name,
+        COUNT(DISTINCT sth.process_id) as process_count
+      FROM service_time_hp sth
+      ${branchJoin}
+      WHERE sth.service_unit IN (:serviceUnits)
+        AND DATE(sth.end_time) >= :startDate
+        AND DATE(sth.end_time) <= :endDate
+        AND sth.officer_name IS NOT NULL
+        AND sth.officer_name != ''
+        AND sth.officer_name != 'Unknown Officer'
+        ${branchWhere}
+      GROUP BY sth.officer_name
       ORDER BY process_count DESC
       LIMIT 1
     `, { replacements: { serviceUnits, startDate, endDate }, type: db.sequelize.QueryTypes.SELECT });

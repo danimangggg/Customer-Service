@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import axios from 'axios';
+import api from '../../axiosInstance';
+import { useSearchParams } from 'react-router-dom';
 import YouTubePlayerIsolated from './YouTubePlayerIsolated';
 import { 
   Box, Typography, CircularProgress, Button, IconButton, 
@@ -22,6 +23,8 @@ import dayjs from 'dayjs';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const TvRealEntertainment = () => {
+  const [searchParams] = useSearchParams();
+  const branchParam = searchParams.get('branch_code') || '';
   const [customers, setCustomers] = useState([]);
   const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,8 +128,8 @@ const TvRealEntertainment = () => {
     if (isInitial) setLoading(true);
     try {
       const [custRes, facRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000 }),
-        axios.get(`${API_URL}/api/facilities`, { timeout: 5000 })
+        api.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} }),
+        api.get(`${API_URL}/api/facilities`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} })
       ]);
       
       // Only update state if data actually changed to prevent unnecessary re-renders
@@ -150,7 +153,7 @@ const TvRealEntertainment = () => {
     } finally {
       if (isInitial) setLoading(false);
     }
-  }, []);
+  }, [branchParam]);
 
   useEffect(() => {
     fetchData(true);
@@ -374,7 +377,9 @@ const TvRealEntertainment = () => {
   useEffect(() => {
     const loadYoutubePlaylist = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/settings/youtube_playlist`);
+        const response = await api.get(`${API_URL}/api/settings/youtube_playlist`, {
+          params: branchParam ? { branch_code: branchParam } : {}
+        });
         if (response.data.success && response.data.value) {
           setYoutubeVideos(response.data.value);
         }
@@ -387,7 +392,7 @@ const TvRealEntertainment = () => {
             const videos = JSON.parse(savedVideos);
             setYoutubeVideos(videos);
             // Migrate to database
-            await axios.put(`${API_URL}/api/settings/youtube_playlist`, {
+            await api.put(`${API_URL}/api/settings/youtube_playlist`, {
               value: videos,
               description: 'YouTube videos playlist for TV entertainment'
             });
@@ -452,7 +457,7 @@ const TvRealEntertainment = () => {
     const handleSave = async () => {
       try {
         // Save to database
-        await axios.put(`${API_URL}/api/settings/youtube_playlist`, {
+        await api.put(`${API_URL}/api/settings/youtube_playlist`, {
           value: tempVideos,
           description: 'YouTube videos playlist for TV entertainment'
         });

@@ -38,8 +38,10 @@ import {
   CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import BranchSelect from '../Settings/BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -55,7 +57,8 @@ const VehicleManagement = () => {
     plate_number: '',
     vehicle_type: 'Truck',
     status: 'Active',
-    description: ''
+    description: '',
+    branch_code: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
@@ -92,7 +95,7 @@ const VehicleManagement = () => {
 
   const fetchVehicles = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/vehicles`, {
+      const response = await api.get(`${api_url}/api/vehicles`, {
         params: {
           page: page + 1, // Backend uses 1-based pagination, frontend uses 0-based
           limit: rowsPerPage,
@@ -143,7 +146,8 @@ const VehicleManagement = () => {
         plate_number: '',
         vehicle_type: 'Truck',
         status: 'Active',
-        description: ''
+        description: '',
+        branch_code: ''
       });
       setEditMode(false);
       console.log('Set to CREATE mode');
@@ -160,7 +164,8 @@ const VehicleManagement = () => {
       plate_number: '',
       vehicle_type: 'Truck',
       status: 'Active',
-      description: ''
+      description: '',
+      branch_code: ''
     });
     console.log('Dialog closed and form reset');
   };
@@ -191,7 +196,8 @@ const VehicleManagement = () => {
         plate_number: currentVehicle.plate_number.trim(),
         vehicle_type: currentVehicle.vehicle_type,
         status: currentVehicle.status,
-        description: currentVehicle.description?.trim() || ''
+        description: currentVehicle.description?.trim() || '',
+        branch_code: currentVehicle.branch_code || ''
       };
 
       // For CREATE mode, explicitly exclude the id field
@@ -586,6 +592,12 @@ const VehicleManagement = () => {
                 multiline
                 rows={3}
                 placeholder="Optional description or notes about the vehicle"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <BranchSelect
+                value={currentVehicle.branch_code}
+                onChange={(val) => handleInputChange('branch_code', val)}
               />
             </Grid>
           </Grid>

@@ -19,6 +19,7 @@ import {
   PersonOutline as DelivererIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
 import withReactContent from 'sweetalert2-react-content';
@@ -117,6 +118,27 @@ const PIVehicleRequests = () => {
     fetchDeliverers();
   }, [currentEthiopianMonth, currentEthiopianYear, filterType]);
 
+  // Silent background polling every 5s
+  useEffect(() => {
+    const silentFetch = async () => {
+      try {
+        if (filterType === 'Regular') {
+          const res = await axios.get(`${api_url}/api/pi-vehicle-requests`, {
+            params: { month: currentEthiopianMonth, year: currentEthiopianYear, process_type: 'regular' }
+          });
+          setRouteData(res.data.routes || []);
+        } else {
+          const res = await axios.get(`${api_url}/api/pi-vehicle-requests/by-facility`, {
+            params: { process_type: filterType.toLowerCase() }
+          });
+          setFacilityData(res.data.facilities || []);
+        }
+      } catch (_) {}
+    };
+    const interval = setInterval(silentFetch, 5000);
+    return () => clearInterval(interval);
+  }, [filterType, currentEthiopianMonth, currentEthiopianYear]);
+
   const fetchRouteData = async () => {
     try {
       setLoading(true);
@@ -175,7 +197,7 @@ const PIVehicleRequests = () => {
 
   const fetchVehicles = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/vehicles/available`);
+      const response = await api.get(`${api_url}/api/vehicles/available`);
       setVehicles(response.data);
     } catch (err) {
       console.error("Vehicles fetch error:", err);

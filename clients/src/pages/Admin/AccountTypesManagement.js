@@ -254,7 +254,7 @@ const AccountTypesManagement = () => {
   // Access control
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const accountType = localStorage.getItem('AccountType') || '';
-  const isAdmin = accountType === 'Admin';
+  const isAdmin = accountType === 'Admin' || accountType === 'Super Admin';
 
   if (!isAdmin) {
     return (

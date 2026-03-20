@@ -97,6 +97,20 @@ const DispatchManagement = () => {
     fetchStats();
   }, [currentEthiopianMonth, currentEthiopianYear, filterType]);
 
+  // Silent background polling every 5s
+  useEffect(() => {
+    const silentFetch = async () => {
+      try {
+        const res = await axios.get(`${api_url}/api/dispatch-routes`, {
+          params: { month: currentEthiopianMonth, year: currentEthiopianYear, process_type: filterType.toLowerCase(), includeAll: true }
+        });
+        setRouteData(res.data.routes || []);
+      } catch (_) {}
+    };
+    const interval = setInterval(silentFetch, 5000);
+    return () => clearInterval(interval);
+  }, [currentEthiopianMonth, currentEthiopianYear, filterType]);
+
   const fetchAssignedRoutes = async () => {
     try {
       setLoading(true);

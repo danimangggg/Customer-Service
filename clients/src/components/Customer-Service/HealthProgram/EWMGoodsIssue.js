@@ -83,6 +83,20 @@ const EWMGoodsIssue = () => {
     fetchProcesses();
   }, [processType]);
 
+  // Silent background polling every 5s
+  useEffect(() => {
+    const silentFetch = async () => {
+      try {
+        const response = await axios.get(`${api_url}/api/ewm-goods-issue-processes`, {
+          params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType }
+        });
+        setProcesses(response.data.processes || []);
+      } catch (_) {}
+    };
+    const interval = setInterval(silentFetch, 5000);
+    return () => clearInterval(interval);
+  }, [processType]);
+
   const fetchProcesses = async () => {
     try {
       setLoading(true);

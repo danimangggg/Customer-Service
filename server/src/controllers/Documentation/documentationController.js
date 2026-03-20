@@ -7,10 +7,14 @@ const getDispatchedODNs = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '', process_type = 'regular' } = req.query;
     const offset = (page - 1) * limit;
 
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
     const isEmergencyOrBreakdown = process_type === 'emergency' || process_type === 'breakdown' || process_type === 'vaccine';
 
-    // For emergency/breakdown/vaccine: skip reporting_month filter, filter by process_type instead
-    // For regular: filter by reporting_month AND process_type
     const processTypeFilter = isEmergencyOrBreakdown
       ? `AND p.process_type = '${process_type}'`
       : `AND p.reporting_month = '${month} ${year}' AND p.process_type = '${process_type}'`;
@@ -53,6 +57,7 @@ const getDispatchedODNs = async (req, res) => {
       )
       WHERE p.status IN ('vehicle_requested', 'driver_assigned', 'dispatch_completed', 'completed')
         ${processTypeFilter}
+        ${branchFilter}
         ${search ? 'AND (COALESCE(f.facility_name, \'\') LIKE ? OR COALESCE(r.route_name, \'\') LIKE ?)' : ''}
       GROUP BY p.facility_id, f.facility_name, f.region_name, f.zone_name, f.woreda_name, 
                r.route_name, r.id, p.reporting_month, ra.id, ra.arrival_kilometer
@@ -91,7 +96,6 @@ const getDocumentationStats = async (req, res) => {
   try {
     const { month, year } = req.query;
     
-    // Validate required parameters
     if (!month || !year) {
       return res.status(400).json({ 
         error: 'Month and year are required parameters',
@@ -99,12 +103,15 @@ const getDocumentationStats = async (req, res) => {
       });
     }
 
-    const reportingMonth = `${month} ${year}`;
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
 
+    const reportingMonth = `${month} ${year}`;
     console.log('Fetching documentation stats for:', reportingMonth);
 
-    // Use LEFT JOINs and COALESCE for more robust queries
-    // Get total dispatched ODNs
     const totalDispatchedQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
@@ -113,9 +120,9 @@ const getDocumentationStats = async (req, res) => {
       LEFT JOIN routes r ON f.route = r.route_name
       LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
       WHERE p.reporting_month = ? AND p.status = 'vehicle_requested'
+      ${branchFilter}
     `;
 
-    // Get confirmed PODs
     const confirmedPODsQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
@@ -126,9 +133,9 @@ const getDocumentationStats = async (req, res) => {
       WHERE p.reporting_month = ? 
         AND p.status = 'vehicle_requested'
         AND o.pod_confirmed = TRUE
+      ${branchFilter}
     `;
 
-    // Get pending PODs
     const pendingPODsQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
@@ -139,6 +146,7 @@ const getDocumentationStats = async (req, res) => {
       WHERE p.reporting_month = ? 
         AND p.status = 'vehicle_requested'
         AND (o.pod_confirmed = FALSE OR o.pod_confirmed IS NULL)
+      ${branchFilter}
     `;
 
     const [totalResult, confirmedResult, pendingResult] = await Promise.all([
