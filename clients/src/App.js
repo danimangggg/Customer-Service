@@ -17,6 +17,7 @@ import CompletedPicklists from './pages/Customer-Service/CompletedPicklists';
 import RDFPicklists from './pages/Customer-Service/RDFPicklists';
 import RDFPicklistsCompleted from './pages/Customer-Service/RDFPicklistsCompleted';
 import EwmDocumentation from './components/Customer-Service/EwmDocumentation';
+import FinanceInvoiceView from './components/Finance/FinanceInvoiceView';
 import QueueManager from './components/Customer-Service/QueueManager';
 import TvDispatch from './pages/Customer-Service/Dispatch/TvDispatchPage';
 import Dispatch from './pages/Customer-Service/Dispatch/DispatchPage';
@@ -101,6 +102,7 @@ const AppContent = () => {
             <Route path = '/rdf-picklists' Component={RDFPicklists} />
             <Route path = '/rdf-completed-picklists' Component={RDFPicklistsCompleted} />
             <Route path = '/ewm-documentation' Component={EwmDocumentation} />
+            <Route path = '/finance-invoices' Component={FinanceInvoiceView} />
             <Route path = '/queue-manager' Component={QueueManager} />
             <Route path = '/tv-dispatch' Component={TvDispatch} />
             <Route path = '/dispatch' Component={Dispatch} />

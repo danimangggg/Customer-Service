@@ -413,25 +413,22 @@ const AllPicklists = () => {
           <Box className="header-gradient">
             <Stack direction="row" alignItems="center" spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
               <Avatar sx={{ 
-                bgcolor: 'rgba(255,255,255,0.2)', 
+                bgcolor: '#1565c0', 
                 width: 64, 
                 height: 64,
-                backdropFilter: 'blur(10px)',
-                border: '2px solid rgba(255,255,255,0.3)'
               }}>
-                <AssignmentIcon fontSize="large" />
+                <AssignmentIcon fontSize="large" sx={{ color: 'white' }} />
               </Avatar>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h3" fontWeight="bold" sx={{ 
-                  textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                  color: '#1a1a1a',
                   mb: 1
                 }}>
                   All Picklists
                 </Typography>
                 <Typography variant="h6" sx={{ 
-                  opacity: 0.9, 
+                  color: '#555', 
                   fontWeight: 300,
-                  textShadow: '0 1px 2px rgba(0,0,0,0.1)'
                 }}>
                   Manage and track picklist submissions
                 </Typography>
@@ -441,13 +438,10 @@ const AllPicklists = () => {
                 onClick={() => navigate('/completed-picklists')}
                 className="action-button"
                 sx={{
-                  bgcolor: 'rgba(255,255,255,0.2)',
+                  bgcolor: '#1565c0',
                   color: 'white',
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  backdropFilter: 'blur(10px)',
                   '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.3)',
-                    border: '2px solid rgba(255,255,255,0.5)',
+                    bgcolor: '#0d47a1',
                   }
                 }}
               >

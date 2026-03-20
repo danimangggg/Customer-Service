@@ -135,7 +135,7 @@ const DispatcherAccount = () => {
                 // 1. EWM is completed and dispatch not completed yet
                 // 2. Dispatch is in progress (started, notifying, or continuing)
                 const isReadyToStart = ewmStatus === 'completed' && dispatchStatus === 'pending';
-                const isInProgress = ['started', 'notifying', 'continuing'].includes(dispatchStatus);
+                const isInProgress = ['started', 'notifying', 'almost_there'].includes(dispatchStatus);
                 const isNotDone = dispatchStatus !== 'completed';
                 
                 return isNotDone && (isReadyToStart || isInProgress);
@@ -219,7 +219,7 @@ const DispatcherAccount = () => {
             
             const isFinalStep = newStatus === 'completed';
             const isNotifying = newStatus === 'notifying';
-            const isContinuing = newStatus === 'continuing';
+            const isContinuing = newStatus === 'almost_there';
             
             // Update ODN dispatch status
             let dispatchStatusValue;
@@ -228,7 +228,7 @@ const DispatcherAccount = () => {
             } else if (isNotifying) {
                 dispatchStatusValue = 'notifying';
             } else if (isContinuing) {
-                dispatchStatusValue = 'continuing';
+                dispatchStatusValue = 'almost_there';
             } else {
                 dispatchStatusValue = 'started';
             }
@@ -298,7 +298,7 @@ const DispatcherAccount = () => {
                     [item.id]: timer
                 }));
             } else {
-                // Clear timer if stopping, continuing, or completing
+                // Clear timer if stopping, almost_there, or completing
                 if (notifyingTimers[item.id]) {
                     clearTimeout(notifyingTimers[item.id]);
                     setNotifyingTimers(prev => {
@@ -621,14 +621,14 @@ const DispatcherAccount = () => {
                                                                         size="small" 
                                                                         variant="contained" 
                                                                         color="primary" 
-                                                                        onClick={() => handleStatusUpdate(item, 'continuing')}
+                                                                        onClick={() => handleStatusUpdate(item, 'almost_there')}
                                                                         startIcon={<PlayArrowIcon />}
                                                                         className="action-button"
                                                                     >
                                                                         Continue
                                                                     </Button>
                                                                 </>
-                                                            ) : dispatchStatus === 'continuing' ? (
+                                                            ) : dispatchStatus === 'almost_there' ? (
                                                                 <Button 
                                                                     size="small" 
                                                                     variant="contained" 

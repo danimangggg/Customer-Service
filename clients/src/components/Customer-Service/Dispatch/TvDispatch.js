@@ -16,11 +16,6 @@ const TvCustomer = () => {
   const isPlayingRef = useRef(false);
   const queue = useRef([]);
 
-  const dynamicStoreKey = useMemo(() => {
-    const storeVal = localStorage.getItem('store') || 'AA1';
-    return storeVal.toUpperCase();
-  }, []);
-
   const playNotification = async () => {
     const url = `${window.location.origin}/audio/notification/notification.mp3`;
     try {
@@ -65,46 +60,52 @@ const TvCustomer = () => {
   }, [fetchData]);
 
   const activeOrders = useMemo(() => {
-    return customers
-      .filter(cust => {
-        const storeDetails = cust.store_details || {};
-        const storeInfo = storeDetails[dynamicStoreKey];
-        
-        if (!storeInfo) return false;
-        
-        const ewmStatus = (storeInfo.ewm_status || '').toLowerCase();
-        const dispatchStatus = (storeInfo.dispatch_status || '').toLowerCase();
-        
-        // Show customers where EWM is completed and dispatch is pending, notifying, or started
-        return ewmStatus === 'completed' && 
-               (dispatchStatus === 'pending' || dispatchStatus === 'notifying' || dispatchStatus === 'started');
-      })
-      .map((cust, index) => {
-        const storeInfo = cust.store_details[dynamicStoreKey];
-        const dispatchStatus = (storeInfo.dispatch_status || '').toLowerCase();
-        const ewmStatus = (storeInfo.ewm_status || '').toLowerCase();
-        
-        return {
-          ...cust,
-          displayTicket: index + 1,
-          isNotifying: dispatchStatus === 'notifying',
-          isEwmCompleted: ewmStatus === 'completed' && dispatchStatus === 'pending'
-        };
-      });
-  }, [customers, dynamicStoreKey]);
+    const seen = new Set();
+    const orders = [];
 
-  // FIXED: Audio trigger logic is now for "EWM Completed" status
+    customers.forEach(cust => {
+      const storeDetails = cust.store_details || {};
+
+      Object.entries(storeDetails).forEach(([storeKey, storeInfo]) => {
+        const ewmStatus = (storeInfo.ewm_status || '').toLowerCase();
+        const dispatchStatus = (storeInfo.dispatch_status || '').toLowerCase();
+
+        if (
+          ewmStatus === 'completed' &&
+          (dispatchStatus === 'pending' || dispatchStatus === 'notifying' || dispatchStatus === 'started' || dispatchStatus === 'almost_there')
+        ) {
+          const uid = `${cust.id}-${storeKey}`;
+          if (!seen.has(uid)) {
+            seen.add(uid);
+            orders.push({
+              ...cust,
+              _storeKey: storeKey,
+              _storeInfo: storeInfo,
+              isNotifying: dispatchStatus === 'notifying',
+              isAlmostThere: dispatchStatus === 'almost_there',
+              isEwmCompleted: dispatchStatus === 'pending',
+            });
+          }
+        }
+      });
+    });
+
+    return orders.map((o, i) => ({ ...o, displayTicket: i + 1 }));
+  }, [customers]);
+
+  // Audio trigger logic for "EWM Completed / pending dispatch" status
   useEffect(() => {
     if (!audioStarted) return;
     const now = Date.now();
     activeOrders.forEach(cust => {
       if (cust.isEwmCompleted) {
-        const count = announcementCounts.current.get(cust.id) || 0;
-        const lastTime = lastAnnouncementTime.current.get(cust.id) || 0;
+        const key = `${cust.id}-${cust._storeKey}`;
+        const count = announcementCounts.current.get(key) || 0;
+        const lastTime = lastAnnouncementTime.current.get(key) || 0;
         if (count < 2 && (now - lastTime > 10000)) {
-          queue.current.push(cust.id);
-          announcementCounts.current.set(cust.id, count + 1);
-          lastAnnouncementTime.current.set(cust.id, now);
+          queue.current.push(key);
+          announcementCounts.current.set(key, count + 1);
+          lastAnnouncementTime.current.set(key, now);
         }
       }
     });
@@ -128,15 +129,18 @@ const TvCustomer = () => {
     if (cust.isNotifying) {
       statusLabel = "Ready to Dispatch";
       themeColor = "#fff"; 
-      rowBg = "#d32f2f"; // RED BACKGROUND
+      rowBg = "#d32f2f";
+    } else if (cust.isAlmostThere) {
+      statusLabel = "Almost There";
+      themeColor = "#ff9800";
     } else if (cust.isEwmCompleted) {
       statusLabel = "EWM Completed";
-      themeColor = "#f1c40f"; // YELLOW THEME
+      themeColor = "#f1c40f";
     }
 
     return (
       <Box sx={{ 
-        display: 'grid', gridTemplateColumns: '100px 1fr 250px 120px', gap: 2, mb: 2.5,
+        display: 'grid', gridTemplateColumns: '100px 1fr 180px 200px 120px', gap: 2, mb: 2.5,
         bgcolor: rowBg,
         borderRadius: '10px',
         animation: (cust.isNotifying || cust.isEwmCompleted) ? 'vibrate 0.3s infinite alternate' : 'none',
@@ -149,6 +153,12 @@ const TvCustomer = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', px: 3, bgcolor: cust.isNotifying ? 'transparent' : 'rgba(255,255,255,0.07)', borderY: `1.5px solid ${themeColor}44` }}>
           <Typography sx={{ fontWeight: 700, color: '#fff', fontSize: '1.3rem' }}>
             {facilities.find(f => f.id === cust.facility_id)?.facility_name || 'Customer'}
+          </Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: cust.isNotifying ? 'transparent' : 'rgba(255,255,255,0.05)', borderY: `1.5px solid ${themeColor}44` }}>
+          <Typography sx={{ fontWeight: 700, color: '#4facfe', fontSize: '1.1rem' }}>
+            {cust._storeKey}
           </Typography>
         </Box>
 

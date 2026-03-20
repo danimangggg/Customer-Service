@@ -9,12 +9,10 @@ const getHPDashboardData = async (req, res) => {
     const { month, year, process_type } = req.query;
     const reportingMonth = month && year ? `${month} ${year}` : null;
 
-    // Get total HP facilities (only facilities that have routes) - NOT month dependent
+    // Get total HP facilities - NOT month dependent
     const totalFacilities = process_type === 'vaccine'
       ? await Facility.count({ where: { is_vaccine_site: true } })
-      : await Facility.count({
-          where: { route: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] } }
-        });
+      : await Facility.count({ where: { is_hp_site: true } });
 
     // For month-dependent metrics, filter by reporting month and process_type
     const processWhere = {};
@@ -42,7 +40,7 @@ const getHPDashboardData = async (req, res) => {
       SELECT COUNT(DISTINCT p.facility_id) as count
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE f.route IS NOT NULL AND f.route != ''
+      WHERE f.is_hp_site = 1
     `;
     
     const rrfQueryParams = [];
@@ -105,15 +103,13 @@ const getHPDashboardData = async (req, res) => {
       }
     });
 
-    // Expected This Month: depends on process type
-    // - vaccine: count facilities with is_vaccine_site = true
-    // - regular: count by period (Monthly always, Odd/Even alternating)
+    // Expected This Month: depends on process type and period
+    // - vaccine: all vaccine sites
+    // - regular: HP sites filtered by period (Monthly always, Odd/Even alternating by month)
     const ethiopianMonths = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
     let expectedThisMonth = totalFacilities;
     if (process_type === 'vaccine') {
-      expectedThisMonth = await Facility.count({
-        where: { is_vaccine_site: true }
-      });
+      expectedThisMonth = await Facility.count({ where: { is_vaccine_site: true } });
     } else if (month) {
       const monthIndex = ethiopianMonths.indexOf(month) + 1; // 1-based
       const isOddMonth = monthIndex % 2 !== 0;
@@ -121,10 +117,7 @@ const getHPDashboardData = async (req, res) => {
         ? { [Op.in]: ['Monthly', 'Odd'] }
         : { [Op.in]: ['Monthly', 'Even'] };
       expectedThisMonth = await Facility.count({
-        where: {
-          route: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] },
-          period: periodFilter
-        }
+        where: { is_hp_site: true, period: periodFilter }
       });
     }
 
@@ -138,8 +131,7 @@ const getHPDashboardData = async (req, res) => {
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id 
       INNER JOIN odns o ON p.id = o.process_id
-      WHERE f.route IS NOT NULL 
-        AND f.route != ''
+      WHERE f.is_hp_site = 1
         AND o.quality_confirmed = true
     `;
     

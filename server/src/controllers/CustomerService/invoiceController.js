@@ -19,8 +19,10 @@ const getEwmCompletedCustomers = async (req, res) => {
         odn.ewm_completed_at,
         odn.next_service_point,
         cq.facility_id,
+        cq.customer_type,
         f.facility_name as customer_name,
         f.region_name,
+        f.zone_name,
         f.woreda_name,
         inv.id as invoice_id,
         inv.invoice_number,
@@ -37,7 +39,7 @@ const getEwmCompletedCustomers = async (req, res) => {
 
     console.log('Executing query...');
     const replacements = store ? [store] : [];
-    const [results] = await db.sequelize.query(query, { replacements });
+    const results = await db.sequelize.query(query, { replacements, type: db.sequelize.QueryTypes.SELECT });
     
     console.log(`Found ${results.length} ODNs with completed EWM status`);
     
@@ -191,7 +193,10 @@ const getInvoices = async (req, res) => {
       SELECT 
         inv.*,
         cq.facility_id,
+        cq.customer_type,
+        f.facility_name,
         f.region_name,
+        f.zone_name,
         f.woreda_name
       FROM invoices inv
       LEFT JOIN customer_queue cq ON inv.process_id = cq.id
@@ -200,7 +205,7 @@ const getInvoices = async (req, res) => {
       ORDER BY inv.invoice_date DESC, inv.created_at DESC
     `;
     
-    const [results] = await db.sequelize.query(query, {
+    const results = await db.sequelize.query(query, {
       replacements,
       type: db.sequelize.QueryTypes.SELECT
     });

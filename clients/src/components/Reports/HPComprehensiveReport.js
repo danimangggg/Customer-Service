@@ -25,6 +25,7 @@ import RouteAnalysis from './HPReport/RouteAnalysis';
 import HPCustomerDetailReport from './HPReport/HPCustomerDetailReport';
 import AllPicklists from '../Customer-Service/AllPicklists';
 import OrganizationProfileView from './OrganizationProfileView';
+import HPDashboard from '../../pages/Customer-Service/HealthProgram/HPDashboard';
 
 const HPComprehensiveReport = () => {
   const navigate = useNavigate();
@@ -129,7 +130,7 @@ const HPComprehensiveReport = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    if (newValue === 7) fetchBestOfHP(bestOfRange);
+    if (newValue === 8) fetchBestOfHP(bestOfRange);
   };
 
   const handleExportReport = () => {
@@ -138,13 +139,14 @@ const HPComprehensiveReport = () => {
   };
 
   const tabs = [
+    { label: 'Dashboard',                 icon: <AssessmentIcon /> },
     { label: 'HP Customer Detail Report', icon: <PeopleIcon /> },
-    { label: 'ODN/POD Details', icon: <AssignmentIcon /> },
-    { label: 'RRF/VRF', icon: <AssessmentIcon /> },
-    { label: 'Service Units Detail', icon: <TableChartIcon /> },
-    { label: 'Route Analysis', icon: <RouteIcon /> },
-    { label: 'All Picklists', icon: <TrendingUpIcon /> },
-    { label: 'Best Of', icon: <EmojiEventsIcon /> }
+    { label: 'ODN/POD Details',           icon: <AssignmentIcon /> },
+    { label: 'RRF/VRF',                   icon: <AssessmentIcon /> },
+    { label: 'Service Units Detail',      icon: <TableChartIcon /> },
+    { label: 'Route Analysis',            icon: <RouteIcon /> },
+    { label: 'All Picklists',             icon: <TrendingUpIcon /> },
+    { label: 'Best Of',                   icon: <EmojiEventsIcon /> }
   ];
 
   return (
@@ -187,8 +189,8 @@ const HPComprehensiveReport = () => {
           </Tabs>
           <Divider />
 
-          {/* Process Type filter — only for tabs that use reportData (3, 4) */}
-          {[3, 4].includes(activeTab) && (
+          {/* Process Type filter — only for Service Units Detail tab */}
+          {[4].includes(activeTab) && (
             <Box sx={{ px: 3, pt: 2 }}>
               <Stack direction="row" alignItems="center" spacing={2}>
                 <Typography variant="body2" color="text.secondary">Process Type:</Typography>
@@ -208,13 +210,14 @@ const HPComprehensiveReport = () => {
           )}
 
           <CardContent sx={{ p: 3 }}>
-            {activeTab === 0 && <HPCustomerDetailReport />}
-            {activeTab === 1 && <ODNPODDetailReport />}
-            {activeTab === 2 && <ReportOverview />}
-            {activeTab === 3 && <ServiceUnitsDetail data={reportData} />}
-            {activeTab === 4 && <RouteAnalysis data={reportData} />}
-            {activeTab === 5 && <AllPicklists />}
-            {activeTab === 6 && (
+            {activeTab === 0 && <HPDashboard />}
+            {activeTab === 1 && <HPCustomerDetailReport />}
+            {activeTab === 2 && <ODNPODDetailReport />}
+            {activeTab === 3 && <ReportOverview />}
+            {activeTab === 4 && <ServiceUnitsDetail data={reportData} />}
+            {activeTab === 5 && <RouteAnalysis />}
+            {activeTab === 6 && <AllPicklists />}
+            {activeTab === 7 && (
               <Box>
                 {/* Date Range Controls */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>

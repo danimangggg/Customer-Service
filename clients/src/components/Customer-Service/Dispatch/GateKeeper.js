@@ -21,7 +21,6 @@ const API_URL = process.env.REACT_APP_API_URL || "http://localhost:3001";
 const GateKeeper = () => {
   const navigate = useNavigate();
   const [records, setRecords] = useState([]);
-  const [facilities, setFacilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [previousCount, setPreviousCount] = useState(0);
@@ -200,38 +199,25 @@ const GateKeeper = () => {
       console.log('Gate Keeper Name:', localStorage.getItem('FullName'));
       console.log('Assigned Stores:', assignedStores);
       
-      // Fetch from TV display endpoint which has ODN-based data
-      const [serviceRes, facilityRes] = await Promise.all([
-        axios.get(`${API_URL}/api/tv-display-customers`),
+      const [facilityRes] = await Promise.all([
         axios.get(`${API_URL}/api/facilities`)
       ]);
       
-      console.log('Service Response:', serviceRes.data);
-      
-      // Filter records that are ready for gate keeper for ANY of the assigned stores
-      const processedRecords = serviceRes.data.filter(row => {
-        const storeDetails = row.store_details || {};
-        const globalStatus = (row.status || '').toLowerCase();
-        
-        // Check if ANY of the assigned stores has completed exit permit and is waiting for gate
-        const hasStoreReadyForGate = assignedStores.some(storeName => {
-          const storeInfo = storeDetails[storeName];
-          if (!storeInfo) return false;
-          
-          const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
-          const gateStatus = (storeInfo.gate_status || '').toLowerCase();
-          
-          // Accept both 'completed' and 'partial' exit permit statuses
-          return (exitPermitStatus === 'completed' || exitPermitStatus === 'partial') && 
-                 (gateStatus === 'pending' || gateStatus === '' || !gateStatus);
-        });
-        
-        // Show records where:
-        // 1. At least one assigned store has completed exit permit
-        // 2. That store's gate status is pending or empty
-        // 3. Global status is not completed (final completion)
-        return hasStoreReadyForGate && globalStatus !== 'completed';
-      });
+      // Fetch pending exit history records for all assigned stores
+      const pendingByStore = await Promise.all(
+        assignedStores.map(storeName =>
+          axios.get(`${API_URL}/api/exit-history-pending/${storeName}`)
+            .then(r => r.data.data || [])
+            .catch(() => [])
+        )
+      );
+      const allPending = pendingByStore.flat();
+
+      // Enrich with facility data (facility_name already comes from SQL JOIN)
+      const processedRecords = allPending.map(row => ({
+        ...row,
+        actual_facility_name: row.facility_name || '—'
+      }));
 
       // Check for new records and trigger notification
       if (isAutoRefresh && processedRecords.length > previousCount) {
@@ -241,11 +227,9 @@ const GateKeeper = () => {
       
       setPreviousCount(processedRecords.length);
 
-      console.log('Total records:', serviceRes.data.length);
       console.log(`Filtered records for gate keeper (${assignedStores.join(', ')}):`, processedRecords.length);
       
       setRecords(processedRecords);
-      setFacilities(facilityRes.data);
     } catch (error) {
       console.error("Fetch Error:", error);
     } finally {
@@ -273,40 +257,19 @@ const GateKeeper = () => {
     const actionText = action === 'allow' ? 'Allow Exit' : 'Cancel Exit';
     const actionColor = action === 'allow' ? '#4caf50' : '#f44336';
     const actionIcon = action === 'allow' ? '✅' : '❌';
-
-    // Find which of the assigned stores are ready for gate processing
-    const storeDetails = record.store_details || {};
-    const storesToProcess = assignedStores.filter(storeName => {
-      const storeInfo = storeDetails[storeName];
-      if (!storeInfo) return false;
-      
-      const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
-      const gateStatus = (storeInfo.gate_status || '').toLowerCase();
-      
-      // Accept both 'completed' and 'partial' exit permit statuses
-      return (exitPermitStatus === 'completed' || exitPermitStatus === 'partial') && 
-             (gateStatus === 'pending' || gateStatus === '' || !gateStatus);
-    });
-
-    if (storesToProcess.length === 0) {
-      setSnackbar({ 
-        open: true, 
-        message: 'No stores ready for gate processing', 
-        severity: 'warning' 
-      });
-      return;
-    }
+    const isPartial = record.exit_type === 'partial';
 
     const result = await Swal.fire({
       title: `${actionIcon} ${actionText}`,
       html: `
         <div style="text-align: left; margin: 20px 0;">
           <p><strong>Vehicle:</strong> ${record.vehicle_plate}</p>
-          <p><strong>Facility:</strong> ${facilities.find(f => f.id === record.facility_id)?.facility_name || record.facility_id}</p>
+          <p><strong>Facility:</strong> ${record.facility_name || '—'}</p>
           <p><strong>Amount:</strong> ${record.total_amount} ${record.measurement_unit}</p>
-          <p><strong>Receipts:</strong> ${record.receipt_count}</p>
+          <p><strong>Receipts:</strong> ${record.receipt_count || '—'}</p>
           ${record.receipt_number ? `<p><strong>Receipt #:</strong> ${record.receipt_number}</p>` : ''}
-          <p><strong>Store(s):</strong> ${storesToProcess.join(', ')}</p>
+          <p><strong>Store:</strong> ${record.store_id}</p>
+          <p><strong>Type:</strong> ${isPartial ? 'Partial Exit' : 'Full Exit'}</p>
         </div>
       `,
       icon: action === 'allow' ? 'success' : 'warning',
@@ -314,153 +277,121 @@ const GateKeeper = () => {
       confirmButtonColor: actionColor,
       cancelButtonColor: '#6c757d',
       confirmButtonText: `Yes, ${actionText}`,
-      cancelButtonText: 'Cancel',
-      customClass: {
-        popup: 'swal2-popup-custom',
-        confirmButton: 'swal2-confirm-custom',
-        cancelButton: 'swal2-cancel-custom'
-      }
+      cancelButtonText: 'Cancel'
     });
 
-    if (result.isConfirmed) {
+    if (!result.isConfirmed) return;
+
+    try {
+      const gateKeeperId = localStorage.getItem('UserId') || localStorage.getItem('EmployeeID');
+      const gateKeeperName = localStorage.getItem('FullName');
+      const newGateStatus = action === 'allow' ? 'allowed' : 'denied';
+
+      // 1. Update this exit_history row's gate_status
+      await axios.put(`${API_URL}/api/exit-history/${record.id}/gate-status`, {
+        gate_status: newGateStatus,
+        gate_keeper_id: gateKeeperId,
+        gate_keeper_name: gateKeeperName
+      });
+      console.log(`✅ exit_history row ${record.id} updated to ${newGateStatus}`);
+
+      // 2. Update ODN gate status for this store
       try {
-        // For 'allow' action, record exit history first
-        if (action === 'allow') {
-          try {
-            // Get the current exit number for this process
-            const exitHistoryResponse = await axios.get(`${API_URL}/api/exit-history/${record.id}`);
-            const existingExits = exitHistoryResponse.data.exits || [];
-            const exitNumber = existingExits.length + 1;
-            
-            // Record exit history for each store
-            await Promise.all(storesToProcess.map(storeName => {
-              // Determine if this is partial or full exit based on exit_permit_status for THIS store
-              const storeInfo = storeDetails[storeName];
-              const exitType = (storeInfo?.exit_permit_status || '').toLowerCase() === 'partial' ? 'partial' : 'full';
-              
-              return axios.post(`${API_URL}/api/exit-history`, {
-                process_id: record.id,
-                store_id: storeName,
-                exit_number: exitNumber,
-                vehicle_plate: record.vehicle_plate,
-                total_amount: record.total_amount,
-                measurement_unit: record.measurement_unit,
-                receipt_count: record.receipt_count,
-                receipt_number: record.receipt_number,
-                gate_keeper_id: localStorage.getItem('EmployeeID'),
-                gate_keeper_name: localStorage.getItem('FullName'),
-                exit_type: exitType,
-                exited_at: new Date().toISOString()
-              });
-            }));
-            
-            console.log(`✅ Exit history recorded (Exit #${exitNumber}, Type: ${exitType})`);
-          } catch (err) {
-            console.error('❌ Failed to record exit history:', err);
-            // Don't fail the gate processing if exit history recording fails
-          }
-        }
-        
-        // Update ODN gate status for all stores being processed
-        await Promise.all(storesToProcess.map(async (storeName) => {
-          const storeInfo = storeDetails[storeName];
-          const isPartialExit = (storeInfo?.exit_permit_status || '').toLowerCase() === 'partial';
-          
-          // Update gate status
-          await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
-            process_id: record.id,
-            store: storeName,
-            gate_status: action === 'allow' ? 'allowed' : 'denied',
-            officer_id: localStorage.getItem('EmployeeID'),
-            officer_name: localStorage.getItem('FullName')
-          });
-          
-          // For partial exits, reset exit_permit_status and gate_status back to pending
-          // so the record reappears in Exit Permit list for next visit
-          if (action === 'allow' && isPartialExit) {
-            await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
-              process_id: record.id,
-              store: storeName,
-              exit_permit_status: 'pending',
-              officer_id: localStorage.getItem('EmployeeID'),
-              officer_name: localStorage.getItem('FullName')
-            });
-            
-            await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
-              process_id: record.id,
-              store: storeName,
-              gate_status: 'pending',
-              officer_id: localStorage.getItem('EmployeeID'),
-              officer_name: localStorage.getItem('FullName')
-            });
-            
-            console.log(`✅ Partial exit: Reset ${storeName} statuses to pending for next visit`);
-          }
-        }));
-
-        // Check if all stores have allowed gate exit (only for non-partial exits)
-        try {
-          const odnResponse = await axios.get(`${API_URL}/api/rdf-odns/${record.id}`);
-          const allOdns = odnResponse.data.odns || [];
-          
-          // Check if any ODN has partial status (which we just reset to pending)
-          const hasPartialExits = storesToProcess.some(storeName => {
-            const storeInfo = storeDetails[storeName];
-            return (storeInfo?.exit_permit_status || '').toLowerCase() === 'partial';
-          });
-          
-          // Only mark as completed if no partial exits and all gates allowed
-          if (!hasPartialExits) {
-            const allGateAllowed = allOdns.every(odn => odn.gate_status === 'allowed');
-            
-            if (allGateAllowed) {
-              // All stores allowed exit, mark customer as completed
-              await axios.put(`${API_URL}/api/update-service-status/${record.id}`, {
-                status: 'completed',
-                completed_at: new Date().toISOString()
-              });
-              console.log('✅ All stores allowed exit, customer marked as completed');
-            }
-          } else {
-            console.log('⏳ Partial exit detected, keeping customer active for next visit');
-          }
-        } catch (err) {
-          console.error('❌ Failed to check all gate statuses:', err);
-        }
-
-        // Record service time for Gate Keeper for each store
-        try {
-          const gateProcessedTime = formatTimestamp();
-          
-          await Promise.all(storesToProcess.map(storeName =>
-            axios.post(`${API_URL}/api/service-time`, {
-              process_id: record.id,
-              service_unit: `Gate Keeper - ${storeName}`,
-              end_time: gateProcessedTime,
-              officer_id: localStorage.getItem('EmployeeID'),
-              officer_name: localStorage.getItem('FullName'),
-              status: 'completed',
-              notes: `Gate ${action === 'allow' ? 'allowed' : 'denied'} exit for vehicle ${record.vehicle_plate}`
-            })
-          ));
-          
-          console.log(`✅ Gate Keeper service time recorded for stores: ${storesToProcess.join(', ')}`);
-        } catch (err) {
-          console.error('❌ Failed to record Gate Keeper service time:', err);
-          // Don't fail the gate processing if service time recording fails
-        }
-
-        setSnackbar({ 
-          open: true, 
-          message: `Vehicle ${record.vehicle_plate} ${action === 'allow' ? 'allowed to exit' : 'denied exit'} for ${storesToProcess.join(', ')}!`, 
-          severity: action === 'allow' ? 'success' : 'warning' 
+        await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
+          process_id: record.process_id,
+          store: record.store_id,
+          gate_status: newGateStatus,
+          officer_id: gateKeeperId,
+          officer_name: gateKeeperName
         });
-        
-        fetchData(true);
-      } catch (error) {
-        console.error('Gate action error:', error);
-        setSnackbar({ open: true, message: "Action failed. Please try again.", severity: "error" });
+      } catch (err) {
+        console.error('❌ Failed to update ODN gate status:', err);
       }
+
+      // 3. If partial and allowed: reset ODN statuses to pending for next round
+      if (action === 'allow' && isPartial) {
+        try {
+          await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
+            process_id: record.process_id,
+            store: record.store_id,
+            exit_permit_status: 'pending',
+            officer_id: gateKeeperId,
+            officer_name: gateKeeperName
+          });
+          await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
+            process_id: record.process_id,
+            store: record.store_id,
+            gate_status: 'pending',
+            officer_id: gateKeeperId,
+            officer_name: gateKeeperName
+          });
+          console.log(`✅ Partial exit: reset ${record.store_id} statuses to pending for next visit`);
+        } catch (err) {
+          console.error('❌ Failed to reset partial exit statuses:', err);
+        }
+      }
+
+      // 3b. If full exit and allowed: mark exit_permit_status = completed on ODN
+      if (action === 'allow' && !isPartial) {
+        try {
+          await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
+            process_id: record.process_id,
+            store: record.store_id,
+            exit_permit_status: 'completed',
+            officer_id: gateKeeperId,
+            officer_name: gateKeeperName
+          });
+        } catch (err) {
+          console.error('❌ Failed to set exit_permit_status completed:', err);
+        }
+      }
+
+      // 4. If full exit and allowed: check if ALL full exit_history rows are allowed → mark process completed
+      if (action === 'allow' && !isPartial) {
+        try {
+          const allExitsRes = await axios.get(`${API_URL}/api/exit-history/${record.process_id}`);
+          const allExits = allExitsRes.data.exits || [];
+          const fullExits = allExits.filter(e => e.exit_type === 'full');
+          const allAllowed = fullExits.length > 0 && fullExits.every(e =>
+            e.id === record.id ? true : e.gate_status === 'allowed'
+          );
+          if (allAllowed) {
+            await axios.put(`${API_URL}/api/update-service-status/${record.process_id}`, {
+              status: 'completed',
+              completed_at: new Date().toISOString()
+            });
+            console.log('✅ All full exits allowed — process marked completed');
+          }
+        } catch (err) {
+          console.error('❌ Failed to check completion:', err);
+        }
+      }
+
+      // 5. Record service time
+      try {
+        await axios.post(`${API_URL}/api/service-time`, {
+          process_id: record.process_id,
+          service_unit: `Gate Keeper - ${record.store_id}`,
+          end_time: formatTimestamp(),
+          officer_id: gateKeeperId,
+          officer_name: gateKeeperName,
+          status: 'completed',
+          notes: `Gate ${newGateStatus} exit for vehicle ${record.vehicle_plate}`
+        });
+      } catch (err) {
+        console.error('❌ Failed to record service time:', err);
+      }
+
+      setSnackbar({
+        open: true,
+        message: `Vehicle ${record.vehicle_plate} ${action === 'allow' ? 'allowed to exit' : 'denied exit'} for ${record.store_id}!`,
+        severity: action === 'allow' ? 'success' : 'warning'
+      });
+
+      fetchData(true);
+    } catch (error) {
+      console.error('Gate action error:', error);
+      setSnackbar({ open: true, message: 'Action failed. Please try again.', severity: 'error' });
     }
   };
 
@@ -772,7 +703,6 @@ const GateKeeper = () => {
               </TableRow>
             ) : (
               records.map((row) => {
-                const facility = facilities.find(f => f.id === row.facility_id);
                 const isCash = row.customer_type?.toLowerCase() === 'cash';
                 
                 return (
@@ -810,7 +740,7 @@ const GateKeeper = () => {
                             fontWeight: 600,
                             fontSize: { xs: '0.6rem', sm: '0.7rem', md: '0.75rem' }
                           }}>
-                            {facility?.facility_name || row.facility_id}
+                            {row.facility_name || row.store_id}
                           </Typography>
                         </Stack>
                         <Typography variant="caption" color="text.secondary" sx={{ 

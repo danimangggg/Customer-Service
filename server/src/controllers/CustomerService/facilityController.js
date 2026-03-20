@@ -46,8 +46,19 @@ const updateFacility = async (req, res) => {
     if (!facility) {
       return res.status(404).json({ message: 'Facility not found' });
     }
-    
-    await facility.update(req.body);
+
+    const updateData = { ...req.body };
+
+    // If neither HP nor vaccine site, clear route and period
+    const isHp = updateData.is_hp_site === 1 || updateData.is_hp_site === true || updateData.is_hp_site === '1';
+    const isVaccine = updateData.is_vaccine_site === 1 || updateData.is_vaccine_site === true || updateData.is_vaccine_site === '1';
+    if (!isHp && !isVaccine) {
+      updateData.route = null;
+      updateData.route2 = null;
+      updateData.period = null;
+    }
+
+    await facility.update(updateData);
     res.json(facility);
   } catch (error) {
     console.error('Error updating facility:', error);
@@ -71,10 +82,27 @@ const deleteFacility = async (req, res) => {
   }
 };
 
+// Clear route and period for non-HP, non-vaccine facilities
+const clearNonHpRoutesPeriods = async (req, res) => {
+  try {
+    const [affectedRows] = await db.sequelize.query(
+      `UPDATE facility SET route = NULL, route2 = NULL, period = NULL
+       WHERE (is_hp_site = 0 OR is_hp_site IS NULL)
+         AND (is_vaccine_site = 0 OR is_vaccine_site IS NULL)
+         AND (route IS NOT NULL OR route2 IS NOT NULL OR period IS NOT NULL)`
+    );
+    res.json({ message: 'Cleared successfully', affected: affectedRows });
+  } catch (error) {
+    console.error('Error clearing non-HP routes/periods:', error);
+    res.status(500).json({ message: 'Failed to clear', error: error.message });
+  }
+};
+
 module.exports = {
   getFacilities,
   getFacilityById,
   createFacility,
   updateFacility,
-  deleteFacility
+  deleteFacility,
+  clearNonHpRoutesPeriods
 };

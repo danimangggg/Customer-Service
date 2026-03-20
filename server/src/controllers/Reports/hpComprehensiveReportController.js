@@ -38,18 +38,10 @@ const getComprehensiveHPReport = async (req, res) => {
     // For others (emergency/breakdown): expected = HP sites (route+period)
     const totalFacilitiesQuery = process_type === 'vaccine'
       ? `SELECT COUNT(DISTINCT f.id) as total FROM facilities f WHERE f.is_vaccine_site = 1`
-      : process_type === 'regular' || process_type === ''
-      ? `
-      SELECT COUNT(DISTINCT f.id) as total
-      FROM facilities f
-      WHERE f.is_hp_site = 1
-        AND f.route IS NOT NULL AND f.route != ''
-        ${periodFilter}
-      `
       : `
       SELECT COUNT(DISTINCT f.id) as total
       FROM facilities f
-      WHERE f.route IS NOT NULL AND f.route != ''
+      WHERE f.is_hp_site = 1
         ${periodFilter}
       `;
     const [totalFacilitiesResult] = await db.sequelize.query(totalFacilitiesQuery, {
@@ -126,9 +118,7 @@ const getComprehensiveHPReport = async (req, res) => {
     // 6. Facilities with RRF Not Sent - Details
     const vaccineFacilityFilter = process_type === 'vaccine'
       ? `f.is_vaccine_site = 1`
-      : (process_type === 'regular' || process_type === '')
-      ? `f.is_hp_site = 1 AND f.route IS NOT NULL AND f.route != '' ${periodFilter}`
-      : `f.route IS NOT NULL AND f.route != '' ${periodFilter}`;
+      : `f.is_hp_site = 1 ${periodFilter}`;
 
     const rrfNotSentFacilitiesQuery = `
       SELECT 
@@ -190,39 +180,66 @@ const getComprehensiveHPReport = async (req, res) => {
     });
 
     // 8. Route Statistics (excluding "RRF not sent")
+    // Facility type filter for route stats — vaccine sites vs HP sites
+    const routeFacilityFilter = process_type === 'vaccine'
+      ? `AND f.is_vaccine_site = 1`
+      : `AND f.is_hp_site = 1`;
+
     const routeStatsQuery = `
       SELECT 
         r.id as route_id,
         r.route_name,
-        COUNT(DISTINCT f.id) as facilities_count,
+        COUNT(DISTINCT f.id) as total_facilities_on_route,
+        COUNT(DISTINCT CASE WHEN p.id IS NOT NULL THEN f.id END) as facilities_count,
         COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' THEN o.id END) as odns_count,
         COUNT(DISTINCT CASE WHEN o.status = 'dispatched' AND o.odn_number != 'RRF not sent' THEN o.id END) as dispatched_count,
         COUNT(DISTINCT CASE WHEN o.pod_confirmed = 1 AND o.odn_number != 'RRF not sent' THEN o.id END) as pod_confirmed_count,
-        COALESCE(SUM(
-          CASE 
-            WHEN ra.arrival_kilometer IS NOT NULL AND ra.departure_kilometer IS NOT NULL 
-            THEN (ra.arrival_kilometer - ra.departure_kilometer)
-            ELSE 0 
-          END
+        COALESCE((
+          SELECT (p2.arrival_kilometer - p2.departure_kilometer)
+          FROM processes p2
+          INNER JOIN facilities f2 ON p2.facility_id = f2.id
+          WHERE f2.route = r.route_name
+            AND p2.arrival_kilometer IS NOT NULL
+            AND p2.departure_kilometer IS NOT NULL
+            ${skipMonthFilter ? (process_type ? `AND p2.process_type = '${process_type}'` : '') : `AND p2.reporting_month = ?`}
+          ORDER BY p2.created_at DESC
+          LIMIT 1
         ), 0) as total_kilometers,
-        e.full_name as assigned_by_name
+        (SELECT p3.driver_name FROM processes p3
+         INNER JOIN facilities f3 ON p3.facility_id = f3.id
+         WHERE f3.route = r.route_name AND p3.driver_name IS NOT NULL
+         ${skipMonthFilter ? (process_type ? `AND p3.process_type = '${process_type}'` : '') : `AND p3.reporting_month = ?`}
+         ORDER BY p3.created_at DESC LIMIT 1) as driver_name,
+        (SELECT p4.deliverer_name FROM processes p4
+         INNER JOIN facilities f4 ON p4.facility_id = f4.id
+         WHERE f4.route = r.route_name AND p4.deliverer_name IS NOT NULL
+         ${skipMonthFilter ? (process_type ? `AND p4.process_type = '${process_type}'` : '') : `AND p4.reporting_month = ?`}
+         ORDER BY p4.created_at DESC LIMIT 1) as deliverer_name,
+        (SELECT p5.vehicle_name FROM processes p5
+         INNER JOIN facilities f5 ON p5.facility_id = f5.id
+         WHERE f5.route = r.route_name AND p5.vehicle_name IS NOT NULL
+         ${skipMonthFilter ? (process_type ? `AND p5.process_type = '${process_type}'` : '') : `AND p5.reporting_month = ?`}
+         ORDER BY p5.created_at DESC LIMIT 1) as vehicle_name
       FROM routes r
-      LEFT JOIN facilities f ON f.route = r.route_name
+      LEFT JOIN facilities f ON f.route = r.route_name ${routeFacilityFilter}
       LEFT JOIN processes p ON p.facility_id = f.id ${skipMonthFilter ? (process_type ? `AND p.process_type = '${process_type}'` : '') : `AND p.reporting_month = ? ${process_type ? `AND p.process_type = '${process_type}'` : ''}`}
       LEFT JOIN odns o ON o.process_id = p.id
-      LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      LEFT JOIN employees e ON e.id = ra.assigned_by
-      GROUP BY r.id, r.route_name, e.full_name
-      HAVING facilities_count > 0
+      GROUP BY r.id, r.route_name
+      HAVING total_facilities_on_route > 0
       ORDER BY r.route_name
     `;
     const routeReplacements = [];
-    if (!skipMonthFilter) routeReplacements.push(reportingMonth);
-    routeReplacements.push(month);
+    if (!skipMonthFilter) routeReplacements.push(reportingMonth); // total_kilometers subquery
+    if (!skipMonthFilter) routeReplacements.push(reportingMonth); // driver_name subquery
+    if (!skipMonthFilter) routeReplacements.push(reportingMonth); // deliverer_name subquery
+    if (!skipMonthFilter) routeReplacements.push(reportingMonth); // vehicle_name subquery
+    if (!skipMonthFilter) routeReplacements.push(reportingMonth); // main join reporting_month
+    console.log('[RouteStats] replacements count:', routeReplacements.length);
     const routeStats = await db.sequelize.query(routeStatsQuery, {
       replacements: routeReplacements,
       type: db.sequelize.QueryTypes.SELECT
     });
+    console.log('[RouteStats] sample:', routeStats.slice(0, 3).map(r => ({ route: r.route_name, km: r.total_kilometers, assigned: r.assigned_by_name })));
 
     // 9. POD Details with Kilometer (excluding "RRF not sent")
     const podDetailsQuery = `
@@ -268,23 +285,28 @@ const getComprehensiveHPReport = async (req, res) => {
       SELECT 
         COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' THEN o.id END) as o2c_stage,
         COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
-          p.ewm_goods_issued_at IS NOT NULL OR
-          p.biller_received_at IS NOT NULL OR
-          p.tm_confirmed_at IS NOT NULL OR
-          p.status IN ('ewm_completed','biller_completed','tm_confirmed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('ewm_completed','ewm_goods_issued','tm_notified','tm_confirmed','biller_received','biller_completed','freight_order_sent_to_ewm','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
           o.pod_confirmed = 1
         ) THEN o.id END) as ewm_phase1_facilities,
         COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
-          p.biller_received_at IS NOT NULL OR
           p.tm_confirmed_at IS NOT NULL OR
-          p.status IN ('biller_completed','tm_confirmed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('tm_confirmed','ewm_goods_issued','biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          o.pod_confirmed = 1
+        ) THEN o.id END) as tm_phase1_facilities,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
+          p.ewm_goods_issued_at IS NOT NULL OR
+          p.status IN ('ewm_goods_issued','biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          o.pod_confirmed = 1
+        ) THEN o.id END) as ewm_phase2_facilities,
+        COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
+          p.biller_received_at IS NOT NULL OR
+          p.status IN ('biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
           o.pod_confirmed = 1
         ) THEN o.id END) as biller_facilities,
         COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
-          p.tm_confirmed_at IS NOT NULL OR
-          p.status IN ('tm_confirmed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
           o.pod_confirmed = 1
-        ) THEN o.id END) as tm_phase1_facilities,
+        ) THEN o.id END) as pi_facilities,
         COUNT(DISTINCT CASE WHEN o.odn_number != 'RRF not sent' AND (
           p.driver_assigned_at IS NOT NULL OR
           p.status IN ('driver_assigned','dispatch_completed','completed') OR
@@ -317,12 +339,33 @@ const getComprehensiveHPReport = async (req, res) => {
       type: db.sequelize.QueryTypes.SELECT
     });
 
+    // Done facilities: distinct facilities with at least one quality_confirmed ODN
+    const doneFacilitiesQuery = `
+      SELECT COUNT(DISTINCT p.facility_id) as total
+      FROM processes p
+      INNER JOIN facilities f ON p.facility_id = f.id
+      INNER JOIN odns o ON o.process_id = p.id
+      WHERE f.route IS NOT NULL AND f.route != ''
+        AND (o.quality_confirmed = 1 OR o.quality_confirmed = true)
+        AND o.odn_number != 'RRF not sent'
+        ${monthFilter}
+        ${ptFilter}
+    `;
+    const doneFacilitiesReplacements = [];
+    if (!skipMonthFilter) doneFacilitiesReplacements.push(reportingMonth);
+    const [doneFacilitiesResult] = await db.sequelize.query(doneFacilitiesQuery, {
+      replacements: doneFacilitiesReplacements,
+      type: db.sequelize.QueryTypes.SELECT
+    });
+
     res.json({
       reportingPeriod: reportingMonth,
+      expectedFacilities,
       summary: {
         totalFacilities: expectedFacilities,
         expectedFacilities,
         expectedThisMonth: expectedFacilities,
+        doneFacilities: doneFacilitiesResult.total || 0,
         rrfSent: rrfSentResult.total,
         rrfNotSent,
         totalODNs: odnStats.total_odns || 0,

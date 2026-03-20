@@ -819,9 +819,7 @@ const HpFacilities = () => {
 
   // Helper function to check if facility is HP
   const isHPFacility = (facility) => {
-    const hasRoute = facility.route && facility.route.toString().trim().length > 0;
-    const hasPeriod = facility.period && facility.period.toString().trim().length > 0;
-    return hasRoute && hasPeriod;
+    return !!facility.is_hp_site;
   };
 
   // Helper function to check if facility should be visible based on period and type
@@ -843,10 +841,15 @@ const HpFacilities = () => {
       return !!facility.is_vaccine_site;
     }
     
-    // Regular: show only facilities marked as HP sites
+    // Regular: show only facilities marked as HP sites, filtered by current period automatically
     if (!facility.is_hp_site) return false;
-    if (filterPeriod !== 'All' && facility.period !== filterPeriod) return false;
-    return true;
+    // Auto-filter by current period: always show Monthly, show Odd/Even based on current month
+    if (facility.period === 'Monthly') return true;
+    if (currentPeriod === 'odd' && facility.period === 'Odd') return true;
+    if (currentPeriod === 'even' && facility.period === 'Even') return true;
+    // Facilities with no period set — show them
+    if (!facility.period) return true;
+    return false;
   };
 
   // For EWM Officers: Create rows for each ODN instead of each facility
@@ -946,7 +949,7 @@ const HpFacilities = () => {
         a.facility_id === f.id && a.reporting_month === selReporting && a.process_type !== 'vaccine'
       );
       // Hide if process is already past O2C stage
-      const alreadyDone = proc && proc.status !== 'o2c_started' && proc.status !== 'completed';
+      const alreadyDone = proc && proc.status !== 'o2c_started';
       
       return matchesSearch && matchesRoute && shouldShow && !alreadyDone;
     });
@@ -1129,22 +1132,6 @@ const HpFacilities = () => {
                   <MenuItem value="Emergency">Emergency</MenuItem>
                   <MenuItem value="Breakdown">Breakdown</MenuItem>
                   <MenuItem value="Vaccine">Vaccine</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} md={2}>
-                <TextField
-                  select
-                  label="Period"
-                  size="small"
-                  fullWidth
-                  value={filterPeriod}
-                  onChange={(e) => setFilterPeriod(e.target.value)}
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 }, display: (filterType !== 'Regular') ? 'none' : undefined }}
-                >
-                  <MenuItem value="All">All</MenuItem>
-                  <MenuItem value="Monthly">Monthly</MenuItem>
-                  <MenuItem value="Odd">Odd</MenuItem>
-                  <MenuItem value="Even">Even</MenuItem>
                 </TextField>
               </Grid>
               <Grid item xs={12} md={2}>

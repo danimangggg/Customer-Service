@@ -318,29 +318,29 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Outstanding Process - for Finance */}
-         {jobTitle === "Finance" && (
-           <MenuTooltip title={"Outstanding Process"}>
-             <ListItem 
-               button 
-               component={Link} 
-               to="/outstandingProcess"
-               sx={getActiveStyles('/outstandingProcess')}
+         {/* Finance Invoices - for Cashier/Finance */}
+         {(jobTitle === "Cashier" || jobTitle === "Finance") && (
+           <MenuTooltip title={"Invoice Records"}>
+             <ListItem
+               button
+               component={Link}
+               to="/finance-invoices"
+               sx={getActiveStyles('/finance-invoices')}
              >
                <ListItemIcon>
-                 <Assignment sx={{ color: '#c62828' }} />
+                 <Receipt sx={{ color: '#1565c0' }} />
                </ListItemIcon>
-               <ListItemText 
-                 primary={"Outstanding Process"} 
-                 sx={{ 
-                   '& .MuiListItemText-primary': { 
-                     fontWeight: isActivePath('/outstandingProcess') ? 600 : 500,
+               <ListItemText
+                 primary={"Invoice Records"}
+                 sx={{
+                   '& .MuiListItemText-primary': {
+                     fontWeight: isActivePath('/finance-invoices') ? 600 : 500,
                      fontSize: '0.95rem',
                      lineHeight: 1.2,
                      whiteSpace: 'normal',
                      wordWrap: 'break-word'
-                   } 
-                 }} 
+                   }
+                 }}
                />
              </ListItem>
            </MenuTooltip>
@@ -1183,7 +1183,7 @@ const Sidebar = () => {
          )}
 
          {/* HP Report - for HP users only */}
-         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager") && (
+         {!isAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") && (
            <MenuTooltip title={"HP Report"}>
              <ListItem 
                button 

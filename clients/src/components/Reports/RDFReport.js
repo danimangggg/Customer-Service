@@ -954,14 +954,19 @@ const RDFReport = () => {
                   width: 180,
                   headerClassName: 'super-app-theme--header',
                   renderCell: (params) => {
-                    const label =
-                      params.row.status === 'completed' ? 'Completed' :
-                      params.row.status === 'Canceled' ? 'Cancelled' :
-                      params.row.next_service_point || 'Registered';
-                    const color =
-                      params.row.status === 'completed' ? '#2e7d32' :
-                      params.row.status === 'Canceled' ? '#c62828' :
-                      '#1565c0';
+                    const nsp = (params.row.next_service_point || '').toLowerCase();
+                    const st = (params.row.status || '').toLowerCase();
+
+                    let label, color;
+                    if (st === 'completed') { label = 'Completed'; color = '#2e7d32'; }
+                    else if (st === 'canceled') { label = 'Cancelled'; color = '#c62828'; }
+                    else if (st === 'archived') { label = 'At Gate Keeper'; color = '#e65100'; }
+                    else if (nsp === 'gate-keeper') { label = 'At Gate Keeper'; color = '#e65100'; }
+                    else if (nsp === 'dispatch' || nsp === 'exit-permit') { label = 'At Dispatch'; color = '#1565c0'; }
+                    else if (nsp === 'ewm') { label = 'At EWM'; color = '#6a1b9a'; }
+                    else if (nsp === 'o2c') { label = 'At O2C'; color = '#0277bd'; }
+                    else { label = params.row.next_service_point || 'Registered'; color = '#1565c0'; }
+
                     return (
                       <Typography variant="body2" sx={{ color, fontWeight: 700 }}>
                         {label}
@@ -1545,44 +1550,45 @@ const RDFReport = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {customerOdns.map((odn, index) => (
-                          <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
-                            <TableCell sx={{ fontWeight: 600 }}>{odn.store}</TableCell>
-                            <TableCell>{odn.odn_number}</TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={odn.ewm_status === 'completed' ? '✓' : '○'} 
-                                color={odn.ewm_status === 'completed' ? 'success' : 'default'}
-                                size="small"
-                                sx={{ minWidth: 40 }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={odn.dispatch_status === 'completed' ? '✓' : '○'} 
-                                color={odn.dispatch_status === 'completed' ? 'success' : 'default'}
-                                size="small"
-                                sx={{ minWidth: 40 }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={odn.exit_permit_status === 'completed' ? '✓' : '○'} 
-                                color={odn.exit_permit_status === 'completed' ? 'success' : 'default'}
-                                size="small"
-                                sx={{ minWidth: 40 }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={odn.gate_status === 'allowed' ? '✓' : '○'} 
-                                color={odn.gate_status === 'allowed' ? 'success' : 'default'}
-                                size="small"
-                                sx={{ minWidth: 40 }}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {customerOdns.map((odn, index) => {
+                          const statusChip = (value) => {
+                            const raw = value || null;
+                            const v = (raw || '').toLowerCase();
+                            if (v === 'completed') return { label: 'Done', color: 'success' };
+                            if (v === 'allowed') return { label: 'Allowed', color: 'success' };
+                            if (v === 'denied') return { label: 'Denied', color: 'error' };
+                            if (v === 'partial') return { label: 'Partial', color: 'warning' };
+                            if (v === 'almost_there' || v === 'continuing') return { label: 'Almost There', color: 'warning' };
+                            if (v === 'notifying') return { label: 'Notifying', color: 'info' };
+                            if (v === 'started') return { label: 'In Progress', color: 'info' };
+                            if (v === 'pending') return { label: 'Awaiting', color: 'warning' };
+                            return { label: '—', color: 'default' };
+                          };
+
+                          const ewm = statusChip(odn.ewm_status);
+                          const dispatch = statusChip(odn.dispatch_status);
+                          const exitPermit = statusChip(odn.exit_permit_status);
+                          const gate = statusChip(odn.gate_status);
+
+                          return (
+                            <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
+                              <TableCell sx={{ fontWeight: 600 }}>{odn.store}</TableCell>
+                              <TableCell>{odn.odn_number}</TableCell>
+                              <TableCell>
+                                <Chip label={ewm.label} color={ewm.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={dispatch.label} color={dispatch.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={exitPermit.label} color={exitPermit.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
+                              </TableCell>
+                              <TableCell>
+                                <Chip label={gate.label} color={gate.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </TableContainer>

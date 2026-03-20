@@ -206,6 +206,12 @@ const TvRealEntertainment = () => {
                 Icon = NotificationsActive;
                 isCalling = true;
                 currentStep = 2;
+              } else if (dispatchStatus === 'almost_there') {
+                statusLabel = `${storeKey} ALMOST THERE`;
+                themeColor = '#ff9800';
+                Icon = LocalShipping;
+                isCalling = false;
+                currentStep = 3;
               } else if (dispatchStatus === 'started') {
                 statusLabel = `${storeKey} DISPATCH IN PROGRESS`;
                 themeColor = '#9c27b0'; 
@@ -226,12 +232,10 @@ const TvRealEntertainment = () => {
                 themeColor = '#636e72';
                 Icon = Assignment;
                 currentStep = 1;
-              } else if (dispatchStatus === 'completed') {
-                statusLabel = `${storeKey} READY FOR EXIT`;
-                themeColor = '#f39c12';
-                Icon = CheckCircleOutline;
-                currentStep = 4;
               }
+
+              // Skip this store entry if dispatch is completed — remove from TV
+              if (dispatchStatus === 'completed') return;
 
               allOrders.push({
                 ...cust,

@@ -152,13 +152,16 @@ const TvCustomer = () => {
                 themeColor = '#ff3f34';
                 Icon = NotificationsActiveIcon;
                 isCalling = true;
+              } else if (dispatchStatus === 'almost_there') {
+                processFlow[3].status = 'in_progress';
+                processFlow[3].color = '#ff9800';
+                currentStep = 3;
+                statusLabel = `${storeKey} ALMOST THERE`;
+                themeColor = '#ff9800';
+                Icon = LocalShippingIcon;
               } else if (dispatchStatus === 'completed') {
-                processFlow[3].status = 'completed';
-                processFlow[3].color = '#00b894';
-                currentStep = 4;
-                statusLabel = `${storeKey} READY FOR EXIT`;
-                themeColor = '#f39c12';
-                Icon = CheckCircleOutlineIcon;
+                // Dispatch done — skip this store, remove from TV display
+                return;
               }
 
               // If O2C completed but EWM not started

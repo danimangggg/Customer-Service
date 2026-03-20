@@ -201,7 +201,7 @@ const EwmDocumentation = () => {
     },
     {
       name: 'region_name',
-      label: 'Region / Woreda',
+      label: 'Location',
       options: {
         filter: true,
         sort: true,
@@ -209,10 +209,9 @@ const EwmDocumentation = () => {
           const customer = customers[tableMeta.rowIndex];
           return (
             <Box>
-              <Typography variant="body2">{value}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                {customer.woreda_name}
-              </Typography>
+              {value                && <Typography variant="body2" fontWeight={700}>{value}</Typography>}
+              {customer.zone_name   && <Typography variant="body2" fontWeight={500}>{customer.zone_name}</Typography>}
+              {customer.woreda_name && <Typography variant="caption" color="text.secondary" display="block">{customer.woreda_name}</Typography>}
             </Box>
           );
         },

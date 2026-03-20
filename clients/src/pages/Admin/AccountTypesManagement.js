@@ -195,12 +195,12 @@ const AccountTypesManagement = () => {
       icon: <AdminIcon />
     },
     {
-      jobTitle: "Finance",
-      accountType: "Finance",
-      description: "Financial operations and reporting",
+      jobTitle: "Cashier",
+      accountType: "Cashier",
+      description: "Cash transactions and customer payments",
       permissions: [
         "Dashboard access",
-        "Financial reports",
+        "Outstanding process",
         "Reports access"
       ],
       color: "#e91e63",

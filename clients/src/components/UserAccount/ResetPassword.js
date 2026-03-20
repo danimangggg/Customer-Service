@@ -96,7 +96,8 @@ const ResetPasswordForm = () => {
         `,
         icon: 'warning',
         confirmButtonColor: '#ff9800',
-        confirmButtonText: 'OK'
+        confirmButtonText: 'OK',
+        customClass: { container: 'swal-above-navbar' }
       });
       return;
     }
@@ -127,7 +128,8 @@ const ResetPasswordForm = () => {
       cancelButtonColor: '#2196f3',
       confirmButtonText: 'Yes, Reset Password!',
       cancelButtonText: 'Cancel',
-      reverseButtons: true
+      reverseButtons: true,
+      customClass: { container: 'swal-above-navbar' }
     });
 
     if (result.isConfirmed) {
@@ -156,7 +158,8 @@ const ResetPasswordForm = () => {
           confirmButtonColor: '#4caf50',
           confirmButtonText: 'Great!',
           timer: 4000,
-          timerProgressBar: true
+          timerProgressBar: true,
+          customClass: { container: 'swal-above-navbar' }
         });
         
         setSelectedUser('');
@@ -178,7 +181,8 @@ const ResetPasswordForm = () => {
           `,
           icon: 'error',
           confirmButtonColor: '#f44336',
-          confirmButtonText: 'OK'
+          confirmButtonText: 'OK',
+          customClass: { container: 'swal-above-navbar' }
         });
       }
     }

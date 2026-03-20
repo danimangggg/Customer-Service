@@ -45,7 +45,12 @@ const getDispatchedODNs = async (req, res) => {
       INNER JOIN odns o ON o.process_id = p.id
       LEFT JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN routes r ON f.route = r.route_name
-      LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
+      LEFT JOIN route_assignments ra ON ra.id = (
+        SELECT ra_sub.id FROM route_assignments ra_sub
+        WHERE ra_sub.route_id = r.id AND ra_sub.ethiopian_month = ?
+        ORDER BY ra_sub.created_at DESC
+        LIMIT 1
+      )
       WHERE p.status IN ('vehicle_requested', 'driver_assigned', 'dispatch_completed', 'completed')
         ${processTypeFilter}
         ${search ? 'AND (COALESCE(f.facility_name, \'\') LIKE ? OR COALESCE(r.route_name, \'\') LIKE ?)' : ''}
@@ -252,7 +257,7 @@ const bulkUpdatePODConfirmation = async (req, res) => {
     const routeKilometerUpdates = new Map(); // Track route-wide kilometer updates
 
     for (const update of updates) {
-      const { odn_id, pod_confirmed, pod_reason, pod_number, arrival_kilometer, route_assignment_id } = update;
+      const { odn_id, pod_confirmed, pod_reason, pod_number, arrival_kilometer, route_assignment_id, route_id } = update;
 
       if (odn_id === undefined || pod_confirmed === undefined) {
         continue; // Skip invalid updates
@@ -291,27 +296,20 @@ const bulkUpdatePODConfirmation = async (req, res) => {
             transaction
           });
 
-          // Update route_assignments table if we have arrival_kilometer and route_assignment_id
-          // This ensures the destination kilometer is applied to the entire route
-          if (arrival_kilometer !== undefined && route_assignment_id) {
-            // Check if we've already updated this route assignment in this batch
-            if (!routeKilometerUpdates.has(route_assignment_id)) {
-              const raUpdateQuery = `
-                UPDATE route_assignments 
-                SET arrival_kilometer = ?
-                WHERE id = ?
-              `;
-
-              await db.sequelize.query(raUpdateQuery, {
-                replacements: [arrival_kilometer, route_assignment_id],
-                type: db.sequelize.QueryTypes.UPDATE,
-                transaction
-              });
-
-              // Mark this route as updated to avoid duplicate updates
-              routeKilometerUpdates.set(route_assignment_id, arrival_kilometer);
-
-              console.log(`Updated route assignment ${route_assignment_id} with destination kilometer: ${arrival_kilometer}`);
+          // Save arrival_kilometer directly on the process record
+          if (arrival_kilometer !== undefined && arrival_kilometer !== null) {
+            // Get process_id from ODN
+            const [odnRow] = await db.sequelize.query(
+              `SELECT process_id FROM odns WHERE id = ?`,
+              { replacements: [odn_id], type: db.sequelize.QueryTypes.SELECT, transaction }
+            );
+            if (odnRow) {
+              await db.sequelize.query(
+                `UPDATE processes SET arrival_kilometer = ? WHERE id = ?`,
+                { replacements: [arrival_kilometer, odnRow.process_id], type: db.sequelize.QueryTypes.UPDATE, transaction }
+              );
+              routeKilometerUpdates.set(odnRow.process_id, arrival_kilometer);
+              console.log(`Updated process ${odnRow.process_id} with arrival_kilometer: ${arrival_kilometer}`);
             }
           }
 

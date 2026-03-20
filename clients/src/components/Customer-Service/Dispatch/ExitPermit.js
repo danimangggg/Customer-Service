@@ -164,42 +164,15 @@ const ExitPermit = () => {
     }
   }, [getStoreKeys, userStore]);
 
-  // Fetch history data - get total count first
+  // Fetch history data from exit_history table (one row per submission)
   const fetchHistoryData = useCallback(async (page = 1) => {
     setHistoryLoading(true);
     try {
       const storeKeys = getStoreKeys();
-      
-      // Fetch TV display customers to get completed records
-      const response = await axios.get(`${API_URL}/api/tv-display-customers`);
-      
-      // Filter for records that have completed exit permit for this store
-      const completedRecords = response.data.filter(row => {
-        const storeDetails = row.store_details || {};
-        const storeInfo = storeDetails[storeKeys.storeId];
-        const globalStatus = (row.status || '').toLowerCase();
-        
-        if (!storeInfo) return false;
-        
-        const exitPermitStatus = (storeInfo.exit_permit_status || '').toLowerCase();
-        
-        // Show records where exit permit is completed for this store
-        // OR global status is completed/archived
-        return exitPermitStatus === 'completed' || 
-               globalStatus === 'completed' || 
-               globalStatus === 'archived';
-      });
-      
-      // Sort by most recent first
-      completedRecords.sort((a, b) => {
-        const dateA = new Date(a.started_at || a.created_at || 0);
-        const dateB = new Date(b.started_at || b.created_at || 0);
-        return dateB - dateA;
-      });
-      
-      setHistoryRecords(completedRecords);
-      setHistoryTotal(completedRecords.length);
-      
+      const response = await axios.get(`${API_URL}/api/exit-history-by-store/${storeKeys.storeId}`);
+      const rows = response.data.data || [];
+      setHistoryRecords(rows);
+      setHistoryTotal(rows.length);
     } catch (error) {
       console.error("History fetch error:", error);
       setHistoryRecords([]);
@@ -253,15 +226,13 @@ const ExitPermit = () => {
     console.log('Matching gate keeper:', gateKeepers.find(gk => gk.id == gateKeeperId));
     
     setEditFormData({
-      facility_id: record.facility_id || '',
       vehicle_plate: record.vehicle_plate || '',
       receipt_count: record.receipt_count || '',
       receipt_number: record.receipt_number || '',
       total_amount: record.total_amount || '',
       measurement_unit: record.measurement_unit || '',
       assigned_gate_keeper_id: gateKeeperId,
-      assigned_gate_keeper_name: record.assigned_gate_keeper_name || '',
-      customer_type: record.customer_type || ''
+      assigned_gate_keeper_name: record.assigned_gate_keeper_name || ''
     });
     setEditDialogOpen(true);
   };
@@ -285,13 +256,11 @@ const ExitPermit = () => {
       // Prepare update data - only include fields that have values
       const updateData = {};
       
-      if (editFormData.facility_id) updateData.facility_id = editFormData.facility_id;
       if (editFormData.vehicle_plate) updateData.vehicle_plate = editFormData.vehicle_plate;
       if (editFormData.receipt_count) updateData.receipt_count = editFormData.receipt_count;
       if (editFormData.receipt_number) updateData.receipt_number = editFormData.receipt_number;
       if (editFormData.total_amount) updateData.total_amount = editFormData.total_amount;
       if (editFormData.measurement_unit) updateData.measurement_unit = editFormData.measurement_unit;
-      if (editFormData.customer_type) updateData.customer_type = editFormData.customer_type;
       if (editFormData.assigned_gate_keeper_id) {
         updateData.assigned_gate_keeper_id = editFormData.assigned_gate_keeper_id;
         updateData.assigned_gate_keeper_name = selectedGateKeeper ? selectedGateKeeper.name : editFormData.assigned_gate_keeper_name;
@@ -301,10 +270,16 @@ const ExitPermit = () => {
       console.log('Record ID:', editingRecord.id);
       console.log('Update data:', updateData);
 
-      // Update customer_queue with edited data
-      const response = await axios.put(`${API_URL}/api/update-service-status/${editingRecord.id}`, updateData);
-      
-      console.log('Update response:', response.data);
+      // Update exit_history row with edited data
+      await axios.put(`${API_URL}/api/exit-history/${editingRecord.id}`, {
+        vehicle_plate: updateData.vehicle_plate,
+        total_amount: updateData.total_amount,
+        measurement_unit: updateData.measurement_unit,
+        receipt_count: updateData.receipt_count,
+        receipt_number: updateData.receipt_number,
+        assigned_gate_keeper_id: updateData.assigned_gate_keeper_id,
+        assigned_gate_keeper_name: updateData.assigned_gate_keeper_name
+      });
 
       // Close dialog first
       handleEditClose();
@@ -337,38 +312,31 @@ const ExitPermit = () => {
   // DataGrid columns for history
   const historyColumns = [
     {
-      field: 'id',
-      headerName: 'ID',
-      width: 80,
+      field: 'exit_number',
+      headerName: '#',
+      width: 60,
       filterable: true,
     },
     {
-      field: 'odn_numbers',
-      headerName: 'ODN Reference',
-      width: 180,
+      field: 'exit_type',
+      headerName: 'Type',
+      width: 100,
       filterable: true,
-      valueGetter: (params) => {
-        const row = params.row;
-        const storeDetails = row.store_details || {};
-        const storeInfo = storeDetails[storeId];
-        if (storeInfo && storeInfo.odns && storeInfo.odns.length > 0) {
-          return storeInfo.odns.join(', ');
-        }
-        return '—';
-      }
+      renderCell: (params) => (
+        <Chip
+          label={params.value === 'partial' ? 'Partial' : 'Full'}
+          size="small"
+          color={params.value === 'partial' ? 'warning' : 'primary'}
+          sx={{ fontWeight: 'bold' }}
+        />
+      )
     },
     {
       field: 'facility_name',
       headerName: 'Facility',
       width: 200,
       filterable: true,
-      valueGetter: (params) => {
-        const row = params.row;
-        return row.actual_facility_name || 
-               row.facility_name || 
-               facilities.find(f => f.id === row.facility_id)?.facility_name || 
-               row.facility_id || '—';
-      }
+      valueGetter: (params) => params.row.facility_name || '—'
     },
     {
       field: 'vehicle_plate',
@@ -395,12 +363,6 @@ const ExitPermit = () => {
       )
     },
     {
-      field: 'measurement_unit',
-      headerName: 'Unit',
-      width: 100,
-      filterable: true,
-    },
-    {
       field: 'receipt_count',
       headerName: 'Receipts',
       width: 100,
@@ -421,12 +383,7 @@ const ExitPermit = () => {
       renderCell: (params) => {
         const isCash = params.row.customer_type?.toLowerCase() === 'cash';
         return isCash && params.value ? (
-          <Chip 
-            label={params.value} 
-            size="small" 
-            color="warning" 
-            sx={{ fontWeight: 'bold' }}
-          />
+          <Chip label={params.value} size="small" color="warning" sx={{ fontWeight: 'bold' }} />
         ) : (
           <Typography variant="body2" color="text.secondary">—</Typography>
         );
@@ -440,43 +397,35 @@ const ExitPermit = () => {
       renderCell: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Person sx={{ fontSize: 16, color: '#4caf50' }} />
-          <Typography variant="body2">{params.value || 'Security'}</Typography>
+          <Typography variant="body2">{params.value || '—'}</Typography>
         </Box>
       )
     },
     {
-      field: 'status',
-      headerName: 'Status',
+      field: 'gate_status',
+      headerName: 'Gate Status',
       width: 130,
       filterable: true,
       renderCell: (params) => {
-        const storeDetails = params.row.store_details || {};
-        const storeInfo = storeDetails[storeId];
-        const gateStatus = storeInfo?.gate_status || '';
-        
-        let color = 'success';
-        let label = 'Completed';
-        
-        if (gateStatus === 'allowed') {
-          color = 'success';
-          label = 'Exit Allowed';
-        } else if (gateStatus === 'denied') {
-          color = 'error';
-          label = 'Exit Denied';
-        } else if (params.value === 'archived') {
-          color = 'info';
-          label = 'Awaiting Gate';
-        }
-        
+        const gs = params.value || 'pending';
+        const colorMap = { allowed: 'success', denied: 'error', pending: 'warning' };
+        const labelMap = { allowed: 'Allowed', denied: 'Denied', pending: 'Pending' };
         return (
-          <Chip 
-            label={label} 
-            color={color} 
-            size="small" 
+          <Chip
+            label={labelMap[gs] || gs}
+            color={colorMap[gs] || 'default'}
+            size="small"
             sx={{ fontWeight: 'bold' }}
           />
         );
       }
+    },
+    {
+      field: 'created_at',
+      headerName: 'Submitted At',
+      width: 170,
+      filterable: true,
+      valueGetter: (params) => params.value ? new Date(params.value).toLocaleString() : '—'
     },
     {
       field: 'actions',
@@ -484,20 +433,13 @@ const ExitPermit = () => {
       width: 100,
       sortable: false,
       filterable: false,
-      renderCell: (params) => {
-        // Allow editing for all records in history
-        return (
-          <Tooltip title="Edit Record">
-            <IconButton 
-              size="small" 
-              color="primary"
-              onClick={() => handleEditClick(params.row)}
-            >
-              <Edit fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        );
-      }
+      renderCell: (params) => (
+        <Tooltip title="Edit Record">
+          <IconButton size="small" color="primary" onClick={() => handleEditClick(params.row)}>
+            <Edit fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      )
     }
   ];
 
@@ -614,9 +556,39 @@ const ExitPermit = () => {
         console.error('❌ Failed to check all ODN statuses:', err);
       }
       
-      // Update customer_queue with exit permit data and gate keeper assignment
+      // Create exit_history record at submission time so each submission is preserved
+      try {
+        const existingExitsRes = await axios.get(`${API_URL}/api/exit-history/${record.id}`);
+        const existingExits = existingExitsRes.data.exits || [];
+        const exitNumber = existingExits.length + 1;
+
+        await axios.post(`${API_URL}/api/exit-history`, {
+          process_id: record.id,
+          store_id: storeKeys.storeId,
+          exit_number: exitNumber,
+          vehicle_plate: data.plateNumber,
+          total_amount: data.amount,
+          measurement_unit: data.measurement,
+          receipt_count: isCash ? data.receiptCount : null,
+          receipt_number: data.receiptNumber || null,
+          exit_type: isPartial ? 'partial' : 'full',
+          gate_status: 'pending',
+          assigned_gate_keeper_id: data.selectedGateKeeper.id,
+          assigned_gate_keeper_name: data.selectedGateKeeper.name,
+          exited_at: new Date().toISOString()
+        });
+        console.log(`✅ Exit history record created (Exit #${exitNumber})`);
+      } catch (err) {
+        console.error('❌ Failed to create exit history record:', err);
+      }
+
+      // Update customer_queue with latest exit permit data and gate keeper assignment
       exitPermitData.assigned_gate_keeper_id = data.selectedGateKeeper.id;
       exitPermitData.assigned_gate_keeper_name = data.selectedGateKeeper.name;
+      // Update next_service_point so the status column reflects current stage
+      if (!exitPermitData.status) {
+        exitPermitData.next_service_point = 'gate-keeper';
+      }
       
       try {
         await axios.put(`${API_URL}/api/update-service-status/${record.id}`, exitPermitData);
@@ -1026,36 +998,6 @@ const ExitPermit = () => {
         </DialogTitle>
         <DialogContent sx={{ mt: 3 }}>
           <Stack spacing={3}>
-            <FormControl fullWidth>
-              <InputLabel>Facility</InputLabel>
-              <Select
-                value={editFormData.facility_id || ''}
-                onChange={(e) => setEditFormData({ ...editFormData, facility_id: e.target.value })}
-                label="Facility"
-                startAdornment={
-                  <InputAdornment position="start">
-                    <Storefront />
-                  </InputAdornment>
-                }
-              >
-                {facilities.map(facility => (
-                  <MenuItem key={facility.id} value={facility.id}>
-                    {facility.facility_name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
-              <InputLabel>Customer Type</InputLabel>
-              <Select
-                value={editFormData.customer_type || ''}
-                onChange={(e) => setEditFormData({ ...editFormData, customer_type: e.target.value })}
-                label="Customer Type"
-              >
-                <MenuItem value="Cash">Cash</MenuItem>
-                <MenuItem value="Credit">Credit</MenuItem>
-              </Select>
-            </FormControl>
             <TextField
               label="Vehicle Plate"
               fullWidth

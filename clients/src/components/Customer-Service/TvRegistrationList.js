@@ -674,12 +674,7 @@ const TvRegistrationList = () => {
         </Box>
       </Box>
 
-      {orderedCustomers.length === 0 ? (
-        <Typography variant="h6" sx={{ mt: 5, color: '#e0f7fa' }}>
-          No customers at O2C service point currently.
-        </Typography>
-      ) : (
-        <Box
+      <Box
           sx={{
             flexGrow: 1,
             width: '98vw',
@@ -695,69 +690,79 @@ const TvRegistrationList = () => {
         >
           <Box
             sx={{
-              width: '35%', // Smaller queue list
+              width: '35%',
               overflowY: 'hidden',
               position: 'relative',
               display: 'flex',
               flexDirection: 'column',
             }}
           >
-            {/* Static Header */}
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: '0.4fr 2fr 2fr 1.2fr 0.8fr', // Match card columns
-                alignItems: 'center',
-                bgcolor: '#1a1a1a',
-                borderRadius: '8px 8px 0 0',
-                p: 1,
-                mb: 0.8,
-                fontWeight: 'bold',
-                fontSize: '0.85rem', // Smaller header font
-                color: '#bbb',
-              }}
-            >
-              <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left' }}>Ticket</Typography>
-              <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left', pl: 0.5 }}>Customer</Typography>
-              <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left', pl: 0.5 }}>Officer</Typography>
-              <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left', pl: 0.5 }}>Status</Typography>
-              <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'right' }}>Wait</Typography>
-            </Box>
-
-            {/* Static "Notifying" Customers Section */}
-            {notifyingCustomers.length > 0 && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', mb: 2 }}>
-                {notifyingCustomers.map((cust, index) => renderCustomerCard(cust, index))}
+            {orderedCustomers.length === 0 ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Typography variant="h6" sx={{ color: '#e0f7fa', textAlign: 'center' }}>
+                  No customers at O2C service point currently.
+                </Typography>
               </Box>
+            ) : (
+              <>
+                {/* Static Header */}
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: '0.4fr 2fr 2fr 1.2fr 0.8fr',
+                    alignItems: 'center',
+                    bgcolor: '#1a1a1a',
+                    borderRadius: '8px 8px 0 0',
+                    p: 1,
+                    mb: 0.8,
+                    fontWeight: 'bold',
+                    fontSize: '0.85rem',
+                    color: '#bbb',
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left' }}>Ticket</Typography>
+                  <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left', pl: 0.5 }}>Customer</Typography>
+                  <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left', pl: 0.5 }}>Officer</Typography>
+                  <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left', pl: 0.5 }}>Status</Typography>
+                  <Typography sx={{ fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'right' }}>Wait</Typography>
+                </Box>
+
+                {/* Static "Notifying" Customers Section */}
+                {notifyingCustomers.length > 0 && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px', mb: 2 }}>
+                    {notifyingCustomers.map((cust, index) => renderCustomerCard(cust, index))}
+                  </Box>
+                )}
+
+                {/* Scrolling "Other" Customers Section */}
+                <Box
+                  sx={{
+                    flexGrow: 1,
+                    overflowY: 'hidden',
+                    position: 'relative',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      animation: shouldScroll ? `scroll-up ${animationDuration} linear infinite` : 'none',
+                      '@media (prefers-reduced-motion: reduce)': {
+                        animation: 'none',
+                      },
+                    }}
+                  >
+                    {otherCustomers.map((cust, index) => renderCustomerCard(cust, index))}
+                    {shouldScroll && otherCustomers.map((cust, index) => renderCustomerCard(cust, index))}
+                  </Box>
+                </Box>
+              </>
             )}
-
-            {/* Scrolling "Other" Customers Section */}
-            <Box
-              sx={{
-                flexGrow: 1,
-                overflowY: 'hidden',
-                position: 'relative',
-              }}
-            >
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  animation: shouldScroll ? `scroll-up ${animationDuration} linear infinite` : 'none',
-                  '@media (prefers-reduced-motion: reduce)': {
-                    animation: 'none',
-                  },
-                }}
-              >
-                {otherCustomers.length > 0 && otherCustomers.map((cust, index) => renderCustomerCard(cust, index))}
-                {shouldScroll && otherCustomers.length > 0 && otherCustomers.map((cust, index) => renderCustomerCard(cust, index))}
-              </Box>
-            </Box>
           </Box>
             
           {/* YouTube Player & QR Code Container */}
@@ -824,7 +829,6 @@ const TvRegistrationList = () => {
             )}
           </Box>
         </Box>
-      )}
 
       <style>
         {`

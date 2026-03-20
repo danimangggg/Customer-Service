@@ -202,7 +202,8 @@ const DocumentationHP = () => {
         pod_confirmed: editFormData.all_pod_received,
         pod_number: editFormData.pod_numbers.trim(),
         arrival_kilometer: parseFloat(editFormData.arrival_kilometer),
-        route_assignment_id: selectedFacility.route_assignment_id
+        route_assignment_id: selectedFacility.route_assignment_id,
+        route_id: selectedFacility.route_id
       }));
 
       await axios.put(`${api_url}/api/odns/bulk-pod-confirmation`, {
@@ -297,7 +298,8 @@ const DocumentationHP = () => {
         pod_confirmed: editFormData.all_pod_received,
         pod_number: editFormData.pod_numbers.trim(),
         arrival_kilometer: parseFloat(editFormData.arrival_kilometer),
-        route_assignment_id: selectedFacility.route_assignment_id
+        route_assignment_id: selectedFacility.route_assignment_id,
+        route_id: selectedFacility.route_id
       }));
 
       console.log('ODN updates:', odnUpdates);

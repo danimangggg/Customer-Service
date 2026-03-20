@@ -224,7 +224,7 @@ const OutstandingCustomers = () => {
             filtered = [];
         } else {
             const jobTitleToServicePointMap = {
-                "Customer Service Officer": "customer service", "EWM Officer": "ewm", "Finance": "finance"
+                "Customer Service Officer": "customer service", "EWM Officer": "ewm", "Finance": "finance", "Cashier": "finance"
             };
             const normalizedJobTitle = jobTitleToServicePointMap[jobTitle] || jobTitle.toLowerCase();
             
@@ -750,7 +750,7 @@ const OutstandingCustomers = () => {
                 Swal.fire('Error', 'Failed to update service point', 'error');
             }
 
-        } else if (jobTitle === 'Finance') {
+        } else if (jobTitle === 'Finance' || jobTitle === 'Cashier') {
             const nextOptions = { O2C: 'O2C', Manager: 'Manager', 'Customer Service': 'Customer Service' };
             const { value: selectedRole, isConfirmed } = await Swal.fire({
                 title: 'Select next service point',
@@ -985,8 +985,8 @@ const OutstandingCustomers = () => {
                         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
                     }
                     .table-header {
-                        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-                        border-bottom: 2px solid #e2e8f0;
+                        background: linear-gradient(135deg, #37474f 0%, #546e7a 100%);
+                        border-bottom: 2px solid #263238;
                     }
                     .table-row {
                         transition: all 0.2s ease;
@@ -1064,16 +1064,16 @@ const OutstandingCustomers = () => {
                                 <Table>
                                     <TableHead className="table-header">
                                         <TableRow>
-                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>
                                                 <Stack direction="row" alignItems="center" spacing={1}>
                                                     <PeopleIcon fontSize="small" />
                                                     <span>Facility</span>
                                                 </Stack>
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>
                                                 Customer Type
                                             </TableCell>
-                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>
                                                 <Stack direction="row" alignItems="center" spacing={1}>
                                                     <TrendingUpIcon fontSize="small" />
                                                     <span>Waiting</span>
@@ -1081,25 +1081,25 @@ const OutstandingCustomers = () => {
                                             </TableCell>
                                             {jobTitle === 'EWM Officer' && (
                                                 <>
-                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>My ODN</TableCell>
-                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }} align="center">Action</TableCell>
-                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }} align="center">Availability</TableCell>
+                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>My ODN</TableCell>
+                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }} align="center">Action</TableCell>
+                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }} align="center">Availability</TableCell>
                                                 </>
                                             )}
 
-                                            {jobTitle === 'O2C Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+                                            {jobTitle === 'O2C Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
 
-                                            {jobTitle === 'Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
-                                            {jobTitle === 'Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Status</TableCell>}
-                                            {jobTitle === 'Manager' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+                                            {jobTitle === 'Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Current Service Point</TableCell>}
+                                            {jobTitle === 'Manager' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
+                                            {jobTitle === 'Manager' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
 
-                                            {jobTitle === 'Customer Service Officer' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
-                                            {jobTitle === 'Customer Service Officer' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Status</TableCell>}
-                                            {jobTitle === 'Customer Service Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+                                            {jobTitle === 'Customer Service Officer' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Current Service Point</TableCell>}
+                                            {jobTitle === 'Customer Service Officer' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
+                                            {jobTitle === 'Customer Service Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
 
-                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Current Service Point</TableCell>}
-                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Status</TableCell>}
-                                            {jobTitle === 'Finance' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>Action</TableCell>}
+                                            {(jobTitle === 'Finance' || jobTitle === 'Cashier') && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Current Service Point</TableCell>}
+                                            {(jobTitle === 'Finance' || jobTitle === 'Cashier') && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
+                                            {(jobTitle === 'Finance' || jobTitle === 'Cashier') && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -1336,7 +1336,7 @@ const OutstandingCustomers = () => {
                                                 </TableCell>
                                             </>
                                         )}
-                                        {jobTitle === 'Finance' && (
+                                        {(jobTitle === 'Finance' || jobTitle === 'Cashier') && (
                                             <>
                                                 <TableCell>{customer.next_service_point || "N/A"}</TableCell>
                                                 <TableCell>

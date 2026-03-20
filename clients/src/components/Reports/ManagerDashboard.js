@@ -116,6 +116,7 @@ const ManagerDashboard = () => {
   const [hpData, setHpData] = useState(null);
   const [rdfStats, setRdfStats] = useState(null);
   const [bestOf, setBestOf] = useState(null);
+  const [bestOfHP, setBestOfHP] = useState(null);
   const [timeTrend, setTimeTrend] = useState([]);
   const [hpLoading, setHpLoading] = useState(true);
   const [rdfLoading, setRdfLoading] = useState(true);
@@ -143,21 +144,29 @@ const ManagerDashboard = () => {
     finally { setRdfLoading(false); }
   }, []);
 
-  const fetchTrend = useCallback(async () => {
+  const fetchBestOfHP = useCallback(async () => {
     try {
+      const r = await axios.get(`${API_URL}/api/best-of-hp`);
+      if (r.data.success) setBestOfHP(r.data.data);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  const fetchTrend = useCallback(async () => {    try {
       const r = await axios.get(`${API_URL}/api/hp-report/time-trend`);
       if (r.data?.trend) setTimeTrend(r.data.trend.slice(-8));
     } catch (e) { console.error(e); }
   }, []);
 
-  useEffect(() => { fetchHP(); fetchTrend(); }, [fetchHP, fetchTrend]);
+  useEffect(() => { fetchHP(); fetchTrend(); fetchBestOfHP(); }, [fetchHP, fetchTrend, fetchBestOfHP]);
   useEffect(() => { fetchRDF(); }, [fetchRDF]);
 
-  const handleRefresh = () => { fetchHP(); fetchRDF(); fetchTrend(); setLastRefresh(new Date()); };
+  const handleRefresh = () => { fetchHP(); fetchRDF(); fetchTrend(); fetchBestOfHP(); setLastRefresh(new Date()); };
 
   // ── derived HP ──
   const hp = hpData?.summary || {};
   const wp = hpData?.workflowProgress || {};
+  const isVaccine = processType === 'vaccine';
+  const rrfLabel = isVaccine ? 'VRF' : 'RRF';
   const hpRrfPct  = hp.expectedFacilities > 0 ? ((hp.rrfSent / hp.expectedFacilities) * 100).toFixed(1) : 0;
   const hpPodPct  = hp.totalODNs > 0 ? ((hp.podConfirmed / hp.totalODNs) * 100).toFixed(1) : 0;
   const hpQualPct = hp.totalODNs > 0 ? ((hp.qualityEvaluated / hp.totalODNs) * 100).toFixed(1) : 0;
@@ -178,8 +187,8 @@ const ManagerDashboard = () => {
   ].filter(d => d.count > 0);
 
   const rrfPie = [
-    { name:'RRF Sent',  value: hp.rrfSent || 0,    color:'#43e97b' },
-    { name:'Not Sent',  value: hp.rrfNotSent || 0,  color:'#f5576c' },
+    { name:`${rrfLabel} Sent`,  value: hp.rrfSent || 0,    color:'#43e97b' },
+    { name:'Not Sent',          value: hp.rrfNotSent || 0,  color:'#f5576c' },
   ];
 
   const rdfPie = [
@@ -257,13 +266,13 @@ const ManagerDashboard = () => {
           <Grid container spacing={2} sx={{ mb:3 }}>
             {[
               { title:'Expected Facilities', value:hp.expectedFacilities,  subtitle:'This period',              icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp,    loading:hpLoading },
-              { title:'RRF Sent',            value:hp.rrfSent,             subtitle:`${hpRrfPct}% of expected`, icon:<AssignmentIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.green,  loading:hpLoading },
-              { title:'RRF Not Sent',        value:hp.rrfNotSent,          subtitle:'Pending facilities',       icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,        gradient:G.red,    loading:hpLoading },
+              { title:`${rrfLabel} Sent`,      value:hp.rrfSent,             subtitle:`${hpRrfPct}% of expected`, icon:<AssignmentIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.green,  loading:hpLoading },
+              { title:`${rrfLabel} Not Sent`,  value:hp.rrfNotSent,          subtitle:'Pending facilities',       icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,        gradient:G.red,    loading:hpLoading },
               { title:'Total ODNs',          value:hp.totalODNs,           subtitle:'Orders generated',         icon:<InventoryIcon sx={{color:'#fff',fontSize:26}}/>,     gradient:G.blue,   loading:hpLoading },
               { title:'Dispatched',          value:hp.dispatched,          subtitle:'ODNs dispatched',          icon:<LocalShippingIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.amber,  loading:hpLoading },
               { title:'POD Confirmed',       value:hp.podConfirmed,        subtitle:`${hpPodPct}% rate`,        icon:<VerifiedIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.green,  loading:hpLoading },
               { title:'Quality Evaluated',   value:hp.qualityEvaluated,    subtitle:`${hpQualPct}% of ODNs`,   icon:<StarIcon sx={{color:'#fff',fontSize:26}}/>,          gradient:G.rdf,    loading:hpLoading },
-              { title:'RRF Rate',            value:`${hpRrfPct}%`,         subtitle:'Facility coverage',        icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.hp,     loading:hpLoading },
+              { title:`${rrfLabel} Rate`,      value:`${hpRrfPct}%`,         subtitle:'Facility coverage',        icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.hp,     loading:hpLoading },
             ].map((k, i) => (
               <Grid item xs={6} sm={4} md={3} key={i}><KpiCard {...k} /></Grid>
             ))}
@@ -307,7 +316,7 @@ const ManagerDashboard = () => {
             </Grid>
 
             <Grid item xs={12} md={5}>
-              <ChartCard title="HP RRF Status" height={220}>
+              <ChartCard title={`HP ${rrfLabel} Status`} height={220}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie data={rrfPie} cx="50%" cy="45%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value">
@@ -324,7 +333,7 @@ const ManagerDashboard = () => {
           {/* ══ HP CHARTS ══ */}
           <Grid container spacing={2} sx={{ mb:3 }}>
             <Grid item xs={12} md={8}>
-              <ChartCard title="HP Monthly Trend — RRF Sent vs ODNs" height={260}>
+              <ChartCard title={`HP Monthly Trend — ${rrfLabel} Sent vs ODNs`} height={260}>
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={timeTrend} margin={{ top:5, right:10, left:-20, bottom:5 }}>
                     <defs>
@@ -342,7 +351,7 @@ const ManagerDashboard = () => {
                     <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
                     <RTooltip contentStyle={tooltipStyle} />
                     <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
-                    <Area type="monotone" dataKey="rrf_sent" name="RRF Sent" stroke="#667eea" fill="url(#gRRF)" strokeWidth={2} dot={false} />
+                    <Area type="monotone" dataKey="rrf_sent" name={`${rrfLabel} Sent`} stroke="#667eea" fill="url(#gRRF)" strokeWidth={2} dot={false} />
                     <Area type="monotone" dataKey="total_odns" name="Total ODNs" stroke="#43e97b" fill="url(#gODN)" strokeWidth={2} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -383,6 +392,55 @@ const ManagerDashboard = () => {
               </ChartCard>
             </Box>
           )}
+
+          {/* ══ HP BEST OF LAST WEEK ══ */}
+          <Box sx={{ mb:3 }}>
+            <Card sx={{ background:G.card, border:'1px solid rgba(255,255,255,0.08)', borderRadius:3, boxShadow:'0 8px 32px rgba(0,0,0,0.3)' }}>
+              <CardContent sx={{ p:3 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb:2 }}>
+                  <EmojiEventsIcon sx={{ color:'#f6d365', fontSize:20 }} />
+                  <Typography variant="caption" fontWeight={600} sx={{ color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.8, fontSize:'0.7rem' }}>
+                    Best of Last Week — HP
+                  </Typography>
+                </Stack>
+                {hpLoading
+                  ? <CircularProgress size={24} sx={{ color:'#667eea' }} />
+                  : bestOfHP?.employees && Object.values(bestOfHP.employees).some(Boolean)
+                    ? (
+                      <Grid container spacing={1.5}>
+                        {[
+                          { role:'O2C',           person: bestOfHP.employees.o2c },
+                          { role:'EWM',           person: bestOfHP.employees.ewm },
+                          { role:'Biller',        person: bestOfHP.employees.biller },
+                          { role:'TM',            person: bestOfHP.employees.tm },
+                          { role:'PI',            person: bestOfHP.employees.pi },
+                          { role:'Dispatcher',    person: bestOfHP.employees.dispatcher },
+                          { role:'Documentation', person: bestOfHP.employees.documentation },
+                          { role:'Quality',       person: bestOfHP.employees.quality },
+                        ].filter(({ person }) => person).map(({ role, person }) => (
+                          <Grid item xs={12} sm={6} md={3} key={role}>
+                            <Box sx={{ background:'rgba(255,255,255,0.04)', borderRadius:2, p:1.5, border:'1px solid rgba(255,255,255,0.06)' }}>
+                              <Typography variant="caption" sx={{ color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:0.5, fontSize:'0.62rem' }}>{role}</Typography>
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt:0.5 }}>
+                                <Avatar sx={{ width:26, height:26, background:G.hp, fontSize:'0.72rem' }}>
+                                  {(person.full_name || '?')[0]}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={700} sx={{ color:'#fff', lineHeight:1.2, fontSize:'0.82rem' }}>{person.full_name}</Typography>
+                                  <Chip label={`${person.process_count} tasks`} size="small"
+                                    sx={{ height:16, fontSize:'0.62rem', background:'rgba(102,126,234,0.25)', color:'#667eea', mt:0.2 }} />
+                                </Box>
+                              </Stack>
+                            </Box>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    )
+                    : <Typography variant="body2" sx={{ color:'rgba(255,255,255,0.3)' }}>No data for last week.</Typography>
+                }
+              </CardContent>
+            </Card>
+          </Box>
 
           <Divider sx={{ borderColor:'rgba(255,255,255,0.07)', my:3 }} />
 

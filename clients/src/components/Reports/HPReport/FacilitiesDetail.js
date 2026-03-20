@@ -3,12 +3,7 @@ import {
   Box, Card, CardContent, Typography, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Paper, Chip, Stack, TextField, TablePagination, Tabs, Tab,
   Grid, Avatar, LinearProgress
-} from '@mui/material';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, Cell
-} from 'recharts';
-import BusinessIcon from '@mui/icons-material/Business';
+} from '@mui/material';import BusinessIcon from '@mui/icons-material/Business';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -29,68 +24,121 @@ const ServiceUnitsDetail = ({ data }) => {
 
   const wp = workflowProgress || {};
 
-  // Service units data — ordered by workflow stage, counts are cumulative (each >= next)
+  const expectedThisMonth = summary?.expectedThisMonth ?? summary?.expectedFacilities ?? 0;
+  const doneFacilities = summary?.doneFacilities ?? 0;
+  const donePercent = expectedThisMonth > 0 ? ((doneFacilities / expectedThisMonth) * 100).toFixed(1) : 0;
+
+  // Cumulative counts — each stage includes all ODNs that reached it or beyond
+  // Actual flow: O2C → EWM → TM Phase 1 → Biller → TM Phase 2 → Dispatch → Documentation → Quality
+  const cumulative = {
+    o2c:     wp.o2c_stage              || 0,
+    ewm1:    wp.ewm_phase1_facilities  || 0,
+    tm1:     wp.tm_phase1_facilities   || 0,
+    ewm2:    wp.ewm_phase2_facilities  || 0,
+    biller:  wp.biller_facilities      || 0,
+    pi:      wp.pi_facilities          || 0,
+    tm2:     wp.tm_phase2_facilities   || 0,
+    dispatch:wp.dispatch_odns          || 0,
+    doc:     wp.documentation_stage    || 0,
+    quality: wp.quality_stage          || 0,
+  };
+
+  // "Currently at stage" = cumulative[stage] - cumulative[next stage]
+  const atStage = {
+    o2c:      Math.max(0, cumulative.o2c     - cumulative.ewm1),
+    ewm1:     Math.max(0, cumulative.ewm1    - cumulative.tm1),
+    tm1:      Math.max(0, cumulative.tm1     - cumulative.ewm2),
+    ewm2:     Math.max(0, cumulative.ewm2    - cumulative.biller),
+    biller:   Math.max(0, cumulative.biller  - cumulative.pi),
+    pi:       Math.max(0, cumulative.pi      - cumulative.tm2),
+    tm2:      Math.max(0, cumulative.tm2     - cumulative.dispatch),
+    dispatch: Math.max(0, cumulative.dispatch- cumulative.doc),
+    doc:      Math.max(0, cumulative.doc     - cumulative.quality),
+    quality:  cumulative.quality,
+  };
+
+  const totalODNs = cumulative.o2c || summary?.totalODNs || 0;
+  const rateBase = expectedThisMonth > 0 ? expectedThisMonth : totalODNs;
+
+  // Service units — correct workflow order
   const serviceUnits = [
-    {
-      name: 'Expected This Month',
-      icon: <TrendingUpIcon />,
-      count: summary?.expectedThisMonth ?? summary?.expectedFacilities ?? 0,
-      color: 'primary',
-      description: 'Facilities expected to be processed this month'
-    },
     {
       name: 'O2C (Order to Cash)',
       icon: <AccountBalanceIcon />,
-      count: wp.o2c_stage || 0,
+      atStage: atStage.o2c,
+      cumulative: cumulative.o2c,
       color: 'secondary',
-      description: 'Initial order processing and cash management'
+      description: 'Initial order processing'
     },
     {
-      name: 'EWM Phase 1',
+      name: 'EWM',
       icon: <BusinessIcon />,
-      count: wp.ewm_phase1_facilities || 0,
+      atStage: atStage.ewm1,
+      cumulative: cumulative.ewm1,
       color: 'info',
       description: 'EWM goods issued'
     },
     {
-      name: 'EWM Phase 2 / Biller',
-      icon: <InventoryIcon />,
-      count: wp.biller_facilities || 0,
-      color: 'warning',
-      description: 'Biller received — ready for TM'
-    },
-    {
       name: 'TM Phase 1',
       icon: <LocalShippingIcon />,
-      count: wp.tm_phase1_facilities || 0,
+      atStage: atStage.tm1,
+      cumulative: cumulative.tm1,
       color: 'success',
-      description: 'TM confirmed — vehicle assigned'
+      description: 'Vehicle assigned'
+    },
+    {
+      name: 'EWM Phase 2 (Goods Issue)',
+      icon: <BusinessIcon />,
+      atStage: atStage.ewm2,
+      cumulative: cumulative.ewm2,
+      color: 'info',
+      description: 'EWM goods issued after TM Phase 1'
+    },
+    {
+      name: 'Biller',
+      icon: <InventoryIcon />,
+      atStage: atStage.biller,
+      cumulative: cumulative.biller,
+      color: 'warning',
+      description: 'Biller documents printed'
+    },
+    {
+      name: 'PI Officer',
+      icon: <AssignmentIcon />,
+      atStage: atStage.pi,
+      cumulative: cumulative.pi,
+      color: 'secondary',
+      description: 'PI officer processing'
     },
     {
       name: 'TM Phase 2',
       icon: <LocalShippingIcon />,
-      count: wp.tm_phase2_facilities || 0,
+      atStage: atStage.tm2,
+      cumulative: cumulative.tm2,
       color: 'success',
       description: 'Driver & deliverer assigned'
     },
     {
       name: 'Dispatch',
       icon: <AssignmentIcon />,
-      count: wp.dispatch_odns || 0,
+      atStage: atStage.dispatch,
+      cumulative: cumulative.dispatch,
       color: 'error',
-      description: 'ODNs dispatched to facilities'
+      description: 'Dispatched to facilities'
     },
     {
       name: 'Documentation',
       icon: <DescriptionIcon />,
-      count: wp.documentation_stage || 0,
+      atStage: atStage.doc,
+      cumulative: cumulative.doc,
       color: 'info',
       description: 'POD confirmed'
     },
     {
       name: 'Quality Evaluation',
       icon: <QualityIcon />,
-      count: wp.quality_stage || 0,
+      atStage: atStage.quality,
+      cumulative: cumulative.quality,
       color: 'error',
       description: 'Quality assessment completed'
     },
@@ -103,44 +151,42 @@ const ServiceUnitsDetail = ({ data }) => {
   };
 
   const currentServiceUnit = serviceUnits[activeTab];
-  const totalODNs = summary?.totalODNs || 0;
 
-  // Workflow Progress Data for Bar Chart
-  const workflowData = [
-    { stage: 'O2C', count: wp.o2c_stage || 0, color: '#2196f3' },
-    { stage: 'EWM Ph1', count: wp.ewm_phase1_facilities || 0, color: '#4caf50' },
-    { stage: 'EWM Ph2/Biller', count: wp.biller_facilities || 0, color: '#ff9800' },
-    { stage: 'TM Ph1', count: wp.tm_phase1_facilities || 0, color: '#9c27b0' },
-    { stage: 'TM Ph2', count: wp.tm_phase2_facilities || 0, color: '#673ab7' },
-    { stage: 'Dispatch', count: wp.dispatch_odns || 0, color: '#795548' },
-    { stage: 'Documentation', count: wp.documentation_stage || 0, color: '#f44336' },
-    { stage: 'Quality', count: wp.quality_stage || 0, color: '#607d8b' }
-  ];
-
-  // Custom label component for bar charts
-  const renderCustomizedLabel = (props) => {
-    const { x, y, width, height, value, payload } = props;
-    return (
-      <text 
-        x={x + width / 2} 
-        y={y - 5} 
-        fill="#000" 
-        textAnchor="middle" 
-        dominantBaseline="middle"
-        fontSize="12"
-        fontWeight="bold"
-      >
-        {value}
-      </text>
-    );
-  };
+  // Workflow Progress Data for Bar Chart — show "currently at stage" counts
+  const totalFacilities = summary?.totalFacilities ?? summary?.totalODNs ?? 0;
 
   return (
     <Box>
+      {/* Expected This Month vs Done — facility-based summary */}
+      <Card sx={{ mb: 3, borderLeft: 4, borderColor: 'primary.main' }}>
+        <CardContent>
+          <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 1.5 }}>
+            <Avatar sx={{ bgcolor: 'primary.light', color: 'primary.main', width: 48, height: 48 }}>
+              <TrendingUpIcon />
+            </Avatar>
+            <Box sx={{ flexGrow: 1 }}>
+              <Typography variant="body2" color="text.secondary">Expected This Month</Typography>
+              <Typography variant="h4" fontWeight="bold" color="primary.main">{expectedThisMonth} facilities</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="body2" color="text.secondary">Completed</Typography>
+              <Typography variant="h4" fontWeight="bold" color="success.main">{doneFacilities} / {expectedThisMonth}</Typography>
+            </Box>
+          </Stack>
+          <LinearProgress
+            variant="determinate"
+            value={parseFloat(donePercent)}
+            sx={{ height: 10, borderRadius: 5 }}
+            color="success"
+          />
+          <Typography variant="caption" color="text.secondary">{donePercent}% complete</Typography>
+        </CardContent>
+      </Card>
+
       {/* Service Units Overview Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {serviceUnits.map((unit, index) => {
-          const percentage = totalODNs > 0 ? ((unit.count / totalODNs) * 100).toFixed(1) : 0;
+          const pct = rateBase > 0 ? ((unit.atStage / rateBase) * 100).toFixed(1) : 0;
           return (
             <Grid item xs={12} md={4} key={index}>
               <Card sx={{ 
@@ -163,20 +209,11 @@ const ServiceUnitsDetail = ({ data }) => {
                       {unit.icon}
                     </Avatar>
                     <Box sx={{ flexGrow: 1 }}>
-                      <Typography variant="h6" fontWeight="bold" noWrap>
-                        {unit.count}
+                      <Typography variant="h5" fontWeight="bold" color={`${unit.color}.main`}>
+                        {unit.cumulative}
                       </Typography>
                       <Typography variant="body2" color="text.secondary" noWrap>
                         {unit.name}
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={parseFloat(percentage)}
-                        sx={{ mt: 1, height: 6, borderRadius: 3 }}
-                        color={unit.color}
-                      />
-                      <Typography variant="caption" color="text.secondary">
-                        {percentage}% of total ODNs
                       </Typography>
                     </Box>
                   </Stack>
@@ -215,10 +252,10 @@ const ServiceUnitsDetail = ({ data }) => {
               <Card variant="outlined">
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" fontWeight="bold" color={`${currentServiceUnit.color}.main`}>
-                    {currentServiceUnit.count}
+                    {currentServiceUnit.atStage}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    ODNs Processed
+                    Currently at this Stage
                   </Typography>
                 </CardContent>
               </Card>
@@ -227,7 +264,19 @@ const ServiceUnitsDetail = ({ data }) => {
               <Card variant="outlined">
                 <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" fontWeight="bold" color="success.main">
-                    {totalODNs > 0 ? ((currentServiceUnit.count / totalODNs) * 100).toFixed(1) : 0}%
+                    {currentServiceUnit.cumulative}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Reached this Stage
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Card variant="outlined">
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" fontWeight="bold" color="info.main">
+                    {rateBase > 0 ? ((currentServiceUnit.cumulative / rateBase) * 100).toFixed(1) : 0}%
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Completion Rate
@@ -238,20 +287,8 @@ const ServiceUnitsDetail = ({ data }) => {
             <Grid item xs={12} md={3}>
               <Card variant="outlined">
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" fontWeight="bold" color="info.main">
-                    {totalODNs - currentServiceUnit.count}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Pending ODNs
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <Card variant="outlined">
-                <CardContent sx={{ textAlign: 'center' }}>
                   <Typography variant="h4" fontWeight="bold" color="warning.main">
-                    {serviceUnits.findIndex(unit => unit.name === currentServiceUnit.name) + 1}
+                    {serviceUnits.findIndex(u => u.name === currentServiceUnit.name) + 1}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     Process Stage
@@ -270,35 +307,25 @@ const ServiceUnitsDetail = ({ data }) => {
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.100' }}>
                   <TableCell sx={{ fontWeight: 'bold' }}>Service Unit</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }} align="center">ODNs Processed</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }} align="center">Completion Rate</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }} align="center">Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }} align="center">Currently Here</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }} align="center">Reached (Cumulative %)</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {serviceUnits.map((unit, index) => {
-                  const percentage = totalODNs > 0 ? ((unit.count / totalODNs) * 100).toFixed(1) : 0;
+                  const pct = rateBase > 0 ? ((unit.cumulative / rateBase) * 100).toFixed(1) : 0;
                   const isActive = index === activeTab;
-                  
                   return (
                     <TableRow 
                       key={index} 
                       hover 
-                      sx={{ 
-                        bgcolor: isActive ? `${unit.color}.50` : 'inherit',
-                        cursor: 'pointer'
-                      }}
+                      sx={{ bgcolor: isActive ? `${unit.color}.50` : 'inherit', cursor: 'pointer' }}
                       onClick={() => setActiveTab(index)}
                     >
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={2}>
-                          <Avatar sx={{ 
-                            bgcolor: `${unit.color}.light`, 
-                            color: `${unit.color}.main`,
-                            width: 32, 
-                            height: 32 
-                          }}>
+                          <Avatar sx={{ bgcolor: `${unit.color}.light`, color: `${unit.color}.main`, width: 32, height: 32 }}>
                             {unit.icon}
                           </Avatar>
                           <Typography variant="body2" fontWeight={isActive ? 'bold' : 'normal'}>
@@ -308,34 +335,24 @@ const ServiceUnitsDetail = ({ data }) => {
                       </TableCell>
                       <TableCell align="center">
                         <Typography variant="h6" fontWeight="bold" color={`${unit.color}.main`}>
-                          {unit.count}
+                          {unit.atStage}
                         </Typography>
+                        <Typography variant="caption" color="text.secondary">currently here</Typography>
                       </TableCell>
                       <TableCell align="center">
-                        <Stack alignItems="center" spacing={1}>
+                        <Typography variant="body2" fontWeight="bold">{unit.cumulative}</Typography>
+                        <Stack alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
                           <LinearProgress
                             variant="determinate"
-                            value={parseFloat(percentage)}
+                            value={parseFloat(pct)}
                             sx={{ width: 60, height: 8, borderRadius: 4 }}
                             color={unit.color}
                           />
-                          <Typography variant="body2" fontWeight="bold">
-                            {percentage}%
-                          </Typography>
+                          <Typography variant="caption">{pct}%</Typography>
                         </Stack>
                       </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={unit.count > 0 ? 'Active' : 'Pending'}
-                          size="small"
-                          color={unit.count > 0 ? 'success' : 'default'}
-                          variant={unit.count > 0 ? 'filled' : 'outlined'}
-                        />
-                      </TableCell>
                       <TableCell>
-                        <Typography variant="body2" color="text.secondary">
-                          {unit.description}
-                        </Typography>
+                        <Typography variant="body2" color="text.secondary">{unit.description}</Typography>
                       </TableCell>
                     </TableRow>
                   );
@@ -346,36 +363,6 @@ const ServiceUnitsDetail = ({ data }) => {
         </CardContent>
       </Card>
 
-      {/* Workflow Stage Progress Chart - Moved to End */}
-      <Card sx={{ mt: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>Workflow Stage Progress (ODN Count)</Typography>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={workflowData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barCategoryGap="30%">
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="stage" 
-                tick={{ fontSize: 12 }}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-              />
-              <YAxis 
-                label={{ value: 'Number of ODNs', angle: -90, position: 'insideLeft' }}
-              />
-              <Tooltip 
-                formatter={(value, name, props) => [value, `${props.payload.stage} ODNs`]}
-                labelFormatter={(label) => `Service Unit: ${label}`}
-              />
-              <Bar dataKey="count" name="ODN Count" label={renderCustomizedLabel} maxBarSize={40}>
-                {workflowData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
     </Box>
   );
 };

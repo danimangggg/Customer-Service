@@ -73,14 +73,14 @@ const FeatureBox = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   marginBottom: theme.spacing(1.5),
   padding: theme.spacing(1.5),
-  background: 'linear-gradient(135deg, #c62828 0%, #e53935 100%)',
+  background: 'linear-gradient(135deg, #1565c0 0%, #1e88e5 100%)',
   borderRadius: 16,
   animation: `${slideInLeft} 0.8s ease-out`,
   transition: 'all 0.3s ease',
   cursor: 'default',
   '&:hover': {
     transform: 'translateX(8px) scale(1.02)',
-    boxShadow: '0 8px 30px rgba(198,40,40,0.25)',
+    boxShadow: '0 8px 30px rgba(21,101,192,0.35)',
   },
   '& .MuiSvgIcon-root': {
     fontSize: 44,
@@ -196,6 +196,7 @@ export default function SignIn() {
         } else if (jobTitle === 'TM Manager')               { navigate('/hp-dashboard');
         } else if (jobTitle === 'Biller')                   { navigate('/hp-dashboard');
         } else if (jobTitle === 'Dispatcher')               { navigate('/dispatch');
+        } else if (jobTitle === 'Cashier' || jobTitle === 'Finance') { navigate('/finance-invoices');
         } else if (jobTitle === 'Dispatcher - HP')          { navigate('/hp-dashboard');
         } else if (jobTitle === 'Dispatch-Documentation')   { navigate('/exit-permit');
         } else if (jobTitle === 'EWM-Documentation')        { navigate('/ewm-documentation');
@@ -203,6 +204,7 @@ export default function SignIn() {
         } else if (jobTitle === 'WIM Operator')             { navigate('/all-picklists');
         } else if (jobTitle === 'Queue Manager')            { navigate('/queue-manager');
         } else if (jobTitle === 'Documentation Officer')    { navigate('/documentation-management');
+        } else if (jobTitle === 'Documentation Officer - HP') { navigate('/documentation-hp');
         } else if (jobTitle === 'Documentation Follower')   { navigate('/document-followup');
         } else if (jobTitle === 'Quality Evaluator')        { navigate('/quality-evaluation');
         } else if (accountType === 'Self Assesment') {

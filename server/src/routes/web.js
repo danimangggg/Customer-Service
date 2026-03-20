@@ -103,6 +103,10 @@ let routes =  (app) => {
   const exitHistoryController = require('../controllers/exitHistoryController');
   router.get('/api/exit-history/:processId', exitHistoryController.getExitHistory);
   router.post('/api/exit-history', exitHistoryController.createExitHistory);
+  router.get('/api/exit-history-by-store/:store', exitHistoryController.getHistoryByStore);
+  router.get('/api/exit-history-pending/:store', exitHistoryController.getPendingByStore);
+  router.put('/api/exit-history/:id/gate-status', exitHistoryController.updateGateStatus);
+  router.put('/api/exit-history/:id', exitHistoryController.updateExitHistoryRow);
 
   // Invoice routes (EWM-Documentation)
   const invoiceController = require('../controllers/CustomerService/invoiceController');
@@ -130,6 +134,7 @@ let routes =  (app) => {
   router.put('/api/facilities/:id', facilityController.updateFacility);
   router.put('/api/update-facilities/:id', facilityController.updateFacility); // Alternative endpoint for FacilityManager
   router.delete('/api/facilities/:id', facilityController.deleteFacility);
+  router.post('/api/facilities/clear-non-hp-routes', facilityController.clearNonHpRoutesPeriods);
   router.get('/api/regions', locationController.getRegions);
   router.get('/api/zones', locationController.getZones);
   router.get('/api/woredas', locationController.getWoredas);

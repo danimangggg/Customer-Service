@@ -174,7 +174,6 @@ const ODNPODDetailReport = () => {
           { label: 'Total ODNs', value: totalODNs, color: '#2196f3' },
           { label: 'Total PODs', value: totalPODs, color: '#9c27b0' },
           { label: 'All Confirmed', value: allConfirmedCount, color: '#4caf50', sub: 'facilities' },
-          { label: 'Partially Confirmed', value: partiallyConfirmedCount, color: '#ff9800', sub: 'facilities' },
           { label: 'Not Confirmed', value: notConfirmedCount, color: '#f44336', sub: 'facilities' },
         ].map(({ label, value, color, sub }) => (
           <Grid item xs={6} sm={4} md key={label}>
@@ -230,7 +229,6 @@ const ODNPODDetailReport = () => {
               <Select value={selectedStatus} label="POD Status" onChange={e => { setSelectedStatus(e.target.value); setPage(0); }}>
                 <MenuItem value="All">All</MenuItem>
                 <MenuItem value="All Confirmed">All Confirmed</MenuItem>
-                <MenuItem value="Partially Confirmed">Partially Confirmed</MenuItem>
                 <MenuItem value="Not Confirmed">Not Confirmed</MenuItem>
               </Select>
             </FormControl>

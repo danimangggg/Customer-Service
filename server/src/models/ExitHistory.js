@@ -55,6 +55,19 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'full'
     },
+    gate_status: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      defaultValue: 'pending'
+    },
+    assigned_gate_keeper_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    assigned_gate_keeper_name: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
     exited_at: {
       type: DataTypes.DATE,
       allowNull: false,
