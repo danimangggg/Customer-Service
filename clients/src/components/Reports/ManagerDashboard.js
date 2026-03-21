@@ -12,7 +12,6 @@ import {
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import PeopleIcon from '@mui/icons-material/People';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -30,6 +29,14 @@ const ethiopianMonths = [
   'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit',
   'Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume',
 ];
+
+const formatDuration = (mins) => {
+  if (mins == null || mins === 0) return '—';
+  if (mins < 60) return `${mins}m`;
+  if (mins < 1440) { const h = Math.floor(mins/60), m = mins%60; return m > 0 ? `${h}h ${m}m` : `${h}h`; }
+  const d = Math.floor(mins/1440), rem = mins%1440, h = Math.floor(rem/60);
+  return h > 0 ? `${d}d ${h}h` : `${d}d`;
+};
 
 const getCurrentEthiopianMonth = () => {
   const gDate = new Date();
@@ -50,31 +57,31 @@ const getCurrentEthiopianMonth = () => {
   return { year: ethYear, monthIndex: Math.max(0, Math.min(ethMonthIndex, 12)) };
 };
 
-// Professional muted palette — enterprise dark theme
+// Professional light theme
 const C = {
-  bg:        '#0f1117',
-  surface:   '#161b27',
-  surfaceAlt:'#1c2333',
-  border:    'rgba(255,255,255,0.07)',
-  borderHov: 'rgba(255,255,255,0.13)',
-  text:      '#e2e8f0',
-  textMuted: 'rgba(226,232,240,0.45)',
-  textDim:   'rgba(226,232,240,0.25)',
+  bg:        '#f1f5f9',
+  surface:   '#ffffff',
+  surfaceAlt:'#f8fafc',
+  border:    '#e2e8f0',
+  borderHov: '#cbd5e1',
+  text:      '#0f172a',
+  textMuted: '#64748b',
+  textDim:   '#94a3b8',
   indigo:    '#6366f1',
-  indigoSoft:'rgba(99,102,241,0.15)',
-  teal:      '#14b8a6',
-  tealSoft:  'rgba(20,184,166,0.15)',
-  emerald:   '#10b981',
-  emeraldSoft:'rgba(16,185,129,0.15)',
-  amber:     '#f59e0b',
-  amberSoft: 'rgba(245,158,11,0.15)',
-  rose:      '#f43f5e',
-  roseSoft:  'rgba(244,63,94,0.15)',
-  sky:       '#38bdf8',
-  skySoft:   'rgba(56,189,248,0.15)',
-  violet:    '#8b5cf6',
-  violetSoft:'rgba(139,92,246,0.15)',
-  slate:     '#64748b',
+  indigoSoft:'rgba(99,102,241,0.1)',
+  teal:      '#0d9488',
+  tealSoft:  'rgba(13,148,136,0.1)',
+  emerald:   '#059669',
+  emeraldSoft:'rgba(5,150,105,0.1)',
+  amber:     '#d97706',
+  amberSoft: 'rgba(217,119,6,0.1)',
+  rose:      '#e11d48',
+  roseSoft:  'rgba(225,29,72,0.1)',
+  sky:       '#0284c7',
+  skySoft:   'rgba(2,132,199,0.1)',
+  violet:    '#7c3aed',
+  violetSoft:'rgba(124,58,237,0.1)',
+  slate:     '#475569',
 };
 
 const G = {
@@ -82,12 +89,12 @@ const G = {
   rdf:   `linear-gradient(135deg,${C.rose} 0%,${C.violet} 100%)`,
   green: `linear-gradient(135deg,${C.emerald} 0%,${C.teal} 100%)`,
   blue:  `linear-gradient(135deg,${C.sky} 0%,${C.indigo} 100%)`,
-  amber: `linear-gradient(135deg,${C.amber} 0%,#fb923c 100%)`,
-  red:   `linear-gradient(135deg,${C.rose} 0%,#fb7185 100%)`,
+  amber: `linear-gradient(135deg,${C.amber} 0%,#ea580c 100%)`,
+  red:   `linear-gradient(135deg,${C.rose} 0%,#f43f5e 100%)`,
   card:  C.surface,
 };
-const CHART_COLORS = [C.indigo, C.teal, C.amber, C.rose, C.sky, C.violet, C.emerald, '#fb923c'];
-const tooltipStyle = { background: C.surfaceAlt, border:`1px solid ${C.border}`, borderRadius:8, color: C.text, fontSize:12 };
+const CHART_COLORS = [C.indigo, C.teal, C.amber, C.rose, C.sky, C.violet, C.emerald, '#ea580c'];
+const tooltipStyle = { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, color: '#0f172a', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.1)' };
 
 const KpiCard = ({ title, value, subtitle, icon, gradient, loading }) => (
   <Card sx={{
@@ -95,24 +102,24 @@ const KpiCard = ({ title, value, subtitle, icon, gradient, loading }) => (
     border: `1px solid ${C.border}`,
     borderRadius: 2,
     overflow: 'hidden',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
     transition: 'border-color 0.2s, box-shadow 0.2s',
-    '&:hover': { borderColor: C.borderHov, boxShadow: '0 4px 16px rgba(0,0,0,0.5)' }
+    '&:hover': { borderColor: C.borderHov, boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }
   }}>
     <Box sx={{ height: 3, background: gradient }} />
     <CardContent sx={{ p: 2.5 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="caption" sx={{ color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.67rem', fontWeight: 600 }}>
+          <Typography variant="caption" sx={{ color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.75rem', fontWeight: 600 }}>
             {title}
           </Typography>
           {loading
             ? <CircularProgress size={24} sx={{ mt: 1, color: C.indigo }} />
             : <Typography variant="h4" fontWeight={700} sx={{ color: C.text, lineHeight: 1.15, mt: 0.5, letterSpacing: -0.5 }}>{value ?? '—'}</Typography>
           }
-          {subtitle && <Typography variant="caption" sx={{ color: C.textDim, mt: 0.4, display: 'block', fontSize: '0.7rem' }}>{subtitle}</Typography>}
+          {subtitle && <Typography variant="caption" sx={{ color: C.textDim, mt: 0.4, display: 'block', fontSize: '0.78rem' }}>{subtitle}</Typography>}
         </Box>
-        <Box sx={{ background: gradient, borderRadius: 1.5, p: 1, opacity: 0.85, ml: 1.5, flexShrink: 0 }}>{icon}</Box>
+        <Box sx={{ background: gradient, borderRadius: 1.5, p: 1, opacity: 0.9, ml: 1.5, flexShrink: 0 }}>{icon}</Box>
       </Stack>
     </CardContent>
   </Card>
@@ -121,16 +128,16 @@ const KpiCard = ({ title, value, subtitle, icon, gradient, loading }) => (
 const SectionLabel = ({ label, gradient }) => (
   <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
     <Box sx={{ width: 3, height: 20, background: gradient, borderRadius: 2 }} />
-    <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1.5, fontSize: '0.7rem', lineHeight: 1 }}>
+    <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1.5, fontSize: '0.92rem', lineHeight: 1 }}>
       {label}
     </Typography>
   </Stack>
 );
 
 const ChartCard = ({ title, children, height = 260 }) => (
-  <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', overflow: 'hidden', height: '100%' }}>
+  <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden', height: '100%' }}>
     <CardContent sx={{ p: 2.5 }}>
-      <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem', display: 'block', mb: 1.5 }}>
+      <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.78rem', display: 'block', mb: 1.5 }}>
         {title}
       </Typography>
       <Box sx={{ height }}>{children}</Box>
@@ -182,9 +189,18 @@ const ManagerDashboard = () => {
     } catch (e) { console.error(e); }
   }, []);
 
-  const fetchTrend = useCallback(async () => {    try {
+  const fetchTrend = useCallback(async () => {
+    try {
       const r = await api.get(`${API_URL}/api/hp-report/time-trend`);
-      if (r.data?.trend) setTimeTrend(r.data.trend.slice(-8));
+      if (r.data?.trendData) {
+        setTimeTrend(
+          r.data.trendData.slice(-8).map(d => ({
+            month: d.reporting_month,
+            rrf_sent: parseInt(d.facilities_reported) || 0,
+            total_odns: parseInt(d.total_odns) || 0,
+          }))
+        );
+      }
     } catch (e) { console.error(e); }
   }, []);
 
@@ -208,24 +224,23 @@ const ManagerDashboard = () => {
 
   // ── chart data ──
   const funnelData = [
-    { stage:'O2C',      count: wp.o2cCompleted || 0 },
-    { stage:'EWM',      count: wp.ewmCompleted || 0 },
-    { stage:'PI',       count: wp.piCompleted || 0 },
-    { stage:'TM',       count: wp.tmCompleted || 0 },
-    { stage:'Dispatch', count: wp.dispatched || 0 },
-    { stage:'Doc',      count: wp.documentationCompleted || 0 },
-    { stage:'Quality',  count: wp.qualityEvaluated || 0 },
+    { stage:'O2C',      count: wp.o2c_stage || 0 },
+    { stage:'EWM',      count: wp.ewm_phase1_facilities || 0 },
+    { stage:'PI',       count: wp.pi_facilities || 0 },
+    { stage:'TM',       count: wp.tm_phase1_facilities || 0 },
+    { stage:'Doc',      count: wp.documentation_stage || 0 },
+    { stage:'Quality',  count: wp.quality_stage || 0 },
   ].filter(d => d.count > 0);
 
   const rrfPie = [
-    { name:`${rrfLabel} Sent`,  value: hp.rrfSent || 0,    color:'#43e97b' },
-    { name:'Not Sent',          value: hp.rrfNotSent || 0,  color:'#f5576c' },
+    { name:`${rrfLabel} Sent`,  value: hp.rrfSent || 0,    color: C.emerald },
+    { name:'Not Sent',          value: hp.rrfNotSent || 0,  color: C.rose },
   ];
 
   const rdfPie = [
-    { name:'Completed',     value: rdfStats?.completedCount || 0,                                                color:'#43e97b' },
-    { name:'In Progress',   value: rdfStats?.inProgressCount || 0,                                               color:'#f6d365' },
-    { name:'Cancelled',     value: (rdfStats?.cancelledCount || 0) + (rdfStats?.autoCancelledCount || 0),        color:'#f5576c' },
+    { name:'Completed',     value: rdfStats?.completedCount || 0,                                                color: C.emerald },
+    { name:'In Progress',   value: rdfStats?.inProgressCount || 0,                                               color: C.amber },
+    { name:'Cancelled',     value: (rdfStats?.cancelledCount || 0) + (rdfStats?.autoCancelledCount || 0),        color: C.rose },
   ].filter(d => d.value > 0);
 
   const topRoutes = (hpData?.routeStats || [])
@@ -239,7 +254,7 @@ const ManagerDashboard = () => {
     <Box sx={{ minHeight: '100vh', background: C.bg, p: 3 }}>
 
       {/* ── HEADER ── */}
-      <Box sx={{ background: C.surface, borderRadius: 2, p: 2.5, mb: 3, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+      <Box sx={{ background: C.surface, borderRadius: 2, p: 2.5, mb: 3, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
 
         <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ xs:'flex-start', md:'center' }} spacing={2}>
           <Stack direction="row" alignItems="center" spacing={2}>
@@ -293,14 +308,14 @@ const ManagerDashboard = () => {
           <SectionLabel label={`Health Program — ${month} ${year} · ${processType === 'vaccine' ? 'Vaccine' : 'HP Regular'}`} gradient={G.hp} />
           <Grid container spacing={2} sx={{ mb:3 }}>
             {[
-              { title:'Expected Facilities', value:hp.expectedFacilities,  subtitle:'This period',              icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp,    loading:hpLoading },
+              { title:'Total Facilities',    value:hp.totalFacilities,     subtitle:'All HP facilities',        icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.blue,   loading:hpLoading },
+              { title:'Expected This Month', value:hp.expectedFacilities,  subtitle:'This period',              icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp,    loading:hpLoading },
               { title:`${rrfLabel} Sent`,      value:hp.rrfSent,             subtitle:`${hpRrfPct}% of expected`, icon:<AssignmentIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.green,  loading:hpLoading },
-              { title:`${rrfLabel} Not Sent`,  value:hp.rrfNotSent,          subtitle:'Pending facilities',       icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,        gradient:G.red,    loading:hpLoading },
               { title:'Total ODNs',          value:hp.totalODNs,           subtitle:'Orders generated',         icon:<InventoryIcon sx={{color:'#fff',fontSize:26}}/>,     gradient:G.blue,   loading:hpLoading },
-              { title:'Dispatched',          value:hp.dispatched,          subtitle:'ODNs dispatched',          icon:<LocalShippingIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.amber,  loading:hpLoading },
               { title:'POD Confirmed',       value:hp.podConfirmed,        subtitle:`${hpPodPct}% rate`,        icon:<VerifiedIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.green,  loading:hpLoading },
               { title:'Quality Evaluated',   value:hp.qualityEvaluated,    subtitle:`${hpQualPct}% of ODNs`,   icon:<StarIcon sx={{color:'#fff',fontSize:26}}/>,          gradient:G.rdf,    loading:hpLoading },
-              { title:`${rrfLabel} Rate`,      value:`${hpRrfPct}%`,         subtitle:'Facility coverage',        icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.hp,     loading:hpLoading },
+              { title:'Completion Rate',     value:`${hpRrfPct}%`,         subtitle:'Facility coverage',        icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.hp,     loading:hpLoading },
+              { title:'Avg Process Time',    value:formatDuration(hp.avgProcessDays), subtitle:'O2C to quality eval', icon:<AccessTimeIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.amber, loading:hpLoading },
             ].map((k, i) => (
               <Grid item xs={6} sm={4} md={3} key={i}><KpiCard {...k} /></Grid>
             ))}
@@ -309,32 +324,31 @@ const ManagerDashboard = () => {
           {/* ══ HP WORKFLOW PROGRESS ══ */}
           <Grid container spacing={2} sx={{ mb:3 }}>
             <Grid item xs={12} md={7}>
-              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', height: '100%' }}>
+              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', height: '100%' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem', display: 'block', mb: 2 }}>
                     HP Workflow Stage Progress
                   </Typography>
                   <Grid container spacing={1.5}>
                     {[
-                      { label:'O2C',           val:wp.o2cCompleted,           color: C.indigo },
-                      { label:'EWM',           val:wp.ewmCompleted,           color: C.emerald },
-                      { label:'PI',            val:wp.piCompleted,            color: C.sky },
-                      { label:'TM',            val:wp.tmCompleted,            color: C.amber },
-                      { label:'Dispatch',      val:wp.dispatched,             color: '#fb923c' },
-                      { label:'Documentation', val:wp.documentationCompleted, color: C.violet },
-                      { label:'Quality',       val:wp.qualityEvaluated,       color: C.teal },
+                      { label:'O2C',           val:wp.o2c_stage,             color: C.indigo },
+                      { label:'EWM',           val:wp.ewm_phase1_facilities, color: C.emerald },
+                      { label:'PI',            val:wp.pi_facilities,         color: C.sky },
+                      { label:'TM',            val:wp.tm_phase1_facilities,  color: C.amber },
+                      { label:'Documentation', val:wp.documentation_stage,   color: C.violet },
+                      { label:'Quality',       val:wp.quality_stage,         color: C.teal },
                     ].map(({ label, val, color }) => {
                       const pct = hp.totalODNs > 0 ? Math.round(((val||0) / hp.totalODNs) * 100) : 0;
                       return (
                         <Grid item xs={12} sm={6} key={label}>
                           <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                            <Typography variant="caption" sx={{ color: C.textMuted, fontWeight: 600, fontSize: '0.72rem' }}>{label}</Typography>
-                            <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: '0.72rem' }}>
+                            <Typography variant="caption" sx={{ color: C.textMuted, fontWeight: 600, fontSize: '0.92rem' }}>{label}</Typography>
+                            <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: '0.92rem' }}>
                               {val ?? 0} <span style={{ color: C.textDim }}>/ {hp.totalODNs ?? 0}</span> ({pct}%)
                             </Typography>
                           </Stack>
                           <LinearProgress variant="determinate" value={pct}
-                            sx={{ height: 5, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.05)', '& .MuiLinearProgress-bar':{ background: color, borderRadius: 4 } }} />
+                            sx={{ height: 5, borderRadius: 4, bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar':{ background: color, borderRadius: 4 } }} />
                         </Grid>
                       );
                     })}
@@ -351,7 +365,7 @@ const ManagerDashboard = () => {
                       {rrfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                     </Pie>
                     <RTooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
+                    <Legend wrapperStyle={{ color: C.text, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
               </ChartCard>
@@ -361,39 +375,39 @@ const ManagerDashboard = () => {
           {/* ══ HP CHARTS ══ */}
           <Grid container spacing={2} sx={{ mb:3 }}>
             <Grid item xs={12} md={8}>
-              <ChartCard title={`HP Monthly Trend — ${rrfLabel} Sent vs ODNs`} height={260}>
+              <ChartCard title={`HP Monthly Trend — ${rrfLabel} Sent vs ODNs`} height={300}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={timeTrend} margin={{ top:5, right:10, left:-20, bottom:5 }}>
+                  <AreaChart data={timeTrend} margin={{ top:10, right:20, left:0, bottom:5 }}>
                     <defs>
                       <linearGradient id="gRRF" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#667eea" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#667eea" stopOpacity={0}/>
+                        <stop offset="5%" stopColor={C.indigo} stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor={C.indigo} stopOpacity={0}/>
                       </linearGradient>
                       <linearGradient id="gODN" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#43e97b" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#43e97b" stopOpacity={0}/>
+                        <stop offset="5%" stopColor={C.teal} stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor={C.teal} stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="month" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" tick={{ fill: C.textMuted, fontSize:11 }} axisLine={{ stroke: C.border }} tickLine={false} />
+                    <YAxis tick={{ fill: C.textMuted, fontSize:11 }} axisLine={false} tickLine={false} width={40} />
                     <RTooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
-                    <Area type="monotone" dataKey="rrf_sent" name={`${rrfLabel} Sent`} stroke="#667eea" fill="url(#gRRF)" strokeWidth={2} dot={false} />
-                    <Area type="monotone" dataKey="total_odns" name="Total ODNs" stroke="#43e97b" fill="url(#gODN)" strokeWidth={2} dot={false} />
+                    <Legend wrapperStyle={{ color: C.text, fontSize:12 }} />
+                    <Area type="monotone" dataKey="rrf_sent" name={`${rrfLabel} Sent`} stroke={C.indigo} fill="url(#gRRF)" strokeWidth={2} dot={{ fill: C.indigo, r:3 }} />
+                    <Area type="monotone" dataKey="total_odns" name="Total ODNs" stroke={C.teal} fill="url(#gODN)" strokeWidth={2} dot={{ fill: C.teal, r:3 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </ChartCard>
             </Grid>
             <Grid item xs={12} md={4}>
-              <ChartCard title="HP Workflow Completion" height={260}>
+              <ChartCard title="HP Workflow Completion" height={300}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={funnelData} margin={{ top:5, right:10, left:-20, bottom:5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="stage" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
+                  <BarChart data={funnelData} margin={{ top:10, right:10, left:0, bottom:5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="stage" tick={{ fill: C.textMuted, fontSize:10 }} axisLine={{ stroke: C.border }} tickLine={false} />
+                    <YAxis tick={{ fill: C.textMuted, fontSize:11 }} axisLine={false} tickLine={false} width={35} />
                     <RTooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="count" name="Completed" radius={[6,6,0,0]}>
+                    <Bar dataKey="count" name="Completed" radius={[4,4,0,0]}>
                       {funnelData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                     </Bar>
                   </BarChart>
@@ -405,16 +419,16 @@ const ManagerDashboard = () => {
           {/* Top routes */}
           {topRoutes.length > 0 && (
             <Box sx={{ mb:3 }}>
-              <ChartCard title="Top Routes by Facilities & ODNs" height={240}>
+              <ChartCard title="Top Routes by Facilities & ODNs" height={300}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topRoutes} margin={{ top:5, right:10, left:-20, bottom:40 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="name" tick={{ fill:'rgba(255,255,255,0.4)', fontSize:10 }} angle={-35} textAnchor="end" axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill:'rgba(255,255,255,0.4)', fontSize:11 }} axisLine={false} tickLine={false} />
+                  <BarChart data={topRoutes} margin={{ top:10, right:20, left:0, bottom:60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize:10 }} angle={-35} textAnchor="end" axisLine={{ stroke: C.border }} tickLine={false} />
+                    <YAxis tick={{ fill: C.textMuted, fontSize:11 }} axisLine={false} tickLine={false} width={35} />
                     <RTooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ color:'rgba(255,255,255,0.5)', fontSize:12 }} />
-                    <Bar dataKey="facilities" name="Facilities" fill="#667eea" radius={[4,4,0,0]} />
-                    <Bar dataKey="odns" name="ODNs" fill="#43e97b" radius={[4,4,0,0]} />
+                    <Legend verticalAlign="top" wrapperStyle={{ color: C.text, fontSize:12, paddingBottom: 8 }} />
+                    <Bar dataKey="facilities" name="Facilities" fill={C.indigo} radius={[4,4,0,0]} />
+                    <Bar dataKey="odns" name="ODNs" fill={C.teal} radius={[4,4,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
@@ -423,7 +437,7 @@ const ManagerDashboard = () => {
 
           {/* ══ HP BEST OF LAST WEEK ══ */}
           <Box sx={{ mb:3 }}>
-            <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }}>
+            <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <CardContent sx={{ p:3 }}>
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb:2 }}>
                   <EmojiEventsIcon sx={{ color: C.amber, fontSize:18 }} />
@@ -442,21 +456,20 @@ const ManagerDashboard = () => {
                           { role:'Biller',        person: bestOfHP.employees.biller },
                           { role:'TM',            person: bestOfHP.employees.tm },
                           { role:'PI',            person: bestOfHP.employees.pi },
-                          { role:'Dispatcher',    person: bestOfHP.employees.dispatcher },
                           { role:'Documentation', person: bestOfHP.employees.documentation },
                           { role:'Quality',       person: bestOfHP.employees.quality },
                         ].filter(({ person }) => person).map(({ role, person }) => (
                           <Grid item xs={12} sm={6} md={3} key={role}>
                             <Box sx={{ background: C.surfaceAlt, borderRadius: 1.5, p: 1.5, border: `1px solid ${C.border}` }}>
-                              <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.62rem', fontWeight: 600 }}>{role}</Typography>
+                              <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.72rem', fontWeight: 600 }}>{role}</Typography>
                               <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
                                 <Avatar sx={{ width: 28, height: 28, background: G.hp, fontSize: '0.75rem', fontWeight: 700 }}>
                                   {(person.full_name || '?')[0]}
                                 </Avatar>
                                 <Box>
-                                  <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.82rem' }}>{person.full_name}</Typography>
+                                  <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.92rem' }}>{person.full_name}</Typography>
                                   <Chip label={`${person.process_count} tasks`} size="small"
-                                    sx={{ height: 16, fontSize: '0.62rem', background: C.indigoSoft, color: C.indigo, mt: 0.2, fontWeight: 600 }} />
+                                    sx={{ height: 16, fontSize: '0.72rem', background: C.indigoSoft, color: C.indigo, mt: 0.2, fontWeight: 600 }} />
                                 </Box>
                               </Stack>
                             </Box>
@@ -481,7 +494,7 @@ const ManagerDashboard = () => {
               { title:'In Progress',         value:rdfStats?.inProgressCount,      subtitle:'Active customers',      icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,  gradient:G.blue,  loading:rdfLoading },
               { title:'Cancelled',           value:rdfStats?.cancelledCount,       subtitle:'Manual cancellations',  icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.red,   loading:rdfLoading },
               { title:'Auto-Cancelled',      value:rdfStats?.autoCancelledCount,   subtitle:'System cancellations',  icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.amber, loading:rdfLoading },
-              { title:'Avg Wait Time',       value:rdfStats?.averageWaitingTime ? `${Math.round(rdfStats.averageWaitingTime)}m` : '—', subtitle:'Service time', icon:<AccessTimeIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp, loading:rdfLoading },
+              { title:'Avg Wait Time',       value:formatDuration(rdfStats?.averageWaitingTime != null ? Math.round(rdfStats.averageWaitingTime) : null), subtitle:'Service time', icon:<AccessTimeIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp, loading:rdfLoading },
               { title:'Completion Rate',     value:`${rdfCompPct}%`,               subtitle:'Overall',               icon:<SpeedIcon sx={{color:'#fff',fontSize:26}}/>,       gradient:G.green, loading:rdfLoading },
               { title:'Cancel Rate',         value: rdfTotal > 0 ? `${(((rdfStats?.cancelledCount||0)+(rdfStats?.autoCancelledCount||0))/rdfTotal*100).toFixed(1)}%` : '—', subtitle:'Combined', icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.red, loading:rdfLoading },
             ].map((k, i) => (
@@ -500,7 +513,7 @@ const ManagerDashboard = () => {
                       {rdfPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                     </Pie>
                     <RTooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ color: C.textMuted, fontSize: 12 }} />
+                    <Legend wrapperStyle={{ color: C.text, fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
               </ChartCard>
@@ -508,7 +521,7 @@ const ManagerDashboard = () => {
 
             {/* Completion bars */}
             <Grid item xs={12} md={4}>
-              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', height: '100%' }}>
+              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', height: '100%' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem', display: 'block', mb: 2 }}>
                     Service Completion Breakdown
@@ -524,11 +537,11 @@ const ManagerDashboard = () => {
                       return (
                         <Box key={label} sx={{ mb: 2 }}>
                           <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                            <Typography variant="caption" sx={{ color: C.textMuted, fontWeight: 600, fontSize: '0.72rem' }}>{label}</Typography>
-                            <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: '0.72rem' }}>{val.toLocaleString()} ({pct}%)</Typography>
+                            <Typography variant="caption" sx={{ color: C.textMuted, fontWeight: 600, fontSize: '0.92rem' }}>{label}</Typography>
+                            <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: '0.92rem' }}>{val.toLocaleString()} ({pct}%)</Typography>
                           </Stack>
                           <LinearProgress variant="determinate" value={pct}
-                            sx={{ height: 5, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.05)', '& .MuiLinearProgress-bar': { background: color, borderRadius: 4 } }} />
+                            sx={{ height: 5, borderRadius: 4, bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar': { background: color, borderRadius: 4 } }} />
                         </Box>
                       );
                     })}
@@ -539,7 +552,7 @@ const ManagerDashboard = () => {
 
             {/* Best of week */}
             <Grid item xs={12} md={4}>
-              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.4)', height: '100%' }}>
+              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', height: '100%' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
                     <EmojiEventsIcon sx={{ color: C.amber, fontSize: 18 }} />
@@ -555,15 +568,15 @@ const ManagerDashboard = () => {
                           {Object.entries(bestOf.employees).map(([role, person]) => person && (
                             <Grid item xs={12} key={role}>
                               <Box sx={{ background: C.surfaceAlt, borderRadius: 1.5, p: 1.5, border: `1px solid ${C.border}` }}>
-                                <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.62rem', fontWeight: 600 }}>{role}</Typography>
+                                <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.72rem', fontWeight: 600 }}>{role}</Typography>
                                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
                                   <Avatar sx={{ width: 28, height: 28, background: G.rdf, fontSize: '0.75rem', fontWeight: 700 }}>
                                     {(person.full_name||'?')[0]}
                                   </Avatar>
                                   <Box>
-                                    <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.82rem' }}>{person.full_name}</Typography>
+                                    <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.92rem' }}>{person.full_name}</Typography>
                                     <Chip label={`${person.process_count} tasks`} size="small"
-                                      sx={{ height: 16, fontSize: '0.62rem', background: C.violetSoft, color: C.violet, mt: 0.2, fontWeight: 600 }} />
+                                      sx={{ height: 16, fontSize: '0.72rem', background: C.violetSoft, color: C.violet, mt: 0.2, fontWeight: 600 }} />
                                   </Box>
                                 </Stack>
                               </Box>

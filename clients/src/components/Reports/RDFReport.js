@@ -21,6 +21,14 @@ import BranchSelect from '../Settings/BranchSelect';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+const formatDuration = (mins) => {
+  if (mins == null || mins === 0) return '—';
+  if (mins < 60) return `${mins}m`;
+  if (mins < 1440) { const h = Math.floor(mins/60), m = mins%60; return m > 0 ? `${h}h ${m}m` : `${h}h`; }
+  const d = Math.floor(mins/1440), rem = mins%1440, h = Math.floor(rem/60);
+  return h > 0 ? `${d}d ${h}h` : `${d}d`;
+};
+
 // Defined OUTSIDE RDFReport so React never remounts it on parent re-render
 const CustomerToolbar = ({ searchInput, onSearchChange, onSearchClear, dateFrom, onDateFrom, dateTo, onDateTo, statusFilter, onStatusFilter }) => (
   <GridToolbarContainer sx={{ p: 1.5, gap: 1.5, bgcolor: '#f8f9fa', borderBottom: '1px solid #e0e0e0', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -792,10 +800,10 @@ const RDFReport = () => {
                         </Avatar>
                         <Box>
                           <Typography variant="h3" fontWeight="bold">
-                            {(dashboardStats.averageWaitingTime / 60).toFixed(1)}
+                            {formatDuration(Math.round(dashboardStats.averageWaitingTime))}
                           </Typography>
                           <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                            Avg. Waiting Time (hrs)
+                            Avg. Waiting Time
                           </Typography>
                         </Box>
                       </Stack>
@@ -961,7 +969,7 @@ const RDFReport = () => {
                   headerClassName: 'super-app-theme--header',
                   renderCell: (params) => (
                     <Chip 
-                      label={`${params.value || 0} min`}
+                      label={formatDuration(params.value)}
                       color={
                         params.value >= 1440 ? 'error' : 
                         params.value >= 180 ? 'warning' : 
@@ -1214,13 +1222,7 @@ const RDFReport = () => {
                     },
                     {
                       field: 'waiting_minutes', headerName: 'Waiting Time', width: 130,
-                      renderCell: (params) => {
-                        const mins = params.value;
-                        if (mins === null || mins === undefined) return '—';
-                        if (mins < 60) return `${mins} min`;
-                        const h = Math.floor(mins / 60), m = mins % 60;
-                        return m > 0 ? `${h}h ${m}m` : `${h}h`;
-                      },
+                      renderCell: (params) => formatDuration(params.value),
                     },
                     { field: 'region_name', headerName: 'Region', width: 140 },
                     { field: 'woreda_name', headerName: 'Woreda', width: 140 },
@@ -1482,7 +1484,7 @@ const RDFReport = () => {
               <Grid item xs={12} md={6}>
                 <Typography variant="subtitle2" color="text.secondary">Total Waiting Time</Typography>
                 <Chip 
-                  label={`${selectedCustomer.total_waiting_time || 0} minutes`}
+                  label={formatDuration(selectedCustomer.total_waiting_time)}
                   color={
                     selectedCustomer.total_waiting_time >= 1440 ? 'error' : // 24 hours = 1440 minutes - RED
                     selectedCustomer.total_waiting_time >= 180 ? 'warning' : // 3 hours = 180 minutes - YELLOW
@@ -1527,7 +1529,7 @@ const RDFReport = () => {
                             <TableCell>{service.officer_name}</TableCell>
                             <TableCell>{new Date(service.start_time).toLocaleString()}</TableCell>
                             <TableCell>{new Date(service.end_time).toLocaleString()}</TableCell>
-                            <TableCell>{service.waiting_minutes} min</TableCell>
+                            <TableCell>{formatDuration(service.waiting_minutes)}</TableCell>
                             <TableCell>
                               <Chip 
                                 label={service.status} 

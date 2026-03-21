@@ -57,6 +57,7 @@ const Sidebar = () => {
   const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tmSettingsOpen, setTmSettingsOpen] = useState(false);
+  const [tmReportsOpen, setTmReportsOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [mgmtReportsOpen, setMgmtReportsOpen] = useState(false);
   const [mgmtProfileOpen, setMgmtProfileOpen] = useState(false);
@@ -208,7 +209,17 @@ const Sidebar = () => {
 
        <List sx={{ pt: 2, px: 1 }}>
          {/* DASHBOARDS SECTION - AT THE TOP */}
-         
+         {(jobTitle === "Manager" || jobTitle === "Coordinator" || accountType === "Admin") && (
+           <MenuTooltip title={"Dashboard"}>
+             <ListItem button component={Link} to="/manager-dashboard"
+               sx={getActiveStyles('/manager-dashboard')}>
+               <ListItemIcon><Dashboard sx={{ color: '#e91e63' }} /></ListItemIcon>
+               <ListItemText primary={"Dashboard"}
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/manager-dashboard') ? 600 : 500, fontSize: '1.05rem' } }} />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
          {/* MAIN NAVIGATION ITEMS */}
 
          {/* Outstanding Process - for O2C Officer - HP (goes to hp-facilities) */}
@@ -953,6 +964,30 @@ const Sidebar = () => {
 
 
 
+         {/* Vehicle Log Sheet - Driver, General Service only */}
+         {(jobTitle === 'Driver' || jobTitle === 'General Service') && (
+           <MenuTooltip title={"Vehicle Log Sheet"}>
+             <ListItem button component={Link} to="/transportation/vehicle-log-sheet"
+               sx={{ borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/vehicle-log-sheet') }}>
+               <ListItemIcon><DirectionsCar sx={{ color: '#1565c0' }} /></ListItemIcon>
+               <ListItemText primary={"Vehicle Log Sheet"}
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/vehicle-log-sheet') ? 600 : 500, fontSize: '0.95rem' } }} />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Fuel Log Book - Driver and General Service */}
+         {(jobTitle === 'Driver' || jobTitle === 'General Service') && (
+           <MenuTooltip title={"Fuel Log Book"}>
+             <ListItem button component={Link} to="/transportation/fuel-log-book"
+               sx={{ borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/fuel-log-book') }}>
+               <ListItemIcon><DirectionsCar sx={{ color: '#16a34a' }} /></ListItemIcon>
+               <ListItemText primary={"Fuel Log Book"}
+                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/fuel-log-book') ? 600 : 500, fontSize: '0.95rem' } }} />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
          {/* Outstanding - TM Manager only */}
          {jobTitle === "TM Manager" && (
            <MenuTooltip title={"Outstanding"}>
@@ -1034,6 +1069,48 @@ const Sidebar = () => {
                    </ListItem>
                  </MenuTooltip>
 
+               </List>
+             </Collapse>
+
+             {/* Reports submenu for TM Manager */}
+             <MenuTooltip title={"Reports"}>
+               <ListItem button onClick={() => setTmReportsOpen(!tmReportsOpen)}
+                 sx={{ borderRadius: 2, mx: 1, mb: 1, bgcolor: tmReportsOpen ? 'rgba(198,40,40,0.12)' : 'transparent', '&:hover': { bgcolor: 'rgba(198,40,40,0.08)' } }}>
+                 <ListItemIcon><BarChart sx={{ color: '#607d8b' }} /></ListItemIcon>
+                 <ListItemText primary={"Reports"} sx={{ '& .MuiListItemText-primary': { fontWeight: tmReportsOpen ? 600 : 500, fontSize: '0.95rem' } }} />
+                 {tmReportsOpen ? <ExpandLess /> : <ExpandMore />}
+               </ListItem>
+             </MenuTooltip>
+             <Collapse in={tmReportsOpen} timeout="auto" unmountOnExit>
+               <List component="div" disablePadding>
+                 <MenuTooltip title={"HP Report"}>
+                   <ListItem button component={Link} to="/reports/hp-comprehensive"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/reports/hp-comprehensive') }}>
+                     <ListItemIcon><LocalHospital sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"HP Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.95rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"RDF Report"}>
+                   <ListItem button component={Link} to="/reports/rdf"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/reports/rdf') }}>
+                     <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"RDF Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.95rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"Vehicle Log Sheet"}>
+                   <ListItem button component={Link} to="/transportation/vehicle-log-sheet"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/vehicle-log-sheet') }}>
+                     <ListItemIcon><DirectionsCar sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"Vehicle Log Sheet"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/vehicle-log-sheet') ? 600 : 500, fontSize: '0.95rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"Fuel Log Book"}>
+                   <ListItem button component={Link} to="/transportation/fuel-log-book"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/fuel-log-book') }}>
+                     <ListItemIcon><DirectionsCar sx={{ color: '#16a34a', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"Fuel Log Book"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/fuel-log-book') ? 600 : 500, fontSize: '0.95rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
                </List>
              </Collapse>
            </>
@@ -1123,18 +1200,6 @@ const Sidebar = () => {
            </>
          )}
 
-         {/* Dashboard - Manager and Coordinator */}
-         {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
-           <MenuTooltip title={"Dashboard"}>
-             <ListItem button component={Link} to="/manager-dashboard"
-               sx={getActiveStyles('/manager-dashboard')}>
-               <ListItemIcon><Dashboard sx={{ color: '#e91e63' }} /></ListItemIcon>
-               <ListItemText primary={"Dashboard"}
-                 sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/manager-dashboard') ? 600 : 500, fontSize: '0.95rem' } }} />
-             </ListItem>
-           </MenuTooltip>
-         )}
-
          {/* Reports submenu - Manager and Coordinator */}
          {(jobTitle === "Manager" || jobTitle === "Coordinator") && (
            <>
@@ -1160,6 +1225,20 @@ const Sidebar = () => {
                      sx={{ pl: 4, ...getActiveStyles('/reports/rdf') }}>
                      <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"RDF Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"Vehicle Log Sheet"}>
+                   <ListItem button component={Link} to="/transportation/vehicle-log-sheet"
+                     sx={{ pl: 4, ...getActiveStyles('/transportation/vehicle-log-sheet') }}>
+                     <ListItemIcon><DirectionsCar sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"Vehicle Log Sheet"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/vehicle-log-sheet') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"Fuel Log Book"}>
+                   <ListItem button component={Link} to="/transportation/fuel-log-book"
+                     sx={{ pl: 4, ...getActiveStyles('/transportation/fuel-log-book') }}>
+                     <ListItemIcon><DirectionsCar sx={{ color: '#16a34a', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"Fuel Log Book"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/fuel-log-book') ? 600 : 500, fontSize: '0.9rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                </List>

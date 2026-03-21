@@ -38,10 +38,16 @@ const getComprehensiveHPReport = async (req, res) => {
       ? `AND f.period IN ('Monthly', 'Odd')`
       : `AND f.period IN ('Monthly', 'Even')`;
 
-    // 2. Expected Facilities (should report in current month based on period)
-    // For vaccine: expected = facilities marked as vaccine sites
-    // For HP regular: expected = facilities marked as HP sites matching the current period
-    // For others (emergency/breakdown): expected = HP sites (route+period)
+    // 2a. Total Facilities — all HP/vaccine sites regardless of period
+    const allFacilitiesQuery = process_type === 'vaccine'
+      ? `SELECT COUNT(DISTINCT f.id) as total FROM facilities f WHERE f.is_vaccine_site = 1 ${branchFilter}`
+      : `SELECT COUNT(DISTINCT f.id) as total FROM facilities f WHERE f.is_hp_site = 1 ${branchFilter}`;
+    const [allFacilitiesResult] = await db.sequelize.query(allFacilitiesQuery, {
+      type: db.sequelize.QueryTypes.SELECT
+    });
+    const totalFacilities = allFacilitiesResult.total;
+
+    // 2b. Expected Facilities — HP sites matching the current period (odd/even)
     const totalFacilitiesQuery = process_type === 'vaccine'
       ? `SELECT COUNT(DISTINCT f.id) as total FROM facilities f WHERE f.is_vaccine_site = 1 ${branchFilter}`
       : `
@@ -191,6 +197,26 @@ const getComprehensiveHPReport = async (req, res) => {
         ${ptFilter}
     `;
     const [odnStats] = await db.sequelize.query(odnStatsQuery, {
+      replacements: skipMonthFilter ? [] : [reportingMonth],
+      type: db.sequelize.QueryTypes.SELECT
+    });
+
+    // Avg process time — from O2C start (process created_at) to quality evaluation completed
+    const avgTimeQuery = `
+      SELECT ROUND(AVG(per_process_minutes), 1) as avg_process_minutes
+      FROM (
+        SELECT TIMESTAMPDIFF(MINUTE, p.created_at, COALESCE(MAX(o.quality_evaluated_at), NOW())) as per_process_minutes
+        FROM processes p
+        INNER JOIN facilities f ON p.facility_id = f.id
+        LEFT JOIN odns o ON o.process_id = p.id AND o.odn_number != 'RRF not sent'
+        WHERE p.created_at IS NOT NULL
+          ${monthFilter}
+          ${ptFilter}
+          ${branchFilter}
+        GROUP BY p.id, p.created_at
+      ) t
+    `;
+    const [avgTimeResult] = await db.sequelize.query(avgTimeQuery, {
       replacements: skipMonthFilter ? [] : [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
@@ -381,7 +407,7 @@ const getComprehensiveHPReport = async (req, res) => {
       reportingPeriod: reportingMonth,
       expectedFacilities,
       summary: {
-        totalFacilities: expectedFacilities,
+        totalFacilities,
         expectedFacilities,
         expectedThisMonth: expectedFacilities,
         doneFacilities: doneFacilitiesResult.total || 0,
@@ -390,7 +416,8 @@ const getComprehensiveHPReport = async (req, res) => {
         totalODNs: odnStats.total_odns || 0,
         dispatchedODNs: odnStats.dispatched_odns || 0,
         podConfirmed: odnStats.pod_confirmed_odns || 0,
-        qualityEvaluated: odnStats.quality_evaluated_odns || 0
+        qualityEvaluated: odnStats.quality_evaluated_odns || 0,
+        avgProcessDays: avgTimeResult?.avg_process_minutes != null ? parseFloat(avgTimeResult.avg_process_minutes) : null,
       },
       rrfSentFacilities,
       rrfNotSentFacilities,

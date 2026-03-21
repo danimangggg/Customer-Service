@@ -54,6 +54,8 @@ import AccountTypesManagement from './pages/Admin/AccountTypesManagement';
 import RouteManagementPage from './pages/Transportation/RouteManagementPage';
 import RouteManagementCRUDPage from './pages/Transportation/RouteManagementCRUDPage';
 import VehicleManagement from './components/Transportation/VehicleManagement';
+import VehicleLogSheet from './components/Transportation/VehicleLogSheet';
+import FuelLogBook from './components/Transportation/FuelLogBook';
 import StoreManagementPage from './pages/Settings/StoreManagementPage';
 import BranchManagement from './components/Settings/BranchManagement';
 import HPComprehensiveReport from './components/Reports/HPComprehensiveReport';
@@ -61,6 +63,20 @@ import RDFReport from './components/Reports/RDFReport';
 import ManagerDashboard from './components/Reports/ManagerDashboard';
 
 import {BrowserRouter as Router, Routes, Route, useLocation} from 'react-router-dom'
+
+const VehicleLogSheetRoute = () => {
+  const jt = localStorage.getItem('JobTitle');
+  const at = localStorage.getItem('AccountType');
+  const viewOnly = jt === 'TM Manager' || jt === 'General Service' || jt === 'Manager' || jt === 'Coordinator' || at === 'Admin' || at === 'Super Admin';
+  return <VehicleLogSheet viewOnly={viewOnly} />;
+};
+
+const FuelLogBookRoute = () => {
+  const jt = localStorage.getItem('JobTitle');
+  const at = localStorage.getItem('AccountType');
+  const viewOnly = jt !== 'Driver';
+  return <FuelLogBook viewOnly={viewOnly} />;
+};
 
 const AppContent = () => {
   const location = useLocation();
@@ -141,6 +157,8 @@ const AppContent = () => {
             <Route path = '/transportation/route-management' Component={RouteManagementPage} />
             <Route path = '/transportation/routes' Component={RouteManagementCRUDPage} />
             <Route path = '/transportation/vehicle-management' Component={VehicleManagement} />
+            <Route path='/transportation/vehicle-log-sheet' element={<VehicleLogSheetRoute />} />
+            <Route path='/transportation/fuel-log-book' element={<FuelLogBookRoute />} />
             <Route path = '/settings/store-management' Component={StoreManagementPage} />
             <Route path = '/settings/branches' Component={BranchManagement} />
         </Route>

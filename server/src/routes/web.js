@@ -154,6 +154,20 @@ let routes =  (app) => {
   router.put('/api/vehicles/:id', vehicleController.updateVehicle);
   router.delete('/api/vehicles/:id', vehicleController.deleteVehicle);
 
+  // Vehicle Log Sheet routes
+  const vehicleLogSheetController = require('../controllers/Transportation/vehicleLogSheetController');
+  router.get('/api/vehicle-log-sheets', vehicleLogSheetController.getAll);
+  router.post('/api/vehicle-log-sheets', vehicleLogSheetController.create);
+  router.put('/api/vehicle-log-sheets/:id', vehicleLogSheetController.update);
+  router.delete('/api/vehicle-log-sheets/:id', vehicleLogSheetController.remove);
+
+  // Fuel Log Book routes
+  const fuelLogBookController = require('../controllers/Transportation/fuelLogBookController');
+  router.get('/api/fuel-log-books', fuelLogBookController.getAll);
+  router.post('/api/fuel-log-books', fuelLogBookController.create);
+  router.put('/api/fuel-log-books/:id', fuelLogBookController.update);
+  router.delete('/api/fuel-log-books/:id', fuelLogBookController.remove);
+
   // Store Management routes
   router.get('/api/stores', storeController.getAllStores);
   router.post('/api/stores', storeController.createStore);

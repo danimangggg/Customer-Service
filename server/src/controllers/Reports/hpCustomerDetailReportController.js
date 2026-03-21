@@ -176,43 +176,22 @@ const getHPCustomersDetailReport = async (req, res) => {
 
     console.log('Query successful, found', customers.length, 'real HP processes');
 
-    // Enrich with total waiting time from service_time_hp
-    for (const customer of customers) {
-      try {
-        const waitingTimeQuery = `
-          SELECT 
-            st.end_time,
-            st.created_at
-          FROM service_time_hp st
-          WHERE st.process_id = ?
-          ORDER BY st.created_at ASC
-        `;
-        
-        const serviceTimes = await db.sequelize.query(waitingTimeQuery, {
-          replacements: [customer.id],
-          type: db.sequelize.QueryTypes.SELECT
-        });
-        
-        let totalMinutes = 0;
-        serviceTimes.forEach((service, index) => {
-          if (index === 0) {
-            // First service: from process creation to end_time
-            const start = new Date(customer.created_at);
-            const end = new Date(service.end_time);
-            totalMinutes += Math.round((end - start) / (1000 * 60));
-          } else {
-            // Subsequent: from previous end_time to current end_time
-            const start = new Date(serviceTimes[index - 1].end_time);
-            const end = new Date(service.end_time);
-            totalMinutes += Math.round((end - start) / (1000 * 60));
-          }
-        });
-        
-        customer.total_waiting_time = Math.max(0, totalMinutes);
-      } catch (err) {
-        console.error(`Failed to calculate waiting time for process ${customer.id}:`, err);
-        customer.total_waiting_time = 0;
-      }
+    // Calculate total waiting time: process created_at → quality_evaluated_at
+    const waitingTimeQuery = `
+      SELECT p.id,
+        TIMESTAMPDIFF(MINUTE, p.created_at, COALESCE(MAX(o.quality_evaluated_at), NOW())) as total_waiting_time
+      FROM processes p
+      LEFT JOIN odns o ON o.process_id = p.id AND o.odn_number != 'RRF not sent'
+      WHERE p.id IN (${customers.map(c => c.id).join(',') || 'NULL'})
+      GROUP BY p.id, p.created_at
+    `;
+    if (customers.length > 0) {
+      const waitingTimes = await db.sequelize.query(waitingTimeQuery, {
+        type: db.sequelize.QueryTypes.SELECT
+      });
+      const wtMap = {};
+      waitingTimes.forEach(r => { wtMap[r.id] = r.total_waiting_time; });
+      customers.forEach(c => { c.total_waiting_time = wtMap[c.id] || 0; });
     }
 
     res.json({

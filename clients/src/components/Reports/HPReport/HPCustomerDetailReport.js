@@ -16,6 +16,14 @@ import * as XLSX from 'xlsx';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
+const formatDuration = (mins) => {
+  if (mins == null || mins === 0) return '—';
+  if (mins < 60) return `${mins}m`;
+  if (mins < 1440) { const h = Math.floor(mins/60), m = mins%60; return m > 0 ? `${h}h ${m}m` : `${h}h`; }
+  const d = Math.floor(mins/1440), rem = mins%1440, h = Math.floor(rem/60);
+  return h > 0 ? `${d}d ${h}h` : `${d}d`;
+};
+
 const ethiopianMonths = [
   'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit',
   'Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
@@ -424,7 +432,7 @@ const HPCustomerDetailReport = () => {
                                   display: 'inline-block'
                                 }}
                               >
-                                {Math.floor(customer.total_waiting_time / 60)}h {customer.total_waiting_time % 60}m
+                              {formatDuration(customer.total_waiting_time)}
                               </Typography>
                             ) : (
                               <Typography variant="body2" color="text.secondary">—</Typography>
@@ -595,14 +603,10 @@ const HPCustomerDetailReport = () => {
                             Total Waiting Time
                           </Typography>
                           <Chip 
-                            label={
-                              selectedCustomer.total_time_minutes 
-                                ? `${Math.floor(selectedCustomer.total_time_minutes / 60)}h ${selectedCustomer.total_time_minutes % 60}m` 
-                                : 'Not Available'
-                            } 
+                            label={formatDuration(selectedCustomer.total_time_minutes) || 'Not Available'}
                             color={
-                              selectedCustomer.total_time_minutes >= 1440 ? 'error' : // 24 hours
-                              selectedCustomer.total_time_minutes >= 480 ? 'warning' : // 8 hours
+                              selectedCustomer.total_time_minutes >= 1440 ? 'error' :
+                              selectedCustomer.total_time_minutes >= 480 ? 'warning' :
                               'success'
                             }
                             sx={{ mt: 0.5, fontWeight: 'bold', fontSize: '1rem' }}
@@ -699,7 +703,7 @@ const HPCustomerDetailReport = () => {
                             </TableCell>
                             <TableCell>
                               <Chip 
-                                label={`${service.waiting_minutes || 0} min`}
+                                label={formatDuration(service.waiting_minutes)}
                                 size="small"
                                 color="info"
                                 variant="outlined"

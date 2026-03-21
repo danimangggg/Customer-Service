@@ -205,6 +205,7 @@ export default function SignIn() {
         } else if (jobTitle === 'Dispatch-Documentation')   { navigate('/exit-permit');
         } else if (jobTitle === 'EWM-Documentation')        { navigate('/ewm-documentation');
         } else if (jobTitle === 'Gate Keeper')              { navigate('/gate-keeper');
+        } else if (jobTitle === 'General Service')           { navigate('/transportation/vehicle-log-sheet');
         } else if (jobTitle === 'WIM Operator')             { navigate('/all-picklists');
         } else if (jobTitle === 'Queue Manager')            { navigate('/queue-manager');
         } else if (jobTitle === 'Documentation Officer')    { navigate('/customer-dashboard');
