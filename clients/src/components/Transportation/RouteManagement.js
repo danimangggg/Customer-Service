@@ -48,6 +48,7 @@ import {
   Business as BusinessIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -178,7 +179,7 @@ const RouteManagement = () => {
         search: searchTerm
       });
       
-      const response = await axios.get(`${API_URL}/api/ready-routes`, {
+      const response = await api.get(`${API_URL}/api/ready-routes`, {
         params: {
           month: currentEthiopianMonth,
           year: currentEthiopianYear,
@@ -202,7 +203,7 @@ const RouteManagement = () => {
 
   const fetchDrivers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/drivers/available`);
+      const response = await api.get(`${API_URL}/api/drivers/available`);
       console.log('Drivers fetched:', response.data);
       setDrivers(response.data);
     } catch (error) {
@@ -212,7 +213,7 @@ const RouteManagement = () => {
 
   const fetchDeliverers = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/deliverers/available`);
+      const response = await api.get(`${API_URL}/api/deliverers/available`);
       console.log('Deliverers fetched:', response.data);
       setDeliverers(response.data);
     } catch (error) {
@@ -222,7 +223,7 @@ const RouteManagement = () => {
 
   const fetchVehicles = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/vehicles`);
+      const response = await api.get(`${API_URL}/api/vehicles`);
       console.log('Vehicles fetched:', response.data);
       // Handle both response formats: direct array or { vehicles: [...] }
       const vehiclesData = response.data.vehicles || response.data;
@@ -238,7 +239,7 @@ const RouteManagement = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/ready-routes/stats`, {
+      const response = await api.get(`${API_URL}/api/ready-routes/stats`, {
         params: {
           month: currentEthiopianMonth,
           year: currentEthiopianYear
@@ -283,11 +284,11 @@ const RouteManagement = () => {
       // Check if we're editing an existing assignment or creating a new one
       if (editingRoute && editingRoute.assignment_id) {
         // Update existing assignment
-        await axios.put(`${API_URL}/api/route-assignments/${editingRoute.assignment_id}`, assignmentData);
+        await api.put(`${API_URL}/api/route-assignments/${editingRoute.assignment_id}`, assignmentData);
         MySwal.fire('Success', 'Route assignment updated successfully', 'success');
       } else {
         // Create new assignment
-        await axios.post(`${API_URL}/api/route-assignments`, assignmentData);
+        await api.post(`${API_URL}/api/route-assignments`, assignmentData);
         MySwal.fire('Success', 'Route assignment created successfully', 'success');
       }
       

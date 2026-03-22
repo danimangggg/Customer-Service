@@ -107,7 +107,7 @@ const VehicleManagement = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/vehicles/stats`);
+      const response = await api.get(`${API_URL}/api/vehicles/stats`);
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -130,11 +130,11 @@ const VehicleManagement = () => {
       console.log('Submitting form data:', formData); // Debug log
       
       if (editingVehicle) {
-        const response = await axios.put(`${API_URL}/api/vehicles/${editingVehicle.id}`, formData);
+        const response = await api.put(`${API_URL}/api/vehicles/${editingVehicle.id}`, formData);
         console.log('Update response:', response.data); // Debug log
         showSnackbar('Vehicle updated successfully', 'success');
       } else {
-        const response = await axios.post(`${API_URL}/api/vehicles`, formData);
+        const response = await api.post(`${API_URL}/api/vehicles`, formData);
         console.log('Create response:', response.data); // Debug log
         showSnackbar('Vehicle created successfully', 'success');
       }
@@ -150,7 +150,7 @@ const VehicleManagement = () => {
 
   const handleDelete = async () => {
     try {
-      await axios.delete(`${API_URL}/api/vehicles/${vehicleToDelete.id}`);
+      await api.delete(`${API_URL}/api/vehicles/${vehicleToDelete.id}`);
       showSnackbar('Vehicle deleted successfully', 'success');
       setDeleteConfirmOpen(false);
       setVehicleToDelete(null);

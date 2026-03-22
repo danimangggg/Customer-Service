@@ -39,7 +39,7 @@ const getCurrentEthiopianMonth = () => {
   return { year: ethYear, monthIndex: Math.max(0, Math.min(ethMonthIndex, 12)) };
 };
 
-const ReportOverview = () => {
+const ReportOverview = ({ branchCode = '' }) => {
   const initialEth = getCurrentEthiopianMonth();
   const ethYears = Array.from({ length: 6 }, (_, i) => initialEth.year - 2 + i);
 
@@ -62,7 +62,7 @@ const ReportOverview = () => {
   const fetchData = useCallback(async () => {    try {
       setLoading(true);
       const response = await api.get(`${api_url}/api/hp-comprehensive-report`, {
-        params: { month: selectedMonth, year: selectedYear, process_type: processType }
+        params: { month: selectedMonth, year: selectedYear, process_type: processType, ...(branchCode ? { branch_code: branchCode } : {}) }
       });
       setData(response.data);
     } catch (err) {
@@ -70,17 +70,18 @@ const ReportOverview = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, selectedYear, processType]);
+  }, [selectedMonth, selectedYear, processType, branchCode]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
   if (!data) return loading ? <LinearProgress /> : null;
 
-  const { summary, rrfSentFacilities, rrfNotSentFacilities } = data;
+  const { summary, rrfSentFacilities, rrfNotSentFacilities, notProcessedFacilities } = data;
 
   const allFacilities = [
     ...(rrfSentFacilities || []).map(f => ({ ...f, rrfStatus: 'sent' })),
-    ...(rrfNotSentFacilities || []).map(f => ({ ...f, rrfStatus: 'not_sent' }))
+    ...(rrfNotSentFacilities || []).map(f => ({ ...f, rrfStatus: 'not_sent' })),
+    ...(notProcessedFacilities || []).map(f => ({ ...f, rrfStatus: 'not_processed' }))
   ];
 
   const filteredFacilities = allFacilities
@@ -91,7 +92,8 @@ const ReportOverview = () => {
         (f.region_name || '').toLowerCase().includes(facilitySearch.toLowerCase());
       const matchesFilter = facilityFilter === 'all' ||
         (facilityFilter === 'sent' && f.rrfStatus === 'sent') ||
-        (facilityFilter === 'not_sent' && f.rrfStatus === 'not_sent');
+        (facilityFilter === 'not_sent' && f.rrfStatus === 'not_sent') ||
+        (facilityFilter === 'not_processed' && f.rrfStatus === 'not_processed');
       return matchesSearch && matchesFilter;
     })
     .sort((a, b) => {
@@ -116,7 +118,7 @@ const ReportOverview = () => {
       'Region': f.region_name,
       'Zone': f.zone_name,
       'Woreda': f.woreda_name,
-      'RRF Status': f.rrfStatus === 'sent' ? 'Sent' : 'Not Sent'
+      'Status': f.rrfStatus === 'sent' ? 'Sent' : f.rrfStatus === 'not_sent' ? 'RRF Not Sent' : 'Not Processed'
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -135,9 +137,9 @@ const ReportOverview = () => {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {[
           { title: 'Expected Facilities', value: summary.expectedFacilities, color: '#2196f3', sub: `${selectedMonth} ${selectedYear}` },
-          { title: 'RRF Sent', value: summary.rrfSent, color: '#4caf50', sub: `${rrfPercentage}% of expected` },
-          { title: 'RRF Not Sent', value: summary.rrfNotSent, color: '#f44336', sub: `${(100 - rrfPercentage).toFixed(1)}% pending` },
-          { title: 'Total ODNs', value: summary.totalODNs, color: '#9c27b0', sub: 'From RRF sent facilities' },
+          { title: `${processType === 'vaccine' ? 'VRF' : 'RRF'} Sent`, value: summary.rrfSent, color: '#4caf50', sub: `${rrfPercentage}% of expected` },
+          { title: `${processType === 'vaccine' ? 'VRF' : 'RRF'} Not Sent`, value: summary.rrfNotSent, color: '#f44336', sub: `Processed, ${processType === 'vaccine' ? 'VRF' : 'RRF'} not sent` },
+          { title: 'Not Processed', value: summary.notProcessed, color: '#ff9800', sub: 'No process started' },
         ].map(({ title, value, color, sub }) => (
           <Grid item xs={6} md={3} key={title}>
             <Card sx={{ borderLeft: 4, borderColor: color }}>
@@ -154,7 +156,7 @@ const ReportOverview = () => {
       {/* Progress */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>RRF Submission Progress</Typography>
+          <Typography variant="h6" gutterBottom>Submission Progress</Typography>
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
             <Typography variant="body2">{summary.rrfSent} of {summary.expectedFacilities} facilities submitted</Typography>
             <Typography variant="body2" fontWeight="bold">{rrfPercentage}%</Typography>
@@ -185,16 +187,15 @@ const ReportOverview = () => {
               <Select value={processType} label="Type" onChange={e => { setProcessType(e.target.value); setPage(0); }}>
                 <MenuItem value="regular">HP Regular</MenuItem>
                 <MenuItem value="vaccine">Vaccine</MenuItem>
-                <MenuItem value="breakdown">Breakdown</MenuItem>
-                <MenuItem value="emergency">Emergency</MenuItem>
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 130 }}>
-              <InputLabel>RRF Status</InputLabel>
-              <Select value={facilityFilter} label="RRF Status" onChange={e => { setFacilityFilter(e.target.value); setPage(0); }}>
+              <InputLabel>Status</InputLabel>
+              <Select value={facilityFilter} label="Status" onChange={e => { setFacilityFilter(e.target.value); setPage(0); }}>
                 <MenuItem value="all">All</MenuItem>
-                <MenuItem value="sent">RRF Sent</MenuItem>
+                <MenuItem value="sent">Sent</MenuItem>
                 <MenuItem value="not_sent">RRF Not Sent</MenuItem>
+                <MenuItem value="not_processed">Not Processed</MenuItem>
               </Select>
             </FormControl>
             <TextField
@@ -240,7 +241,8 @@ const ReportOverview = () => {
                     </TableSortLabel>
                   </TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>Region</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }} align="center">RRF Status</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>Branch</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }} align="center">Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -255,18 +257,19 @@ const ReportOverview = () => {
                       <Chip label={f.route || 'N/A'} size="small" variant="outlined" color="primary" />
                     </TableCell>
                     <TableCell>{f.region_name}</TableCell>
+                    <TableCell>{f.branch_name || f.branch_code || 'N/A'}</TableCell>
                     <TableCell align="center">
                       <Chip
-                        label={f.rrfStatus === 'sent' ? 'Sent' : 'Not Sent'}
+                        label={f.rrfStatus === 'sent' ? 'Sent' : f.rrfStatus === 'not_sent' ? 'RRF Not Sent' : 'Not Processed'}
                         size="small"
-                        color={f.rrfStatus === 'sent' ? 'success' : 'error'}
+                        color={f.rrfStatus === 'sent' ? 'success' : f.rrfStatus === 'not_sent' ? 'error' : 'warning'}
                         icon={f.rrfStatus === 'sent' ? <CheckCircleIcon /> : <CancelIcon />}
                       />
                     </TableCell>
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={6} align="center">
                       <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>No facilities found</Typography>
                     </TableCell>
                   </TableRow>

@@ -82,7 +82,8 @@ const getRouteById = async (req, res) => {
 // Create new route
 const createRoute = async (req, res) => {
   try {
-    const { route_name, branch_code } = req.body;
+    const { route_name } = req.body;
+    const branchCode = req.headers['x-branch-code'] || req.body.branch_code || null;
 
     // Validation
     if (!route_name || route_name.trim().length === 0) {
@@ -100,7 +101,7 @@ const createRoute = async (req, res) => {
 
     const route = await Route.create({
       route_name: route_name.trim(),
-      branch_code: branch_code || null
+      branch_code: branchCode
     });
 
     res.status(201).json({

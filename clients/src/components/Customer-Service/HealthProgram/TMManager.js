@@ -12,6 +12,7 @@ import {
   Download as DownloadIcon,
   Speed as SpeedIcon,
   Groups as GroupsIcon,
+  Undo as UndoIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import api from '../../../axiosInstance';
@@ -79,8 +80,8 @@ const TMManager = () => {
     const silentFetch = async () => {
       try {
         const [r1, r2] = await Promise.all([
-          axios.get(`${api_url}/api/tm-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } }),
-          axios.get(`${api_url}/api/tm-vehicle-assignment-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } })
+          api.get(`${api_url}/api/tm-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } }),
+          api.get(`${api_url}/api/tm-vehicle-assignment-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } })
         ]);
         setPhase1Processes(r1.data.processes || []);
         setPhase2Processes(r2.data.processes || []);
@@ -93,14 +94,14 @@ const TMManager = () => {
   const fetchPhase1Processes = async () => {
     try {
       setLoading(true); setError(null);
-      const res = await axios.get(`${api_url}/api/tm-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } });
+      const res = await api.get(`${api_url}/api/tm-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } });
       setPhase1Processes(res.data.processes || []);
     } catch (err) { setError("Failed to load Phase 1 processes."); } finally { setLoading(false); }
   };
 
   const fetchPhase2Processes = async () => {
     try {
-      const res = await axios.get(`${api_url}/api/tm-vehicle-assignment-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } });
+      const res = await api.get(`${api_url}/api/tm-vehicle-assignment-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } });
       setPhase2Processes(res.data.processes || []);
     } catch (err) { console.error(err); }
   };
@@ -111,24 +112,46 @@ const TMManager = () => {
 
   const fetchDriversAndDeliverers = async () => {
     try {
-      const res = await api.get(`${api_url}/api/get-employee`);
-      const all = Array.isArray(res.data) ? res.data : [];
-      const drv = all.filter(e => e.jobTitle?.toLowerCase().includes('driver'));
-      const dlv = all.filter(e => e.jobTitle?.toLowerCase().includes('deliverer'));
-      setDrivers(drv.length > 0 ? drv : all);
-      setDeliverers(dlv.length > 0 ? dlv : all);
+      const [drvRes, dlvRes] = await Promise.all([
+        api.get(`${api_url}/api/drivers/available`),
+        api.get(`${api_url}/api/deliverers/available`)
+      ]);
+      setDrivers(drvRes.data || []);
+      setDeliverers(dlvRes.data || []);
     } catch (err) { console.error(err); }
   };
 
   const handleCreateFreightOrder = (process) => { setSelectedProcess(process); setSelectedVehicle(''); setDialogType('phase1'); setOpenDialog(true); };
   const handleAssignDriver = (process) => { setSelectedProcess(process); setSelectedDriver(''); setSelectedDeliverer(''); setDepartureKilometer(''); setDialogType('phase2'); setOpenDialog(true); };
 
+  const handleRevert = async (process, label) => {
+    const result = await Swal.fire({
+      title: 'Return to Previous Step?',
+      text: `This will return "${process.facility?.facility_name}" back to the previous step.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Return',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#f44336'
+    });
+    if (result.isConfirmed) {
+      try {
+        await api.post(`${api_url}/api/hp-revert-process`, { process_id: process.id });
+        successToast('Process returned to previous step');
+        fetchPhase1Processes();
+        fetchPhase2Processes();
+      } catch (err) {
+        Swal.fire('Error', err.response?.data?.error || 'Failed to revert process', 'error');
+      }
+    }
+  };
+
   const handleSaveFreightOrder = async () => {
     if (!selectedVehicle) { Swal.fire('Error', 'Please select a vehicle', 'error'); return; }
     try {
       const vehicle = vehicles.find(v => v.id === selectedVehicle);
-      await axios.post(`${api_url}/api/tm-create-freight-order`, { process_id: selectedProcess.id, vehicle_id: vehicle.id, vehicle_name: vehicle.vehicle_name, tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName });
-      try { await axios.post(`${api_url}/api/service-time-hp`, { process_id: selectedProcess.id, service_unit: 'TM Manager - HP', end_time: new Date().toISOString(), officer_id: loggedInUserId, officer_name: loggedInUserName, status: 'completed', notes: `Vehicle assigned: ${vehicle.vehicle_name}` }); } catch (e) {}
+      await api.post(`${api_url}/api/tm-create-freight-order`, { process_id: selectedProcess.id, vehicle_id: vehicle.id, vehicle_name: vehicle.vehicle_name, tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName });
+      try { await api.post(`${api_url}/api/service-time-hp`, { process_id: selectedProcess.id, service_unit: 'TM Manager - HP', end_time: new Date().toISOString(), officer_id: loggedInUserId, officer_name: loggedInUserName, status: 'completed', notes: `Vehicle assigned: ${vehicle.vehicle_name}` }); } catch (e) {}
       successToast('Vehicle assigned successfully');
       setOpenDialog(false); fetchPhase1Processes(); fetchPhase2Processes();
     } catch (err) { Swal.fire('Error', 'Failed to assign vehicle', 'error'); }
@@ -140,8 +163,8 @@ const TMManager = () => {
     try {
       const driver = drivers.find(d => d.id === selectedDriver);
       const deliverer = deliverers.find(d => d.id === selectedDeliverer);
-      await axios.post(`${api_url}/api/tm-assign-vehicle`, { process_id: selectedProcess.id, driver_id: driver.id, driver_name: driver.full_name, deliverer_id: deliverer.id, deliverer_name: deliverer.full_name, departure_kilometer: parseFloat(departureKilometer), tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName });
-      try { await axios.post(`${api_url}/api/service-time-hp`, { process_id: selectedProcess.id, service_unit: 'TM Manager - HP', end_time: new Date().toISOString(), officer_id: loggedInUserId, officer_name: loggedInUserName, status: 'completed', notes: 'Driver & deliverer assigned' }); } catch (e) {}
+      await api.post(`${api_url}/api/tm-assign-vehicle`, { process_id: selectedProcess.id, driver_id: driver.id, driver_name: driver.full_name, deliverer_id: deliverer.id, deliverer_name: deliverer.full_name, departure_kilometer: parseFloat(departureKilometer), tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName });
+      try { await api.post(`${api_url}/api/service-time-hp`, { process_id: selectedProcess.id, service_unit: 'TM Manager - HP', end_time: new Date().toISOString(), officer_id: loggedInUserId, officer_name: loggedInUserName, status: 'completed', notes: 'Driver & deliverer assigned' }); } catch (e) {}
       successToast('Driver and deliverer assigned successfully');
       setOpenDialog(false); fetchPhase1Processes(); fetchPhase2Processes();
     } catch (err) { Swal.fire('Error', 'Failed to assign driver and deliverer', 'error'); }
@@ -161,7 +184,7 @@ const TMManager = () => {
     </Container>
   );
 
-  const PhaseTable = ({ processes, page, setPage, color, actionLabel, actionIcon, onAction }) => (
+  const PhaseTable = ({ processes, page, setPage, color, actionLabel, actionIcon, onAction, onRevert }) => (
     <TableContainer>
       <Table>
         <TableHead>
@@ -195,10 +218,18 @@ const TMManager = () => {
                 <Typography variant="body2" color="text.secondary">{process.facility?.region_name || 'N/A'}</Typography>
               </TableCell>
               <TableCell align="center">
-                <Button variant="contained" size="small" startIcon={actionIcon} onClick={() => onAction(process)} disabled={!process.facility}
-                  sx={{ bgcolor: color, '&:hover': { filter: 'brightness(0.9)' }, borderRadius: 2, px: 2 }}>
-                  {actionLabel}
-                </Button>
+                <Stack direction="row" spacing={1} justifyContent="center">
+                  <Button variant="contained" size="small" startIcon={actionIcon} onClick={() => onAction(process)} disabled={!process.facility}
+                    sx={{ bgcolor: color, '&:hover': { filter: 'brightness(0.9)' }, borderRadius: 2, px: 2 }}>
+                    {actionLabel}
+                  </Button>
+                  {onRevert && (
+                    <Button variant="outlined" color="error" size="small" startIcon={<UndoIcon />} onClick={() => onRevert(process)} disabled={!process.facility}
+                      sx={{ borderRadius: 2 }}>
+                      Return
+                    </Button>
+                  )}
+                </Stack>
               </TableCell>
             </TableRow>
           ))}
@@ -263,8 +294,6 @@ const TMManager = () => {
           <Typography variant="body2" fontWeight={600} color="text.secondary">Process Type:</Typography>
           <TextField select size="small" value={processType} onChange={e => setProcessType(e.target.value)} sx={{ minWidth: 160 }}>
             <MenuItem value="regular">HP Regular</MenuItem>
-            <MenuItem value="emergency">Emergency</MenuItem>
-            <MenuItem value="breakdown">Breakdown</MenuItem>
             <MenuItem value="vaccine">Vaccine</MenuItem>
           </TextField>
         </Stack>
@@ -286,7 +315,7 @@ const TMManager = () => {
             </Button>
           </Stack>
         </Box>
-        <PhaseTable processes={phase1Processes} page={page1} setPage={setPage1} color="#1565c0" actionLabel="Assign Vehicle" actionIcon={<CarIcon />} onAction={handleCreateFreightOrder} />
+        <PhaseTable processes={phase1Processes} page={page1} setPage={setPage1} color="#1565c0" actionLabel="Assign Vehicle" actionIcon={<CarIcon />} onAction={handleCreateFreightOrder} onRevert={handleRevert} />
       </Card>
 
       {/* Phase 2 */}
@@ -298,7 +327,7 @@ const TMManager = () => {
             <Chip label={`${phase2Processes.length} pending`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
           </Stack>
         </Box>
-        <PhaseTable processes={phase2Processes} page={page2} setPage={setPage2} color="#2e7d32" actionLabel="Assign Driver" actionIcon={<PersonIcon />} onAction={handleAssignDriver} />
+        <PhaseTable processes={phase2Processes} page={page2} setPage={setPage2} color="#2e7d32" actionLabel="Assign Driver" actionIcon={<PersonIcon />} onAction={handleAssignDriver} onRevert={handleRevert} />
       </Card>
 
       {/* Phase 1 Dialog */}

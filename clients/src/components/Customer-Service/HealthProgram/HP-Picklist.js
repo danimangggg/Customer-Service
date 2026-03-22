@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
 import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
@@ -58,7 +57,7 @@ const HPPickListDetail = () => {
     setError(null);
     try {
       // Fetch HP process details
-      const processRes = await axios.get(`${api_url}/api/active-processes`);
+      const processRes = await api.get(`/api/active-processes`);
       const processes = Array.isArray(processRes.data) ? processRes.data : [];
       const processItem = processes.find(p => String(p.id) === process_id);
 
@@ -72,13 +71,13 @@ const HPPickListDetail = () => {
       console.log('HP Process Item:', processItem); // Debug log to see what data we have
 
       // Fetch facility details
-      const facilitiesRes = await api.get(`${api_url}/api/facilities`);
+      const facilitiesRes = await api.get(`/api/facilities`);
       const facilities = Array.isArray(facilitiesRes.data) ? facilitiesRes.data : [];
       const facilityItem = facilities.find(f => String(f.id) === String(processItem.facility_id));
       setFacility(facilityItem || null);
 
       // Fetch submitted picklists for this HP process
-      const picklistsRes = await axios.get(`${api_url}/api/getPicklists`);
+      const picklistsRes = await api.get(`/api/getPicklists`);
       
       // Handle both old format (array) and new format (object with data property)
       let allPicklists = Array.isArray(picklistsRes.data) 
@@ -130,7 +129,7 @@ const HPPickListDetail = () => {
       setSubmittedPicklists(filtered);
 
       // Fetch WIM Operators with store information
-      const empRes = await api.get(`${api_url}/api/get-employee`);
+      const empRes = await api.get(`/api/get-employee`);
       const employees = Array.isArray(empRes.data) ? empRes.data : [];
       
       console.log('=== WIM OPERATOR DEBUG ===');
@@ -211,7 +210,7 @@ const HPPickListDetail = () => {
         formData.append('store', userStore);
         formData.append('operator_id', selectedOperator);
 
-        await axios.post(`${api_url}/api/uploadPicklist`, formData, {
+        await api.post(`/api/uploadPicklist`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       }
@@ -253,7 +252,7 @@ const HPPickListDetail = () => {
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`${api_url}/api/deletePicklist/${id}`, { data: { fileUrl } });
+      await api.delete(`/api/deletePicklist/${id}`, { data: { fileUrl } });
       successToast('Deleted');
       setSubmittedPicklists(prev => prev.filter(p => p.id !== id));
     } catch (err) {
@@ -275,7 +274,7 @@ const HPPickListDetail = () => {
     if (!result.isConfirmed) return;
 
     try {
-      const response = await axios.put(`${api_url}/api/completePicklist/${id}`);
+      const response = await api.put(`/api/completePicklist/${id}`);
       
       successToast('Completed');
       

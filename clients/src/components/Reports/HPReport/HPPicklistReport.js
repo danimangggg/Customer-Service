@@ -8,7 +8,7 @@ import { Assignment } from '@mui/icons-material';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-const HPPicklistReport = () => {
+const HPPicklistReport = ({ branchCode = '' }) => {
   const [picklists, setPicklists] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ const HPPicklistReport = () => {
     const fetch = async () => {
       try {
         setLoading(true);
-        const response = await api.get(`${API_URL}/api/picklist-history`, { params: { page: 1, limit: 10000 } });
+        const response = await api.get(`${API_URL}/api/picklist-history`, { params: { page: 1, limit: 10000, ...(branchCode ? { branch_code: branchCode } : {}) } });
         if (response.data.success && response.data.picklists) {
           const rows = response.data.picklists
             .filter(p => p.store === 'HP')

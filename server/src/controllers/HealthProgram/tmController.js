@@ -6,23 +6,30 @@ const Facility = db.facility;
 exports.getTMProcesses = async (req, res) => {
   try {
     const { month, year, process_type = 'regular' } = req.query;
-    
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+
     const whereClause = { status: 'ewm_completed', process_type };
     if (process_type === 'regular') {
       whereClause.reporting_month = `${month} ${year}`;
     }
-    
+
+    const facilityWhere = (accountType !== 'Super Admin' && branchCode)
+      ? { branch_code: branchCode }
+      : {};
+
     const processes = await Process.findAll({
       where: whereClause,
       include: [{
         model: Facility,
         as: 'facility',
         attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
-        required: false
+        where: Object.keys(facilityWhere).length ? facilityWhere : undefined,
+        required: Object.keys(facilityWhere).length > 0
       }],
       order: [['created_at', 'DESC']]
     });
-    
+
     res.json({ success: true, processes });
   } catch (error) {
     console.error('Get TM processes error:', error);
@@ -176,9 +183,13 @@ exports.sendToEWM = async (req, res) => {
 exports.getVehicleAssignmentProcesses = async (req, res) => {
   try {
     const { month, year, process_type = 'regular' } = req.query;
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+    const facilityWhere = (accountType !== 'Super Admin' && branchCode)
+      ? { branch_code: branchCode }
+      : {};
 
     if (process_type === 'regular') {
-      // Regular: only show processes whose routes have a PI vehicle request
       const piRequestsQuery = `
         SELECT DISTINCT pvr.route_id, r.route_name, pvr.requested_at
         FROM pi_vehicle_requests pvr
@@ -201,7 +212,7 @@ exports.getVehicleAssignmentProcesses = async (req, res) => {
           model: Facility,
           as: 'facility',
           attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
-          where: { route: routeNames },
+          where: { route: routeNames, ...facilityWhere },
           required: true
         }],
         order: [['created_at', 'DESC']]
@@ -235,7 +246,8 @@ exports.getVehicleAssignmentProcesses = async (req, res) => {
         model: Facility,
         as: 'facility',
         attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
-        required: false
+        where: Object.keys(facilityWhere).length ? facilityWhere : undefined,
+        required: Object.keys(facilityWhere).length > 0
       }],
       order: [['created_at', 'DESC']]
     });

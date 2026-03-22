@@ -66,7 +66,10 @@ const getHPCustomersDetailReport = async (req, res) => {
 
     // Build status filter condition
     let statusFilterCondition = '';
-    if (statusFilter) {
+    if (statusFilter === 'rrf_not_sent') {
+      const rrfPattern = process_type === 'vaccine' ? 'VRF not sent%' : 'RRF not sent%';
+      statusFilterCondition = `AND EXISTS (SELECT 1 FROM odns o WHERE o.process_id = p.id AND o.odn_number LIKE '${rrfPattern}')`;
+    } else if (statusFilter) {
       statusFilterCondition = `AND p.status = '${statusFilter}'`;
     }
 
@@ -109,6 +112,15 @@ const getHPCustomersDetailReport = async (req, res) => {
         f.woreda_name,
         f.route,
         f.facility_type,
+        f.branch_code,
+        COALESCE(b.branch_name, f.branch_code) as branch_name,
+        -- RRF/VRF not sent flag and officer
+        (SELECT o.odn_number FROM odns o WHERE o.process_id = p.id AND (o.odn_number LIKE 'RRF not sent%' OR o.odn_number LIKE 'VRF not sent%') LIMIT 1) as rrf_not_sent_label,
+        COALESCE(
+          (SELECT st.officer_name FROM service_time_hp st WHERE st.process_id = p.id AND st.service_unit = 'O2C Officer - HP' ORDER BY st.created_at DESC LIMIT 1),
+          e.full_name
+        ) as rrf_not_sent_officer,
+        COALESCE(e.full_name, p.o2c_officer_id) as o2c_officer_name,
         -- Calculate total kilometers from route assignments
         (
           SELECT COALESCE(
@@ -158,6 +170,8 @@ const getHPCustomersDetailReport = async (req, res) => {
         
       FROM processes p
       LEFT JOIN facilities f ON p.facility_id = f.id
+      LEFT JOIN employees e ON e.id = p.o2c_officer_id
+      LEFT JOIN epss_branches b ON b.branch_code = f.branch_code
       WHERE f.route IS NOT NULL AND f.route != ''
       ${monthYearCondition}
       ${processTypeCondition}
@@ -181,7 +195,7 @@ const getHPCustomersDetailReport = async (req, res) => {
       SELECT p.id,
         TIMESTAMPDIFF(MINUTE, p.created_at, COALESCE(MAX(o.quality_evaluated_at), NOW())) as total_waiting_time
       FROM processes p
-      LEFT JOIN odns o ON o.process_id = p.id AND o.odn_number != 'RRF not sent'
+      LEFT JOIN odns o ON o.process_id = p.id AND (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%')
       WHERE p.id IN (${customers.map(c => c.id).join(',') || 'NULL'})
       GROUP BY p.id, p.created_at
     `;

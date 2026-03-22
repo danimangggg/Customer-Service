@@ -1,6 +1,7 @@
  
 const bcrypt = require('bcryptjs');
 const db = require("../../models");
+const { QueryTypes } = require('sequelize');
 const jwt = require('jsonwebtoken');
 const User = db.employee;
 
@@ -23,6 +24,13 @@ const login =  async (req, res) => {
     }
     
     console.log('User found, checking password');
+
+    // Guard: password must be a non-empty string (bcrypt hash)
+    if (!user.password || typeof user.password !== 'string') {
+      console.log('Invalid password hash for user:', user_name, typeof user.password);
+      return res.status(400).json({ error: 'Invalid username or password' });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
    
     if (!isMatch) {
@@ -38,13 +46,14 @@ const login =  async (req, res) => {
       try {
         const [storeResult] = await db.sequelize.query(
           'SELECT store_name FROM stores WHERE id = ?',
-          { replacements: [user.store_id] }
+          { replacements: [user.store_id], type: QueryTypes.SELECT }
         );
-        if (storeResult && storeResult.length > 0) {
-          storeName = storeResult[0].store_name;
+        if (storeResult) {
+          storeName = storeResult.store_name;
         }
       } catch (storeError) {
         console.error('Store query error:', storeError.message);
+        // Non-fatal — continue login without store name
       }
     }
 
@@ -54,13 +63,14 @@ const login =  async (req, res) => {
       try {
         const [branchResult] = await db.sequelize.query(
           'SELECT branch_name FROM epss_branches WHERE branch_code = ?',
-          { replacements: [user.branch_code] }
+          { replacements: [user.branch_code], type: QueryTypes.SELECT }
         );
-        if (branchResult && branchResult.length > 0) {
-          branchName = branchResult[0].branch_name;
+        if (branchResult) {
+          branchName = branchResult.branch_name;
         }
       } catch (branchError) {
         console.error('Branch query error:', branchError.message);
+        // Non-fatal — continue login without branch name
       }
     }
     

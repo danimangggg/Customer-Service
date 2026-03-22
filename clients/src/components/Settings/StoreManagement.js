@@ -34,11 +34,9 @@ import {
   Store as StoreIcon,
   CheckCircle as ActiveIcon
 } from '@mui/icons-material';
-import axios from 'axios';
 import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import BranchSelect from './BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -58,7 +56,7 @@ const StoreManagement = () => {
   const [formData, setFormData] = useState({
     store_name: '',
     description: '',
-    branch_code: ''
+    branch_code: localStorage.getItem('branch_code') || ''
   });
 
   useEffect(() => {
@@ -91,7 +89,7 @@ const StoreManagement = () => {
       setFormData({
         store_name: '',
         description: '',
-        branch_code: ''
+        branch_code: localStorage.getItem('branch_code') || ''
       });
     }
     setOpenDialog(true);
@@ -109,10 +107,10 @@ const StoreManagement = () => {
   const handleSubmit = async () => {
     try {
       if (editingStore) {
-        await axios.put(`${API_URL}/api/stores/${editingStore.id}`, formData);
+        await api.put(`${API_URL}/api/stores/${editingStore.id}`, formData);
         showSnackbar('Store updated successfully', 'success');
       } else {
-        await axios.post(`${API_URL}/api/stores`, formData);
+        await api.post(`${API_URL}/api/stores`, formData);
         showSnackbar('Store added successfully', 'success');
       }
       fetchStores();
@@ -166,7 +164,7 @@ const StoreManagement = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`${API_URL}/api/stores/${store.id}`);
+        await api.delete(`${API_URL}/api/stores/${store.id}`);
         
         // Success animation
         await MySwal.fire({
@@ -400,11 +398,6 @@ const StoreManagement = () => {
               multiline
               rows={3}
               placeholder="Optional description"
-            />
-            <BranchSelect
-              value={formData.branch_code}
-              onChange={(val) => setFormData({ ...formData, branch_code: val })}
-              helperText="Assign this store to a branch"
             />
           </Box>
         </DialogContent>

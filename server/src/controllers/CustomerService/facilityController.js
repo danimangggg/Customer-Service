@@ -111,12 +111,13 @@ const clearNonHpRoutesPeriods = async (req, res) => {
 
 // Bulk import facilities from Excel
 const bulkImportFacilities = async (req, res) => {
-  const rows = req.body; // array of facility objects
+  const rows = req.body;
   if (!Array.isArray(rows) || rows.length === 0) {
     return res.status(400).json({ message: 'No data provided' });
   }
 
-  const results = { created: 0, updated: 0, errors: [] };
+  const branchCode = req.headers['x-branch-code'] || null;
+  const results = { created: 0, updated: 0, skipped: [], errors: [] };
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -125,22 +126,35 @@ const bulkImportFacilities = async (req, res) => {
       continue;
     }
     try {
-      const existing = await Facility.findOne({ where: { facility_name: row.facility_name } });
-      if (existing) {
-        await existing.update({
-          facility_type: row.facility_type || existing.facility_type,
-          region_name: row.region_name || existing.region_name,
-          zone_name: row.zone_name || existing.zone_name,
-          woreda_name: row.woreda_name || existing.woreda_name,
-          route: row.route || existing.route,
-          route2: row.route2 || existing.route2,
-          period: row.period || existing.period,
-          is_hp_site: row.is_hp_site !== undefined ? row.is_hp_site : existing.is_hp_site,
-          is_vaccine_site: row.is_vaccine_site !== undefined ? row.is_vaccine_site : existing.is_vaccine_site,
+      // If customer_id provided, check if it already exists → skip
+      if (row.customer_id) {
+        const byCustomerId = await Facility.findOne({ where: { customer_id: String(row.customer_id) } });
+        if (byCustomerId) {
+          results.skipped.push({ customer_id: row.customer_id, facility_name: byCustomerId.facility_name });
+          continue;
+        }
+      }
+
+      // Fall back: match by facility_name → update
+      const byName = await Facility.findOne({ where: { facility_name: row.facility_name } });
+      if (byName) {
+        await byName.update({
+          customer_id: row.customer_id ? String(row.customer_id) : byName.customer_id,
+          facility_type: row.facility_type || byName.facility_type,
+          region_name: row.region_name || byName.region_name,
+          zone_name: row.zone_name || byName.zone_name,
+          woreda_name: row.woreda_name || byName.woreda_name,
+          route: row.route || byName.route,
+          route2: row.route2 || byName.route2,
+          period: row.period || byName.period,
+          is_hp_site: row.is_hp_site !== undefined ? row.is_hp_site : byName.is_hp_site,
+          is_vaccine_site: row.is_vaccine_site !== undefined ? row.is_vaccine_site : byName.is_vaccine_site,
+          branch_code: branchCode || byName.branch_code,
         });
         results.updated++;
       } else {
         await Facility.create({
+          customer_id: row.customer_id ? String(row.customer_id) : null,
           facility_name: row.facility_name,
           facility_type: row.facility_type || null,
           region_name: row.region_name || null,
@@ -151,6 +165,7 @@ const bulkImportFacilities = async (req, res) => {
           period: row.period || null,
           is_hp_site: row.is_hp_site ? 1 : 0,
           is_vaccine_site: row.is_vaccine_site ? 1 : 0,
+          branch_code: branchCode,
         });
         results.created++;
       }

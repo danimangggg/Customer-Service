@@ -7,6 +7,12 @@ const getODNsForQualityEvaluation = async (req, res) => {
     const { month, year, page = 1, limit = 10, search = '', process_type = 'regular' } = req.query;
     const offset = (page - 1) * limit;
 
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
     const isEmergencyOrBreakdown = process_type === 'emergency' || process_type === 'breakdown' || process_type === 'vaccine';
 
     const processTypeFilter = isEmergencyOrBreakdown
@@ -26,6 +32,7 @@ const getODNsForQualityEvaluation = async (req, res) => {
         o.quality_feedback,
         o.quality_evaluated_by,
         o.quality_evaluated_at,
+        p.facility_id,
         f.facility_name,
         f.region_name,
         f.zone_name,
@@ -42,6 +49,7 @@ const getODNsForQualityEvaluation = async (req, res) => {
       WHERE p.status IN ('documentation_completed')
         AND o.pod_confirmed = TRUE
         ${processTypeFilter}
+        ${branchFilter}
         ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
       ORDER BY p.created_at DESC, f.facility_name, o.odn_number
       LIMIT ? OFFSET ?
@@ -62,75 +70,63 @@ const getODNsForQualityEvaluation = async (req, res) => {
   }
 };
 
-// Get statistics for quality evaluation
 const getQualityEvaluationStats = async (req, res) => {
   try {
     const { month, year } = req.query;
     const reportingMonth = `${month} ${year}`;
 
-    // Get total ODNs ready for quality evaluation (completed document follow-up)
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType  = req.headers['x-account-type'] || null;
+    const queryBranch  = req.query.branch_code || null;
+    const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+
+    const baseWhere = `
+      INNER JOIN facilities f ON p.facility_id = f.id
+      WHERE p.reporting_month = ?
+        AND p.status IN ('documentation_completed')
+        AND o.pod_confirmed = TRUE
+        ${branchFilter}
+    `;
+
     const totalReadyQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE p.status IN ('documentation_completed')
-        AND o.pod_confirmed = TRUE
+      INNER JOIN processes p ON o.process_id = p.id
+      ${baseWhere}
     `;
 
-    // Get quality confirmed count
     const qualityConfirmedQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE p.status IN ('documentation_completed')
-        AND o.pod_confirmed = TRUE
+      INNER JOIN processes p ON o.process_id = p.id
+      ${baseWhere}
         AND o.quality_confirmed = TRUE
     `;
 
-    // Get quality pending count
     const qualityPendingQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE p.status IN ('documentation_completed')
-        AND o.pod_confirmed = TRUE
-        AND o.quality_confirmed = FALSE
+      INNER JOIN processes p ON o.process_id = p.id
+      ${baseWhere}
+        AND (o.quality_confirmed = FALSE OR o.quality_confirmed IS NULL)
     `;
 
-    // Get ODNs with feedback count
     const withFeedbackQuery = `
       SELECT COUNT(DISTINCT o.id) as count
       FROM odns o
-      INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
-      INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE p.status IN ('documentation_completed')
-        AND o.pod_confirmed = TRUE
+      INNER JOIN processes p ON o.process_id = p.id
+      ${baseWhere}
         AND o.quality_feedback IS NOT NULL
         AND o.quality_feedback != ''
     `;
 
-    const totalResult = await db.sequelize.query(totalReadyQuery, {
-      replacements: [reportingMonth],
-      type: db.sequelize.QueryTypes.SELECT
-    });
-
-    const confirmedResult = await db.sequelize.query(qualityConfirmedQuery, {
-      replacements: [reportingMonth],
-      type: db.sequelize.QueryTypes.SELECT
-    });
-
-    const pendingResult = await db.sequelize.query(qualityPendingQuery, {
-      replacements: [reportingMonth],
-      type: db.sequelize.QueryTypes.SELECT
-    });
-
-    const feedbackResult = await db.sequelize.query(withFeedbackQuery, {
-      replacements: [reportingMonth],
-      type: db.sequelize.QueryTypes.SELECT
-    });
+    const [totalResult, confirmedResult, pendingResult, feedbackResult] = await Promise.all([
+      db.sequelize.query(totalReadyQuery, { replacements: [reportingMonth], type: db.sequelize.QueryTypes.SELECT }),
+      db.sequelize.query(qualityConfirmedQuery, { replacements: [reportingMonth], type: db.sequelize.QueryTypes.SELECT }),
+      db.sequelize.query(qualityPendingQuery, { replacements: [reportingMonth], type: db.sequelize.QueryTypes.SELECT }),
+      db.sequelize.query(withFeedbackQuery, { replacements: [reportingMonth], type: db.sequelize.QueryTypes.SELECT })
+    ]);
 
     res.json({
       totalReady: totalResult[0]?.count || 0,

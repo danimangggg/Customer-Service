@@ -19,7 +19,6 @@ import axios from 'axios';
 import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import BranchSelect from '../Settings/BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -45,7 +44,7 @@ const HPFacilities = () => {
     period: '',
     is_vaccine_site: false,
     is_hp_site: false,
-    branch_code: ''
+    branch_code: localStorage.getItem('branch_code') || ''
   });
 
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -195,6 +194,7 @@ const HPFacilities = () => {
   const handleDownloadTemplate = () => {
     const templateData = [
       {
+        customer_id: 'HC001',
         facility_name: 'Example Health Center',
         facility_type: 'Health Center',
         region_name: 'Addis Ababa',
@@ -227,15 +227,19 @@ const HPFacilities = () => {
         MySwal.fire('Empty File', 'No rows found in the Excel file.', 'warning');
         return;
       }
-      const res = await axios.post(`${api_url}/api/facilities/bulk-import`, rows);
-      const { created, updated, errors } = res.data;
+      const res = await api.post(`${api_url}/api/facilities/bulk-import`, rows);
+      const { created, updated, skipped = [], errors } = res.data;
       await MySwal.fire({
         title: 'Import Complete',
         html: `
           <div style="text-align:center;padding:10px">
             <p>✅ Created: <strong>${created}</strong></p>
             <p>🔄 Updated: <strong>${updated}</strong></p>
-            ${errors.length > 0 ? `<p>❌ Errors: <strong>${errors.length}</strong></p>` : ''}
+            ${skipped.length > 0 ? `<p>⏭️ Skipped (already exist): <strong>${skipped.length}</strong></p>
+              <div style="max-height:120px;overflow-y:auto;text-align:left;font-size:11px;background:#f9f9f9;padding:6px;border-radius:4px">
+                ${skipped.map(s => `<div>${s.customer_id} — ${s.facility_name}</div>`).join('')}
+              </div>` : ''}
+            ${errors.length > 0 ? `<p>❌ Errors: <strong>${errors.length}</strong></p><p style="font-size:12px;color:red">${errors[0]?.message || ''}</p>` : ''}
           </div>
         `,
         icon: errors.length > 0 ? 'warning' : 'success',
@@ -672,10 +676,7 @@ const HPFacilities = () => {
               <MenuItem value="Even">Even</MenuItem>
               <MenuItem value="Monthly">Monthly</MenuItem>
             </TextField>
-            <BranchSelect
-              value={selectedFacility.branch_code}
-              onChange={(val) => setSelectedFacility({...selectedFacility, branch_code: val})}
-            />
+
           </DialogContent>
           <DialogActions sx={{ p: 2, borderTop: '1px solid #eee' }}>
             <Button onClick={() => setOpenEdit(false)} color="inherit">Cancel</Button>

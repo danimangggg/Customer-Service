@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../utils/toast';
 import {
@@ -57,8 +57,8 @@ const AllPicklists = () => {
     try {
       setLoading(true);
       const [pickRes, empRes] = await Promise.all([
-        axios.get(`${api_url}/api/getPicklists`),
-        axios.get(`${api_url}/api/get-employee`),
+        api.get(`/api/getPicklists`),
+        api.get(`/api/get-employee`),
       ]);
 
       // Handle both old format (array) and new format (object with data property)
@@ -138,7 +138,7 @@ const AllPicklists = () => {
     fetchData();
     const interval = setInterval(async () => {
       try {
-        const pickRes = await axios.get(`${api_url}/api/getPicklists`);
+        const pickRes = await api.get(`/api/getPicklists`);
         // Handle both old format (array) and new format (object with data property)
         let allPicklists = Array.isArray(pickRes.data) 
           ? pickRes.data 
@@ -240,7 +240,7 @@ const AllPicklists = () => {
       clearInterval(notificationIntervalRef.current);
       if (audioRef.current) audioRef.current.pause();
 
-      await axios.put(`${api_url}/api/completePicklist/${picklistId}`, {
+      await api.put(`/api/completePicklist/${picklistId}`, {
         fileUrl: picklist.url,
         status: 'Completed',
       });
@@ -248,7 +248,7 @@ const AllPicklists = () => {
       // Record WIM Operator service time
       try {
         // Get the customer queue record
-        const customerRes = await axios.get(`${api_url}/api/serviceList`);
+        const customerRes = await api.get(`/api/serviceList`);
         const customer = customerRes.data.find(c => c.id === picklist.customer_queue_id);
         
         if (customer) {
@@ -277,14 +277,14 @@ const AllPicklists = () => {
           };
           
           // Update customer_queue with WIM completion tracking only
-          await axios.put(`${api_url}/api/update-service-point`, {
+          await api.put(`/api/update-service-point`, {
             id: customer.id,
             wim_completed_at: wimEndTime,
             wim_operator_id: localStorage.getItem('EmployeeID'),
             wim_operator_name: localStorage.getItem('FullName')
           });
           
-          const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+          const serviceTimeResponse = await api.post(`/api/service-time`, serviceTimeData);
           console.log('✅ WIM Operator service time recorded:', serviceTimeResponse.data);
         }
       } catch (err) {

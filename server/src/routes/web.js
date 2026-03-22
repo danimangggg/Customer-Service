@@ -108,6 +108,7 @@ let routes =  (app) => {
   router.get('/api/exit-history-pending/:store', exitHistoryController.getPendingByStore);
   router.put('/api/exit-history/:id/gate-status', exitHistoryController.updateGateStatus);
   router.put('/api/exit-history/:id', exitHistoryController.updateExitHistoryRow);
+  router.delete('/api/exit-history/process/:processId', exitHistoryController.deleteExitHistoryByProcess);
 
   // Invoice routes (EWM-Documentation)
   const invoiceController = require('../controllers/CustomerService/invoiceController');
@@ -230,6 +231,10 @@ let routes =  (app) => {
   router.get('/api/tm-vehicle-assignment-processes', tmController.getVehicleAssignmentProcesses);
   router.post('/api/tm-assign-vehicle', tmController.assignVehicle);
 
+  // HP Process Revert (return to previous step)
+  const hpRevertController = require('../controllers/HealthProgram/hpRevertController');
+  router.post('/api/hp-revert-process', hpRevertController.revertProcess);
+
   // Dispatch routes (HP)
   const dispatchController = require('../controllers/Transportation/dispatchController');
   router.put('/api/processes/:id/complete-dispatch', dispatchController.completeDispatchHP);
@@ -293,6 +298,7 @@ let routes =  (app) => {
   const hpComprehensiveReportController = require('../controllers/Reports/hpComprehensiveReportController');
   router.get('/api/hp-comprehensive-report', hpComprehensiveReportController.getComprehensiveHPReport);
   router.get('/api/hp-report/time-trend', hpComprehensiveReportController.getTimeTrendData);
+  router.get('/api/hp-report/daily-processing-trend', hpComprehensiveReportController.getDailyProcessingTrend);
   router.get('/api/hp-odn-pod-details', hpComprehensiveReportController.getODNPODDetails);
   router.get('/api/hp-odn-pod-details-all', hpComprehensiveReportController.getAllODNPODDetails);
   router.get('/api/service-time-tracking', hpComprehensiveReportController.getServiceTimeTracking);

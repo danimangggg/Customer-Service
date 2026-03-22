@@ -75,10 +75,13 @@ const RDFReport = () => {
   const [customerDetailOpen, setCustomerDetailOpen] = useState(false);
   const [customerServiceDetails, setCustomerServiceDetails] = useState([]);
 
-  // Branch filter — Super Admin can pick a branch; others use their own
+  // Branch filter — Super Admin and Reports job title can pick a branch; others use their own
   const currentAccountType = localStorage.getItem('AccountType') || '';
+  const currentJobTitle = localStorage.getItem('JobTitle') || '';
   const isSuperAdmin = currentAccountType === 'Super Admin';
-  const defaultBranch = isSuperAdmin ? '' : (localStorage.getItem('branch_code') || '');
+  const isReportsRole = currentJobTitle === 'Reports';
+  const canSelectBranch = isSuperAdmin || isReportsRole;
+  const defaultBranch = canSelectBranch ? '' : (localStorage.getItem('branch_code') || '');
   const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
   
   // Dashboard stats
@@ -274,7 +277,9 @@ const RDFReport = () => {
   const fetchCompletedPicklists = async () => {
     try {
       setCompletedPicklistsLoading(true);
-      const response = await api.get(`${API_URL}/api/picklist-history`, { params: { page: 1, limit: 10000 } });
+      const params = { page: 1, limit: 10000 };
+      if (selectedBranch) params.branch_code = selectedBranch;
+      const response = await api.get(`${API_URL}/api/picklist-history`, { params });
       if (response.data.success && response.data.picklists) {
         const rows = response.data.picklists
           .filter(p => p.store && p.store !== 'HP' && p.store !== 'CR')
@@ -308,11 +313,12 @@ const RDFReport = () => {
     try {
       setDocumentationLoading(true);
       
+      const docParams = { includeCompleted: 'true' };
+      if (selectedBranch) docParams.branch_code = selectedBranch;
+
       // Fetch completed customers with includeCompleted parameter
       const [customersRes, facilitiesRes] = await Promise.all([
-        api.get(`${API_URL}/api/tv-display-customers`, {
-          params: { includeCompleted: 'true' }
-        }),
+        api.get(`${API_URL}/api/tv-display-customers`, { params: docParams }),
         api.get(`${API_URL}/api/facilities`)
       ]);
       
@@ -646,8 +652,8 @@ const RDFReport = () => {
         </CardContent>
       </Card>
 
-      {/* Branch filter — Super Admin only */}
-      {isSuperAdmin && (
+      {/* Branch filter — Super Admin and Reports role */}
+      {canSelectBranch && (
         <Box sx={{ mb: 2, maxWidth: 300 }}>
           <BranchSelect
             value={selectedBranch}
@@ -1316,11 +1322,13 @@ const RDFReport = () => {
                   <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
                     <CardContent sx={{ textAlign: 'center', py: 4 }}>
                       <Typography variant="h3" fontWeight="bold" gutterBottom>🏆 This Week's Best 🏆</Typography>
-                      <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                        {new Date(bestOfData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        {' — '}
-                        {new Date(bestOfData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                      </Typography>
+                      {bestOfData.dateRange?.start && (
+                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                          {new Date(bestOfData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {' — '}
+                          {new Date(bestOfData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </Typography>
+                      )}
                     </CardContent>
                   </Card>
                   <Grid container spacing={4}>
@@ -1376,11 +1384,13 @@ const RDFReport = () => {
                   <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
                     <CardContent sx={{ textAlign: 'center', py: 3 }}>
                       <Typography variant="h4" fontWeight="bold" gutterBottom>🥈 Last Week's Best 🥈</Typography>
-                      <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                        {new Date(bestOfLastWeekData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        {' — '}
-                        {new Date(bestOfLastWeekData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                      </Typography>
+                      {bestOfLastWeekData.dateRange?.start && (
+                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                          {new Date(bestOfLastWeekData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {' — '}
+                          {new Date(bestOfLastWeekData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </Typography>
+                      )}
                     </CardContent>
                   </Card>
                   <Grid container spacing={3}>
@@ -1568,7 +1578,6 @@ const RDFReport = () => {
                       <TableHead>
                         <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                           <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>ODN</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>EWM</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Dispatch</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>Exit Permit</TableCell>
@@ -1576,7 +1585,12 @@ const RDFReport = () => {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {customerOdns.map((odn, index) => {
+                        {Object.values(
+                          customerOdns.reduce((acc, odn) => {
+                            if (!acc[odn.store]) acc[odn.store] = odn;
+                            return acc;
+                          }, {})
+                        ).map((odn, index) => {
                           const statusChip = (value) => {
                             const raw = value || null;
                             const v = (raw || '').toLowerCase();
@@ -1599,7 +1613,6 @@ const RDFReport = () => {
                           return (
                             <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
                               <TableCell sx={{ fontWeight: 600 }}>{odn.store}</TableCell>
-                              <TableCell>{odn.odn_number}</TableCell>
                               <TableCell>
                                 <Chip label={ewm.label} color={ewm.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
                               </TableCell>

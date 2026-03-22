@@ -28,6 +28,8 @@ const DefaultRedirect = () => {
         navigate('/documentation-hp');
       } else if (jobTitle === "Quality Evaluator") {
         navigate('/quality-evaluation');
+      } else if (jobTitle === "Reports") {
+        navigate('/reports/hp-comprehensive');
       }
       // EWM-Documentation goes to invoice management
       else if (jobTitle === "EWM-Documentation") {
@@ -52,7 +54,9 @@ const DefaultRedirect = () => {
         navigate('/all-picklists');
       } else if (jobTitle === "Customer Service Officer") {
         navigate('/register-customer');
-      } else if (jobTitle === "Cashier" || jobTitle === "Finance") {
+      } else if (jobTitle === "Cashier") {
+        navigate('/outstandingProcess');
+      } else if (jobTitle === "Finance") {
         navigate('/finance-invoices');
       }
       // Redirect all other authenticated users to customer dashboard

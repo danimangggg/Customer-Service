@@ -20,18 +20,26 @@ const retrievePicklists = async (req, res) => {
     
     // Add pagination parameters
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 100; // Default to 100 records
+    const limit = parseInt(req.query.limit) || 100;
     const offset = (page - 1) * limit;
     
     // Add includeCompleted parameter
     const includeCompleted = req.query.includeCompleted === 'true';
+
+    // Branch filtering
+    const branchCode = req.query.branch_code || null;
+    const headerBranch = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+    const effectiveBranch = branchCode || (accountType !== 'Super Admin' ? headerBranch : null);
+    const branchFilter = effectiveBranch
+      ? `AND COALESCE(f_hp.branch_code, f_aa.branch_code) = '${effectiveBranch}'`
+      : '';
     
     const baseUrl = `${req.protocol}://${req.get('host')}/picklists`;
     
     // Build WHERE clause based on includeCompleted parameter
-    const whereClause = includeCompleted 
-      ? '' // No filter - show all
-      : `WHERE LOWER(COALESCE(p.status, '')) != 'completed'`;
+    const statusFilter = includeCompleted ? '' : `AND LOWER(COALESCE(p.status, '')) != 'completed'`;
+    const whereClause = `WHERE 1=1 ${statusFilter} ${branchFilter}`;
     
     // Use raw SQL query with proper JOINs to get facility information
     // HP picklists use 'processes' table, AA picklists use 'customer_queue' table
@@ -62,15 +70,16 @@ const retrievePicklists = async (req, res) => {
       LIMIT ${limit} OFFSET ${offset}
     `;
     
-    // Get total count for pagination
-    const countWhereClause = includeCompleted 
-      ? '' 
-      : `WHERE LOWER(COALESCE(status, '')) != 'completed'`;
-    
+    // Get total count for pagination - use same JOINs as main query to support branch filtering
+    const countStatusFilter = includeCompleted ? '' : `AND LOWER(COALESCE(p.status, '')) != 'completed'`;
     const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM picklist 
-      ${countWhereClause}
+      SELECT COUNT(*) as total
+      FROM picklist p
+      LEFT JOIN processes pr ON CAST(p.process_id AS UNSIGNED) = pr.id AND p.store = 'HP'
+      LEFT JOIN facilities f_hp ON pr.facility_id = f_hp.id
+      LEFT JOIN customer_queue cq ON CAST(p.process_id AS UNSIGNED) = cq.id AND p.store != 'HP'
+      LEFT JOIN facilities f_aa ON cq.facility_id = f_aa.id
+      WHERE 1=1 ${countStatusFilter} ${branchFilter}
     `;
     const [countResult] = await db.sequelize.query(countQuery);
     const total = countResult[0].total;

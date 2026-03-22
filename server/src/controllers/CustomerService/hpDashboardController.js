@@ -27,7 +27,10 @@ const getHPDashboardData = async (req, res) => {
     if (process_type) processWhere.process_type = process_type;
 
     const odnWhere = {
-      odn_number: { [Op.ne]: 'RRF not sent' }
+      [Op.and]: [
+        { odn_number: { [Op.notLike]: 'RRF not sent%' } },
+        { odn_number: { [Op.notLike]: 'VRF not sent%' } }
+      ]
     };
     if (reportingMonth || process_type) {
       const processes = await Process.findAll({
@@ -59,11 +62,35 @@ const getHPDashboardData = async (req, res) => {
 
     const totalODNs = await ODN.count({ where: odnWhere });
 
+    const facilityTypeFilter = process_type === 'vaccine' ? `f.is_vaccine_site = 1` : `f.is_hp_site = 1`;
+    const rrfNotSentPattern = process_type === 'vaccine' ? 'VRF not sent%' : 'RRF not sent%';
+
+    // RRF/VRF Not Sent — count distinct facilities whose process has that label
+    let rrfNotSentQuery = `
+      SELECT COUNT(DISTINCT p.facility_id) as count
+      FROM processes p
+      INNER JOIN facilities f ON p.facility_id = f.id
+      INNER JOIN odns o ON o.process_id = p.id
+      WHERE ${facilityTypeFilter}
+      AND o.odn_number LIKE '${rrfNotSentPattern}'
+      ${branchFilter}
+    `;
+    const rrfNotSentParams = [];
+    if (reportingMonth) { rrfNotSentQuery += ` AND p.reporting_month = ?`; rrfNotSentParams.push(reportingMonth); }
+    if (process_type)   { rrfNotSentQuery += ` AND p.process_type = ?`;    rrfNotSentParams.push(process_type); }
+    const [rrfNotSentResult] = await db.sequelize.query(rrfNotSentQuery, {
+      replacements: rrfNotSentParams,
+      type: db.sequelize.QueryTypes.SELECT
+    });
+    const rrfNotSentCount = rrfNotSentResult.count;
+
     let rrfSentQuery = `
       SELECT COUNT(DISTINCT p.facility_id) as count
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id
-      WHERE f.is_hp_site = 1
+      INNER JOIN odns o ON o.process_id = p.id
+      WHERE ${facilityTypeFilter}
+      AND (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%')
       ${branchFilter}
     `;
 
@@ -76,26 +103,6 @@ const getHPDashboardData = async (req, res) => {
       rrfSentQuery += ` AND p.process_type = ?`;
       rrfQueryParams.push(process_type);
     }
-    if (reportingMonth) {
-      rrfSentQuery += `
-        AND p.facility_id NOT IN (
-          SELECT DISTINCT p2.facility_id
-          FROM processes p2
-          INNER JOIN odns o ON p2.id = o.process_id
-          INNER JOIN facilities f2 ON p2.facility_id = f2.id
-          WHERE o.odn_number = 'RRF not sent' AND p2.reporting_month = ?
-          ${branchFilter.replace('f.', 'f2.')}
-        )`;
-      rrfQueryParams.push(reportingMonth);
-    } else {
-      rrfSentQuery += `
-        AND p.facility_id NOT IN (
-          SELECT DISTINCT p2.facility_id
-          FROM processes p2
-          INNER JOIN odns o ON p2.id = o.process_id
-          WHERE o.odn_number = 'RRF not sent'
-        )`;
-    }
 
     const [rrfResult] = await db.sequelize.query(rrfSentQuery, {
       replacements: rrfQueryParams,
@@ -103,9 +110,29 @@ const getHPDashboardData = async (req, res) => {
     });
     const rrfSent = rrfResult.count;
 
-    const dispatchedODNs   = await ODN.count({ where: { ...odnWhere, pod_confirmed: true } });
-    const podConfirmed     = await ODN.count({ where: { ...odnWhere, pod_confirmed: true } });
+    const dispatchedODNs = await ODN.count({ where: { ...odnWhere, pod_confirmed: true } });
     const qualityEvaluated = await ODN.count({ where: { ...odnWhere, quality_confirmed: true } });
+
+    // POD Confirmed — count distinct facilities that have at least one pod_confirmed ODN
+    let podConfirmedQuery = `
+      SELECT COUNT(DISTINCT p.facility_id) as count
+      FROM processes p
+      INNER JOIN facilities f ON p.facility_id = f.id
+      INNER JOIN odns o ON o.process_id = p.id
+      WHERE ${facilityTypeFilter}
+        AND o.pod_confirmed = 1
+        AND o.odn_number NOT LIKE 'RRF not sent%'
+        AND o.odn_number NOT LIKE 'VRF not sent%'
+        ${branchFilter}
+    `;
+    const podParams = [];
+    if (reportingMonth) { podConfirmedQuery += ` AND p.reporting_month = ?`; podParams.push(reportingMonth); }
+    if (process_type)   { podConfirmedQuery += ` AND p.process_type = ?`;    podParams.push(process_type); }
+    const [podResult] = await db.sequelize.query(podConfirmedQuery, {
+      replacements: podParams,
+      type: db.sequelize.QueryTypes.SELECT
+    });
+    const podConfirmed = podResult.count;
 
     const ethiopianMonths = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
     let expectedThisMonth = totalFacilities;
@@ -126,9 +153,15 @@ const getHPDashboardData = async (req, res) => {
       SELECT COUNT(DISTINCT p.facility_id) as count
       FROM processes p
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN odns o ON p.id = o.process_id
-      WHERE f.is_hp_site = 1
-        AND o.quality_confirmed = true
+      WHERE ${facilityTypeFilter}
+        AND (
+          EXISTS (
+            SELECT 1 FROM odns o WHERE o.process_id = p.id AND o.quality_confirmed = 1
+          )
+          OR EXISTS (
+            SELECT 1 FROM odns o WHERE o.process_id = p.id AND (o.odn_number LIKE 'RRF not sent%' OR o.odn_number LIKE 'VRF not sent%')
+          )
+        )
         ${branchFilter}
     `;
 
@@ -150,7 +183,7 @@ const getHPDashboardData = async (req, res) => {
 
     res.status(200).json({
       totalODNs, totalFacilities, expectedThisMonth,
-      rrfSent, dispatchedODNs, podConfirmed, qualityEvaluated,
+      rrfSent, rrfNotSentCount, dispatchedODNs, podConfirmed, qualityEvaluated,
       expectedVsDone: { expected, done },
       reportingPeriod: reportingMonth || 'All Time'
     });

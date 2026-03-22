@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import {
   Box,
   Typography,
@@ -33,8 +33,8 @@ const CompletedPicklists = () => {
     try {
       setLoading(true);
       const [pickRes, empRes] = await Promise.all([
-        axios.get(`${api_url}/api/getPicklists?includeCompleted=true`),
-        axios.get(`${api_url}/api/get-employee`),
+        api.get(`/api/getPicklists?includeCompleted=true`),
+        api.get(`/api/get-employee`),
       ]);
 
       // Filter picklists with status "completed" (facility info now comes from backend)

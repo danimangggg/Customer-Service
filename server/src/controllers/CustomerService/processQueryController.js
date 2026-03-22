@@ -4,8 +4,24 @@ const Employee = db.employee;
 
 const getActiveProcesses = async (req, res) => {
   try {
-    // Return all process records (not just o2c_started)
-    const processes = await Process.findAll();
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+
+    // Build facility branch filter
+    const facilityWhere = (accountType !== 'Super Admin' && branchCode)
+      ? { branch_code: branchCode }
+      : {};
+
+    const Facility = db.facility;
+    const includeOpts = [{
+      model: Facility,
+      as: 'facility',
+      attributes: ['id', 'facility_name', 'branch_code'],
+      where: Object.keys(facilityWhere).length ? facilityWhere : undefined,
+      required: Object.keys(facilityWhere).length > 0
+    }];
+
+    const processes = await Process.findAll({ include: includeOpts });
 
     // collect officer ids and fetch employee names
     const officerIds = [...new Set(processes.map(p => p.o2c_officer_id).filter(Boolean))];

@@ -201,7 +201,7 @@ const GateKeeper = () => {
       console.log('Assigned Stores:', assignedStores);
       
       const [facilityRes] = await Promise.all([
-        axios.get(`${API_URL}/api/facilities`)
+        api.get(`${API_URL}/api/facilities`)
       ]);
       
       // Fetch pending exit history records for all assigned stores
@@ -362,6 +362,14 @@ const GateKeeper = () => {
               completed_at: new Date().toISOString()
             });
             console.log('✅ All full exits allowed — process marked completed');
+
+            // Clear dispatch documentation history for this process
+            try {
+              await axios.delete(`${API_URL}/api/exit-history/process/${record.process_id}`);
+              console.log('✅ Exit history cleared for process', record.process_id);
+            } catch (err) {
+              console.error('❌ Failed to clear exit history:', err);
+            }
           }
         } catch (err) {
           console.error('❌ Failed to check completion:', err);

@@ -205,8 +205,9 @@ const DocumentationHP = () => {
       return;
     }
 
-    if (!editFormData.arrival_kilometer || parseFloat(editFormData.arrival_kilometer) < 0) {
-      MySwal.fire('Warning', 'Please enter a valid destination kilometer', 'warning');
+    if (editFormData.arrival_kilometer !== '' && editFormData.arrival_kilometer !== null &&
+        editFormData.arrival_kilometer !== undefined && parseFloat(editFormData.arrival_kilometer) < 0) {
+      MySwal.fire('Warning', 'Destination kilometer cannot be negative', 'warning');
       return;
     }
 

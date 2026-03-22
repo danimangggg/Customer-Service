@@ -17,6 +17,7 @@ import {
   Description as DocumentIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -94,16 +95,15 @@ const QualityEvaluationHP = () => {
     const silentFetch = async () => {
       if (openEditDialog) return;
       try {
-        const res = await axios.get(`${api_url}/api/quality-evaluation-odns`, {
+        const res = await api.get(`${api_url}/api/quality-evaluation-odns`, {
           params: { month: selectedMonth, year: selectedYear, search: searchTerm, process_type: filterType.toLowerCase() }
         });
         const odns = res.data.odns || [];
         const facilityMap = {};
         odns.forEach(odn => {
-          const dispatchDate = odn.dispatch_completed_at ? new Date(odn.dispatch_completed_at).toISOString().split('T')[0] : 'unknown';
-          const key = `${odn.facility_name}_${dispatchDate}`;
+          const key = odn.facility_id;
           if (!facilityMap[key]) {
-            facilityMap[key] = { facility_name: odn.facility_name, region_name: odn.region_name, route_name: odn.route_name, dispatch_completed_at: odn.dispatch_completed_at, odns: [], total_odns: 0, quality_confirmed_count: 0 };
+            facilityMap[key] = { facility_id: odn.facility_id, facility_name: odn.facility_name, region_name: odn.region_name, route_name: odn.route_name, dispatch_completed_at: odn.dispatch_completed_at, odns: [], total_odns: 0, quality_confirmed_count: 0 };
           }
           facilityMap[key].odns.push({ odn_id: odn.odn_id, odn_number: odn.odn_number, pod_number: odn.pod_number, quality_confirmed: odn.quality_confirmed, quality_feedback: odn.quality_feedback });
           facilityMap[key].total_odns++;
@@ -117,68 +117,56 @@ const QualityEvaluationHP = () => {
   }, [selectedMonth, selectedYear, searchTerm, filterType, openEditDialog]);
 
   const fetchQualityFacilities = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await axios.get(`${api_url}/api/quality-evaluation-odns`, {
-        params: {
-          month: selectedMonth,
-          year: selectedYear,
-          search: searchTerm,
-          process_type: filterType.toLowerCase()
-        }
-      });
-      
-      const odns = response.data.odns || [];
-      
-      // Group ODNs by facility + dispatch completion time (to separate different delivery batches)
-      const facilityMap = {};
-      odns.forEach(odn => {
-        const dispatchDate = odn.dispatch_completed_at ? new Date(odn.dispatch_completed_at).toISOString().split('T')[0] : 'unknown';
-        const key = `${odn.facility_name}_${dispatchDate}`; // Unique key per facility-dispatch batch
-        
-        console.log('Processing ODN:', {
-          odn_number: odn.odn_number,
-          facility: odn.facility_name,
-          dispatch_completed_at: odn.dispatch_completed_at,
-          dispatchDate,
-          key
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await api.get(`${api_url}/api/quality-evaluation-odns`, {
+          params: {
+            month: selectedMonth,
+            year: selectedYear,
+            search: searchTerm,
+            process_type: filterType.toLowerCase()
+          }
         });
-        
-        if (!facilityMap[key]) {
-          facilityMap[key] = {
-            facility_name: odn.facility_name,
-            region_name: odn.region_name,
-            route_name: odn.route_name,
-            dispatch_completed_at: odn.dispatch_completed_at,
-            odns: [],
-            total_odns: 0,
-            quality_confirmed_count: 0
-          };
-        }
-        facilityMap[key].odns.push({
-          odn_id: odn.odn_id,
-          odn_number: odn.odn_number,
-          pod_number: odn.pod_number,
-          quality_confirmed: odn.quality_confirmed,
-          quality_feedback: odn.quality_feedback
+
+        const odns = response.data.odns || [];
+
+        // Group ODNs by facility_id (unique per facility, branch-safe)
+        const facilityMap = {};
+        odns.forEach(odn => {
+          const key = odn.facility_id;
+          if (!facilityMap[key]) {
+            facilityMap[key] = {
+              facility_id: odn.facility_id,
+              facility_name: odn.facility_name,
+              region_name: odn.region_name,
+              route_name: odn.route_name,
+              dispatch_completed_at: odn.dispatch_completed_at,
+              odns: [],
+              total_odns: 0,
+              quality_confirmed_count: 0
+            };
+          }
+          facilityMap[key].odns.push({
+            odn_id: odn.odn_id,
+            odn_number: odn.odn_number,
+            pod_number: odn.pod_number,
+            quality_confirmed: odn.quality_confirmed,
+            quality_feedback: odn.quality_feedback
+          });
+          facilityMap[key].total_odns++;
+          if (odn.quality_confirmed) facilityMap[key].quality_confirmed_count++;
         });
-        facilityMap[key].total_odns++;
-        if (odn.quality_confirmed) facilityMap[key].quality_confirmed_count++;
-      });
-      
-      console.log('Facility groups:', Object.keys(facilityMap));
-      console.log('Facility map:', facilityMap);
-      
-      setFacilityData(Object.values(facilityMap));
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setError("Failed to load facilities. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+
+        setFacilityData(Object.values(facilityMap));
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setError("Failed to load facilities. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
   const handleEditClick = (facility) => {
     setSelectedFacility(facility);
@@ -214,7 +202,7 @@ const QualityEvaluationHP = () => {
         quality_feedback: editFormData.quality_feedback
       }));
 
-      await axios.put(`${api_url}/api/odns/bulk-quality-evaluation`, {
+      await api.put(`${api_url}/api/odns/bulk-quality-evaluation`, {
         updates: odnUpdates,
         evaluated_by: loggedInUserId
       });
@@ -286,8 +274,6 @@ const QualityEvaluationHP = () => {
               <InputLabel>Type</InputLabel>
               <Select value={filterType} label="Type" onChange={(e) => { setFilterType(e.target.value); setPage(0); }}>
                 <MenuItem value="Regular">HP Regular</MenuItem>
-                <MenuItem value="Emergency">Emergency</MenuItem>
-                <MenuItem value="Breakdown">Breakdown</MenuItem>
                 <MenuItem value="Vaccine">Vaccine</MenuItem>
               </Select>
             </FormControl>

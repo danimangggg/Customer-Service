@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import {
   Box,
   Typography,
@@ -46,7 +46,7 @@ const QueueManager = () => {
       setError(null);
       
       // Get customers with O2C completed status that have ODNs for this store
-      const response = await axios.get(`${API_URL}/api/customer-availability/o2c-completed`, {
+      const response = await api.get(`/api/customer-availability/o2c-completed`, {
         params: { store: userStore }
       });
       
@@ -145,7 +145,7 @@ const QueueManager = () => {
           is_available: true
         };
         console.log('Marking available:', customerId);
-        promises.push(axios.post(`${API_URL}/api/customer-availability/mark-available`, payload));
+        promises.push(api.post(`/api/customer-availability/mark-available`, payload));
       });
 
       // Mark as unavailable
@@ -159,7 +159,7 @@ const QueueManager = () => {
           is_available: false
         };
         console.log('Marking unavailable:', customerId);
-        promises.push(axios.post(`${API_URL}/api/customer-availability/mark-available`, payload));
+        promises.push(api.post(`/api/customer-availability/mark-available`, payload));
       });
 
       const results = await Promise.all(promises);

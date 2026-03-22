@@ -36,7 +36,7 @@ const getDispatchedODNs = async (req, res) => {
         r.id as route_id,
         p.reporting_month,
         ra.id as route_assignment_id,
-        ra.arrival_kilometer,
+        COALESCE(ra.arrival_kilometer, MAX(p.arrival_kilometer)) as arrival_kilometer,
         COUNT(DISTINCT o.id) as total_odns,
         SUM(CASE WHEN o.pod_confirmed = 1 THEN 1 ELSE 0 END) as confirmed_pods,
         SUM(CASE WHEN o.pod_confirmed = 1 AND o.documents_signed = 1 AND o.documents_handover = 1 THEN 1 ELSE 0 END) as fully_completed_odns,
@@ -271,35 +271,32 @@ const bulkUpdatePODConfirmation = async (req, res) => {
         continue; // Skip invalid updates
       }
 
-      // If not confirmed, reason should be provided
-      if (!pod_confirmed && !pod_reason) {
-        continue; // Skip updates without reason when not confirmed
-      }
-
       try {
         // Start a transaction for updating both tables
         const transaction = await db.sequelize.transaction();
 
         try {
-          // Update ODN table
-          const odnUpdateQuery = `
-            UPDATE odns 
-            SET pod_confirmed = ?, 
-                pod_reason = ?,
-                pod_number = ?,
-                pod_confirmed_by = ?,
-                pod_confirmed_at = NOW()
-            WHERE id = ?
-          `;
+          // Always save pod_number; only set pod_confirmed_at when actually confirming
+          const odnUpdateQuery = pod_confirmed
+            ? `UPDATE odns 
+               SET pod_confirmed = ?, 
+                   pod_reason = ?,
+                   pod_number = ?,
+                   pod_confirmed_by = ?,
+                   pod_confirmed_at = NOW()
+               WHERE id = ?`
+            : `UPDATE odns 
+               SET pod_confirmed = 0,
+                   pod_number = ?,
+                   pod_confirmed_by = ?
+               WHERE id = ?`;
+
+          const odnReplacements = pod_confirmed
+            ? [pod_confirmed, pod_reason || null, pod_number || null, confirmed_by, odn_id]
+            : [pod_number || null, confirmed_by, odn_id];
 
           await db.sequelize.query(odnUpdateQuery, {
-            replacements: [
-              pod_confirmed, 
-              pod_reason || null, 
-              pod_number || null,
-              confirmed_by, 
-              odn_id
-            ],
+            replacements: odnReplacements,
             type: db.sequelize.QueryTypes.UPDATE,
             transaction
           });

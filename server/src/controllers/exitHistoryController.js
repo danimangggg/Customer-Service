@@ -88,6 +88,7 @@ async function getHistoryByStore(req, res) {
       INNER JOIN customer_queue cq ON eh.process_id = cq.id
       LEFT JOIN facilities f ON cq.facility_id = f.id
       WHERE eh.store_id = ?
+        AND LOWER(COALESCE(cq.status, '')) != 'completed'
       ORDER BY eh.created_at DESC
     `, { replacements: [store], type: db.sequelize.QueryTypes.SELECT });
 
@@ -168,5 +169,18 @@ module.exports = {
   getHistoryByStore,
   getPendingByStore,
   updateGateStatus,
-  updateExitHistoryRow
+  updateExitHistoryRow,
+  deleteExitHistoryByProcess
 };
+
+// Delete all exit_history rows for a process (called after Gate Keeper completes)
+async function deleteExitHistoryByProcess(req, res) {
+  try {
+    const { processId } = req.params;
+    await ExitHistory.destroy({ where: { process_id: processId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting exit history:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}

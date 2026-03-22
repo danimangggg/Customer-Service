@@ -26,25 +26,23 @@ const getODNsForFollowup = async (req, res) => {
         o.documents_handover,
         o.followup_completed_by,
         o.followup_completed_at,
+        p.facility_id,
         f.facility_name,
         f.region_name,
         f.zone_name,
         f.woreda_name,
         r.route_name,
         p.reporting_month,
-        ra.status as dispatch_status,
-        ra.completed_at as dispatch_completed_at
+        p.updated_at as dispatch_completed_at
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed'
-        AND p.status = 'vehicle_requested'
+      LEFT JOIN routes r ON f.route = r.route_name
+      WHERE p.status IN ('dispatch_completed', 'vehicle_requested', 'documentation_completed', 'completed')
         AND o.pod_confirmed = TRUE
         ${branchFilter}
         ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
-      ORDER BY ra.completed_at DESC, f.facility_name, o.odn_number
+      ORDER BY p.updated_at DESC, f.facility_name, o.odn_number
       LIMIT ? OFFSET ?
     `;
 
@@ -53,17 +51,14 @@ const getODNsForFollowup = async (req, res) => {
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id AND p.reporting_month = ?
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed'
-        AND p.status = 'vehicle_requested'
+      WHERE p.status IN ('dispatch_completed', 'vehicle_requested', 'documentation_completed', 'completed')
         AND o.pod_confirmed = TRUE
         ${branchFilter}
         ${search ? 'AND (o.odn_number LIKE ? OR f.facility_name LIKE ?)' : ''}
     `;
 
-    let queryParams = [reportingMonth, month];
-    let countParams = [reportingMonth, month];
+    let queryParams = [reportingMonth];
+    let countParams = [reportingMonth];
 
     if (search) {
       const searchPattern = `%${search}%`;
@@ -112,10 +107,7 @@ const getFollowupStats = async (req, res) => {
 
     const baseWhere = `
       INNER JOIN facilities f ON p.facility_id = f.id
-      INNER JOIN routes r ON f.route = r.route_name
-      INNER JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
-      WHERE ra.status = 'Completed' 
-        AND p.status = 'vehicle_requested'
+      WHERE p.status IN ('dispatch_completed', 'vehicle_requested', 'documentation_completed', 'completed')
         AND o.pod_confirmed = TRUE
         ${branchFilter}
     `;
@@ -150,22 +142,22 @@ const getFollowupStats = async (req, res) => {
     `;
 
     const totalResult = await db.sequelize.query(totalConfirmedQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
     const signedResult = await db.sequelize.query(documentsSignedQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
     const handoverResult = await db.sequelize.query(documentsHandoverQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
     const completedResult = await db.sequelize.query(completedFollowupQuery, {
-      replacements: [reportingMonth, month],
+      replacements: [reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
     res.json({

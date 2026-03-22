@@ -123,12 +123,12 @@ const PIVehicleRequests = () => {
     const silentFetch = async () => {
       try {
         if (filterType === 'Regular') {
-          const res = await axios.get(`${api_url}/api/pi-vehicle-requests`, {
+          const res = await api.get(`${api_url}/api/pi-vehicle-requests`, {
             params: { month: currentEthiopianMonth, year: currentEthiopianYear, process_type: 'regular' }
           });
           setRouteData(res.data.routes || []);
         } else {
-          const res = await axios.get(`${api_url}/api/pi-vehicle-requests/by-facility`, {
+          const res = await api.get(`${api_url}/api/pi-vehicle-requests/by-facility`, {
             params: { process_type: filterType.toLowerCase() }
           });
           setFacilityData(res.data.facilities || []);
@@ -144,7 +144,7 @@ const PIVehicleRequests = () => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`${api_url}/api/pi-vehicle-requests`, {
+      const response = await api.get(`${api_url}/api/pi-vehicle-requests`, {
         params: {
           month: currentEthiopianMonth,
           year: currentEthiopianYear,
@@ -166,7 +166,7 @@ const PIVehicleRequests = () => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`${api_url}/api/pi-vehicle-requests/by-facility`, {
+      const response = await api.get(`${api_url}/api/pi-vehicle-requests/by-facility`, {
         params: {
           process_type: filterType.toLowerCase()
         }
@@ -183,7 +183,7 @@ const PIVehicleRequests = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/pi-vehicle-requests/stats`, {
+      const response = await api.get(`${api_url}/api/pi-vehicle-requests/stats`, {
         params: {
           month: currentEthiopianMonth,
           year: currentEthiopianYear
@@ -206,7 +206,7 @@ const PIVehicleRequests = () => {
 
   const fetchDrivers = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/drivers/available`);
+      const response = await api.get(`${api_url}/api/drivers/available`);
       setDrivers(response.data);
     } catch (err) {
       console.error("Drivers fetch error:", err);
@@ -215,7 +215,7 @@ const PIVehicleRequests = () => {
 
   const fetchDeliverers = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/deliverers/available`);
+      const response = await api.get(`${api_url}/api/deliverers/available`);
       setDeliverers(response.data);
     } catch (err) {
       console.error("Deliverers fetch error:", err);
@@ -235,7 +235,7 @@ const PIVehicleRequests = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.post(`${api_url}/api/pi-vehicle-requests/request`, {
+        await api.post(`${api_url}/api/pi-vehicle-requests/request`, {
           route_id: routeId,
           month: currentEthiopianMonth,
           year: currentEthiopianYear,
@@ -244,7 +244,7 @@ const PIVehicleRequests = () => {
 
         // Record service time for PI Officer
         try {
-          await axios.post(`${api_url}/api/service-time-hp`, {
+          await api.post(`${api_url}/api/service-time-hp`, {
             process_id: routeId,
             service_unit: 'PI Officer - HP',
             end_time: new Date().toISOString(),
@@ -281,14 +281,14 @@ const PIVehicleRequests = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.post(`${api_url}/api/pi-vehicle-requests/request-by-process`, {
+        await api.post(`${api_url}/api/pi-vehicle-requests/request-by-process`, {
           process_id: processId,
           requested_by: loggedInUserId
         });
 
         // Record service time for PI Officer
         try {
-          await axios.post(`${api_url}/api/service-time-hp`, {
+          await api.post(`${api_url}/api/service-time-hp`, {
             process_id: processId,
             service_unit: 'PI Officer - HP',
             end_time: new Date().toISOString(),
@@ -329,7 +329,7 @@ const PIVehicleRequests = () => {
     }
 
     try {
-      await axios.post(`${api_url}/api/route-assignments`, {
+      await api.post(`${api_url}/api/route-assignments`, {
         route_id: editingRoute.route_id,
         vehicle_id: assignmentData.vehicle_id,
         driver_id: assignmentData.driver_id,
@@ -362,7 +362,7 @@ const PIVehicleRequests = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`${api_url}/api/pi-vehicle-requests/${routeId}`, {
+        await api.delete(`${api_url}/api/pi-vehicle-requests/${routeId}`, {
           params: {
             month: currentEthiopianMonth,
             year: currentEthiopianYear
@@ -460,8 +460,6 @@ const PIVehicleRequests = () => {
                 onChange={(e) => { setFilterType(e.target.value); setPage(0); }}
               >
                 <MenuItem value="Regular">HP Regular</MenuItem>
-                <MenuItem value="Emergency">Emergency</MenuItem>
-                <MenuItem value="Breakdown">Breakdown</MenuItem>
                 <MenuItem value="Vaccine">Vaccine</MenuItem>
               </Select>
             </FormControl>
@@ -519,9 +517,14 @@ const PIVehicleRequests = () => {
               </TableHead>
               <TableBody>
                 {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => {
-                  // Calculate remaining facilities that need to complete Biller
-                  const remainingFacilities = route.total_facilities_in_route - route.biller_completed_facilities - route.vehicle_requested_facilities;
-                  const allFacilitiesReady = remainingFacilities === 0;
+                  // Use server-computed flag — it accounts for biller_completed, vehicle_requested, and RRF/VRF not sent
+                  const allFacilitiesReady = route.all_facilities_ready === 1;
+                  const readyCount = (route.facilities || []).filter(f =>
+                    f.process_status === 'biller_completed' ||
+                    f.process_status === 'vehicle_requested' ||
+                    f.rrf_not_sent === 1
+                  ).length;
+                  const remainingFacilities = route.total_facilities_in_route - readyCount;
                   
                   // Route is inactive if it has passed PI stage (vehicle already requested/assigned)
                   const hasPassedPI = route.vehicle_requested === 1;
@@ -573,17 +576,18 @@ const PIVehicleRequests = () => {
                         )}
                         {route.facilities.map((facility, idx) => {
                           const isCompleted = facility.process_status === 'biller_completed' || facility.process_status === 'vehicle_requested';
-                          const isPending = facility.process_status === 'no_process' || (!isCompleted && facility.process_status !== 'vehicle_requested');
+                          const isRrfNotSent = facility.rrf_not_sent === 1;
+                          const isReady = isCompleted || isRrfNotSent;
                           return (
                             <Box key={idx} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                               <Typography variant="body2">
                                 • {facility.facility_name}
                               </Typography>
-                              {isCompleted ? (
+                              {isReady ? (
                                 <Chip 
-                                  label="✓" 
+                                  label={isRrfNotSent && !isCompleted ? 'RRF Not Sent ✓' : '✓'} 
                                   size="small" 
-                                  color="success" 
+                                  color={isRrfNotSent && !isCompleted ? 'warning' : 'success'}
                                   sx={{ ml: 1, height: 18, fontSize: '0.7rem' }}
                                 />
                               ) : (

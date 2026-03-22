@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import MUIDataTable from 'mui-datatables';
 import * as XLSX from 'xlsx';
 import {
@@ -66,7 +66,7 @@ const EwmDocumentation = () => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`${API_URL}/api/ewm-completed-customers`, {
+      const response = await api.get(`/api/ewm-completed-customers`, {
         params: { store: userStore }
       });
 
@@ -134,7 +134,7 @@ const EwmDocumentation = () => {
         created_by_name: userName
       };
 
-      await axios.post(`${API_URL}/api/invoices`, payload);
+      await api.post(`/api/invoices`, payload);
 
       Swal.fire({
         icon: 'success',

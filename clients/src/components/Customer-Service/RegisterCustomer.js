@@ -23,7 +23,7 @@ import {
   Phone,
   Email,
 } from '@mui/icons-material';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
@@ -75,7 +75,7 @@ const RegisterCustomer = () => {
   /* ---------------- Fetching Data ---------------- */
   useEffect(() => {
     setLoadingRegions(true);
-    axios.get(`${api_url}/api/regions`).then(res => {
+    api.get(`/api/regions`).then(res => {
       console.log('Fetched regions:', res.data);
       setRegions(res.data);
       setLoadingRegions(false);
@@ -98,8 +98,7 @@ const RegisterCustomer = () => {
       setSelectedWoreda('');
       setSelectedFacility('');
       
-      // Use query parameter to filter zones by region
-      axios.get(`${api_url}/api/zones?region=${encodeURIComponent(selectedRegion)}`).then(res => {
+      api.get(`/api/zones?region=${encodeURIComponent(selectedRegion)}`).then(res => {
         console.log('Filtered zones for region', selectedRegion, ':', res.data);
         setZones(res.data);
         setLoadingZones(false);
@@ -129,8 +128,8 @@ const RegisterCustomer = () => {
       setSelectedFacility('');
       
       // Use query parameter to filter woredas by zone
-      axios.get(`${api_url}/api/woredas?zone=${encodeURIComponent(selectedZone)}`).then(res => {
-        console.log('Filtered woredas for zone', selectedZone, ':', res.data);
+      api.get(`/api/woredas?zone=${encodeURIComponent(selectedZone)}`).then(res => {
+        console.log('Filtered woredas for zone', selectedZone, ':', JSON.stringify(res.data));
         setWoredas(res.data);
         setLoadingWoredas(false);
       }).catch(err => {
@@ -155,8 +154,8 @@ const RegisterCustomer = () => {
       setSelectedFacility('');
       
       // Use the filtered facilities endpoint
-      axios.get(`${api_url}/api/filtered-facilities?woreda=${encodeURIComponent(selectedWoreda)}`).then(res => {
-        console.log('Filtered facilities for woreda', selectedWoreda, ':', res.data);
+      api.get(`/api/filtered-facilities?woreda=${encodeURIComponent(selectedWoreda)}`).then(res => {
+        console.log('Filtered facilities for woreda', selectedWoreda, ':', JSON.stringify(res.data));
         setFacilities(res.data);
         setLoadingFacilities(false);
       }).catch(err => {
@@ -174,8 +173,8 @@ const RegisterCustomer = () => {
 
   // Fetch all employees
   useEffect(() => {
-    axios
-      .get(`${api_url}/api/get-employee`)
+    api
+      .get(`/api/get-employee`)
       .then(res => setOfficers(res.data))
       .catch(err => {
         console.error('Failed to fetch officers:', err);
@@ -189,7 +188,7 @@ const RegisterCustomer = () => {
   useEffect(() => {
     const fetchAssignedCounts = async () => {
       try {
-        const response = await axios.get(`${api_url}/api/serviceList`);
+        const response = await api.get(`/api/serviceList`);
         const allCustomers = response.data;
         const counts = {};
 
@@ -290,7 +289,7 @@ const RegisterCustomer = () => {
       letter_number: letterNumber || null,
     };
 
-    axios.post(`${api_url}/api/customer-queue`, payload).then(async (response) => {
+    api.post(`/api/customer-queue`, payload).then(async (response) => {
       const customerQueueId = response.data.task?.id;
       
       // Insert service time record for Customer Service Officer
@@ -306,7 +305,7 @@ const RegisterCustomer = () => {
         };
         
         try {
-          const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+          const serviceTimeResponse = await api.post(`/api/service-time`, serviceTimeData);
           console.log('✅ Service time recorded:', serviceTimeResponse.data);
         } catch (err) {
           console.error('❌ Failed to record service time:', err);
@@ -482,7 +481,7 @@ const RegisterCustomer = () => {
                             <MenuItem disabled>No regions available</MenuItem>
                           ) : (
                             regions.map(r => (
-                              <MenuItem key={r.id} value={r.region_name}>
+                              <MenuItem key={r.region_name} value={r.region_name}>
                                 {r.region_name}
                               </MenuItem>
                             ))
@@ -516,7 +515,7 @@ const RegisterCustomer = () => {
                             <MenuItem disabled>No zones available for selected region</MenuItem>
                           ) : (
                             zones.map(z => (
-                              <MenuItem key={z.id} value={z.zone_name}>
+                              <MenuItem key={z.zone_name} value={z.zone_name}>
                                 {z.zone_name}
                               </MenuItem>
                             ))
@@ -529,7 +528,7 @@ const RegisterCustomer = () => {
                           fullWidth
                           label="Woreda"
                           value={selectedWoreda}
-                          onChange={e => setSelectedWoreda(e.target.value)}
+                          onChange={e => { console.log('Woreda selected:', e.target.value); setSelectedWoreda(e.target.value); }}
                           className="form-field"
                           disabled={!selectedZone || loadingWoredas}
                           sx={{
@@ -550,7 +549,7 @@ const RegisterCustomer = () => {
                             <MenuItem disabled>No woredas available for selected zone</MenuItem>
                           ) : (
                             woredas.map(w => (
-                              <MenuItem key={w.id} value={w.woreda_name}>
+                              <MenuItem key={w.woreda_name} value={w.woreda_name}>
                                 {w.woreda_name}
                               </MenuItem>
                             ))

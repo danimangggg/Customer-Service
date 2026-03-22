@@ -11,6 +11,7 @@ import {
   Business as BusinessIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../utils/toast';
 
@@ -94,7 +95,7 @@ const HPDriverAssignment = () => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.get(`${api_url}/api/tm-vehicle-assignment-processes`, {
+      const response = await api.get(`${api_url}/api/tm-vehicle-assignment-processes`, {
         params: {
           month: currentEthiopian.month,
           year: currentEthiopian.year
@@ -112,7 +113,7 @@ const HPDriverAssignment = () => {
 
   const fetchDrivers = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/drivers/available`);
+      const response = await api.get(`${api_url}/api/drivers/available`);
       setDrivers(response.data || []);
       console.log('Drivers loaded:', response.data?.length || 0);
     } catch (err) {
@@ -122,7 +123,7 @@ const HPDriverAssignment = () => {
 
   const fetchDeliverers = async () => {
     try {
-      const response = await axios.get(`${api_url}/api/deliverers/available`);
+      const response = await api.get(`${api_url}/api/deliverers/available`);
       setDeliverers(response.data || []);
       console.log('Deliverers loaded:', response.data?.length || 0);
     } catch (err) {
@@ -147,7 +148,7 @@ const HPDriverAssignment = () => {
       const driver = drivers.find(d => d.id === selectedDriver);
       const deliverer = deliverers.find(d => d.id === selectedDeliverer);
 
-      await axios.post(`${api_url}/api/tm-assign-vehicle`, {
+      await api.post(`${api_url}/api/tm-assign-vehicle`, {
         process_id: selectedProcess.id,
         driver_id: driver.id,
         driver_name: driver.full_name,

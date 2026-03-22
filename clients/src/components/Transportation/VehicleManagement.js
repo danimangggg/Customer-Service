@@ -41,7 +41,6 @@ import axios from 'axios';
 import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import BranchSelect from '../Settings/BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -58,11 +57,11 @@ const VehicleManagement = () => {
     vehicle_type: 'Truck',
     status: 'Active',
     description: '',
-    branch_code: ''
+    branch_code: localStorage.getItem('branch_code') || ''
   });
-  const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [searchTerm, setSearchTerm] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const api_url = process.env.REACT_APP_API_URL;
@@ -147,7 +146,7 @@ const VehicleManagement = () => {
         vehicle_type: 'Truck',
         status: 'Active',
         description: '',
-        branch_code: ''
+        branch_code: localStorage.getItem('branch_code') || ''
       });
       setEditMode(false);
       console.log('Set to CREATE mode');
@@ -165,7 +164,7 @@ const VehicleManagement = () => {
       vehicle_type: 'Truck',
       status: 'Active',
       description: '',
-      branch_code: ''
+      branch_code: localStorage.getItem('branch_code') || ''
     });
     console.log('Dialog closed and form reset');
   };
@@ -217,11 +216,11 @@ const VehicleManagement = () => {
 
       if (editMode) {
         console.log(`Making PUT request to: ${api_url}/api/vehicles/${currentVehicle.id}`);
-        await axios.put(`${api_url}/api/vehicles/${currentVehicle.id}`, vehicleData);
+        await api.put(`${api_url}/api/vehicles/${currentVehicle.id}`, vehicleData);
         showSnackbar('Vehicle updated successfully');
       } else {
         console.log(`Making POST request to: ${api_url}/api/vehicles`);
-        await axios.post(`${api_url}/api/vehicles`, vehicleData);
+        await api.post(`${api_url}/api/vehicles`, vehicleData);
         showSnackbar('Vehicle added successfully');
       }
       fetchVehicles();
@@ -283,7 +282,7 @@ const VehicleManagement = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`${api_url}/api/vehicles/${vehicle.id}`);
+        await api.delete(`${api_url}/api/vehicles/${vehicle.id}`);
         
         // Success animation
         await MySwal.fire({
@@ -595,10 +594,7 @@ const VehicleManagement = () => {
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <BranchSelect
-                value={currentVehicle.branch_code}
-                onChange={(val) => handleInputChange('branch_code', val)}
-              />
+
             </Grid>
           </Grid>
         </DialogContent>

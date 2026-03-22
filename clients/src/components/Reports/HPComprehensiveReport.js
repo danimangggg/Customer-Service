@@ -76,10 +76,13 @@ const HPComprehensiveReport = () => {
   const [selectedYear, setSelectedYear] = useState(initialEth.year);
   const [processType, setProcessType] = useState('regular');
 
-  // Branch filter — Super Admin can pick a branch; others use their own
+  // Branch filter — Super Admin and Reports job title can pick a branch; others use their own
   const currentAccountType = localStorage.getItem('AccountType') || '';
+  const currentJobTitle = localStorage.getItem('JobTitle') || '';
   const isSuperAdmin = currentAccountType === 'Super Admin';
-  const defaultBranch = isSuperAdmin ? '' : (localStorage.getItem('branch_code') || '');
+  const isReportsRole = currentJobTitle === 'Reports';
+  const canSelectBranch = isSuperAdmin || isReportsRole;
+  const defaultBranch = canSelectBranch ? '' : (localStorage.getItem('branch_code') || '');
   const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
 
   // Best Of state — default to This Year so data shows immediately
@@ -119,6 +122,11 @@ const HPComprehensiveReport = () => {
     fetchReportData();
   }, [selectedMonth, selectedYear, processType, selectedBranch]);
 
+  useEffect(() => {
+    if (activeTab === 7) fetchBestOfHP(bestOfRange);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBranch]);
+
   const fetchReportData = async () => {
     try {
       setLoading(true);
@@ -147,9 +155,9 @@ const HPComprehensiveReport = () => {
   };
 
   const tabs = [
-    { label: 'Dashboard',                 icon: <AssessmentIcon /> },
-    { label: 'HP Customer Detail Report', icon: <PeopleIcon /> },
-    { label: 'ODN/POD Details',           icon: <AssignmentIcon /> },
+    { label: 'Dashboard',         icon: <AssessmentIcon /> },
+    { label: 'Customer Detail',   icon: <PeopleIcon /> },
+    { label: 'POD Detail',                icon: <AssignmentIcon /> },
     { label: 'RRF/VRF',                   icon: <AssessmentIcon /> },
     { label: 'Service Units Detail',      icon: <TableChartIcon /> },
     { label: 'Route Analysis',            icon: <RouteIcon /> },
@@ -160,8 +168,8 @@ const HPComprehensiveReport = () => {
   return (
     <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
 
-      {/* Branch filter — Super Admin only */}
-      {isSuperAdmin && (
+      {/* Branch filter — Super Admin and Reports role */}
+      {canSelectBranch && (
         <Box sx={{ mb: 2, maxWidth: 300 }}>
           <BranchSelect
             value={selectedBranch}
@@ -220,8 +228,6 @@ const HPComprehensiveReport = () => {
                 >
                   <MenuItem value="">All Types</MenuItem>
                   <MenuItem value="regular">HP Regular</MenuItem>
-                  <MenuItem value="emergency">Emergency</MenuItem>
-                  <MenuItem value="breakdown">Breakdown</MenuItem>
                   <MenuItem value="vaccine">Vaccine</MenuItem>
                 </TextField>
               </Stack>
@@ -229,13 +235,13 @@ const HPComprehensiveReport = () => {
           )}
 
           <CardContent sx={{ p: 3 }}>
-            {activeTab === 0 && <HPDashboard />}
-            {activeTab === 1 && <HPCustomerDetailReport />}
-            {activeTab === 2 && <ODNPODDetailReport />}
-            {activeTab === 3 && <ReportOverview />}
+            {activeTab === 0 && <HPDashboard branchCode={selectedBranch} />}
+            {activeTab === 1 && <HPCustomerDetailReport branchCode={selectedBranch} />}
+            {activeTab === 2 && <ODNPODDetailReport branchCode={selectedBranch} />}
+            {activeTab === 3 && <ReportOverview branchCode={selectedBranch} />}
             {activeTab === 4 && <ServiceUnitsDetail data={reportData} />}
-            {activeTab === 5 && <RouteAnalysis />}
-            {activeTab === 6 && <HPPicklistReport />}
+            {activeTab === 5 && <RouteAnalysis branchCode={selectedBranch} />}
+            {activeTab === 6 && <HPPicklistReport branchCode={selectedBranch} />}
             {activeTab === 7 && (
               <Box>
                 {/* Date Range Controls */}
@@ -285,11 +291,13 @@ const HPComprehensiveReport = () => {
                     <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
                       <CardContent sx={{ textAlign: 'center', py: 4 }}>
                         <Typography variant="h3" fontWeight="bold" gutterBottom>🏆 Best Performers 🏆</Typography>
-                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                          {new Date(bestOfData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                          {' — '}
-                          {new Date(bestOfData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        </Typography>
+                        {bestOfData.dateRange?.start && (
+                          <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                            {new Date(bestOfData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                            {' — '}
+                            {new Date(bestOfData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          </Typography>
+                        )}
                       </CardContent>
                     </Card>
 

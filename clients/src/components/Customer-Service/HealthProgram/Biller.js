@@ -8,9 +8,11 @@ import {
   Print as PrintIcon,
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Undo as UndoIcon
 } from '@mui/icons-material';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
 
@@ -86,7 +88,7 @@ const Biller = () => {
   useEffect(() => {
     const silentFetch = async () => {
       try {
-        const response = await axios.get(`${api_url}/api/biller-processes`, {
+        const response = await api.get(`${api_url}/api/biller-processes`, {
           params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType }
         });
         setProcesses(response.data.processes || []);
@@ -100,7 +102,7 @@ const Biller = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get(`${api_url}/api/biller-processes`, {
+      const response = await api.get(`${api_url}/api/biller-processes`, {
         params: {
           month: currentEthiopian.month,
           year: currentEthiopian.year,
@@ -113,6 +115,27 @@ const Biller = () => {
       setError("Failed to load processes. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRevert = async (process) => {
+    const result = await Swal.fire({
+      title: 'Return to Previous Step?',
+      text: `This will return "${process.facility?.facility_name}" back to EWM Goods Issue.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Return',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#f44336'
+    });
+    if (result.isConfirmed) {
+      try {
+        await api.post(`${api_url}/api/hp-revert-process`, { process_id: process.id });
+        successToast('Process returned to previous step');
+        fetchProcesses();
+      } catch (err) {
+        Swal.fire('Error', err.response?.data?.error || 'Failed to revert process', 'error');
+      }
     }
   };
 
@@ -131,7 +154,7 @@ const Biller = () => {
       try {
         // First receive goods if not already received
         if (process.status === 'ewm_goods_issued' || process.status === 'tm_confirmed') {
-          await axios.post(`${api_url}/api/biller-receive-goods`, {
+          await api.post(`${api_url}/api/biller-receive-goods`, {
             process_id: process.id,
             biller_officer_id: loggedInUserId,
             biller_officer_name: loggedInUserName
@@ -139,13 +162,13 @@ const Biller = () => {
         }
 
         // Then complete billing
-        await axios.post(`${api_url}/api/biller-print-documents`, {
+        await api.post(`${api_url}/api/biller-print-documents`, {
           process_id: process.id
         });
 
         // Record service time for Biller
         try {
-          await axios.post(`${api_url}/api/service-time-hp`, {
+          await api.post(`${api_url}/api/service-time-hp`, {
             process_id: process.id,
             service_unit: 'Biller - HP',
             end_time: new Date().toISOString(),
@@ -287,15 +310,26 @@ const Biller = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      <Button 
-                        variant="contained" 
-                        color="success" 
-                        size="small" 
-                        startIcon={<PrintIcon />} 
-                        onClick={() => handlePrintDocuments(process)}
-                      >
-                        Complete
-                      </Button>
+                      <Stack direction="row" spacing={1} justifyContent="center">
+                        <Button 
+                          variant="contained" 
+                          color="success" 
+                          size="small" 
+                          startIcon={<PrintIcon />} 
+                          onClick={() => handlePrintDocuments(process)}
+                        >
+                          Complete
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          size="small"
+                          startIcon={<UndoIcon />}
+                          onClick={() => handleRevert(process)}
+                        >
+                          Return
+                        </Button>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}

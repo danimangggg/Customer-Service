@@ -45,7 +45,7 @@ const groupByFacility = (odnData) => {
   odnData.forEach(odn => {
     const key = odn.facility_name;
     if (!map[key]) {
-      map[key] = { facility_name: odn.facility_name, route: odn.route || 'N/A', odns: [], pods: [], confirmed_count: 0, total_pods: 0 };
+      map[key] = { facility_name: odn.facility_name, route: odn.route || 'N/A', branch_name: odn.branch_name || odn.branch_code || 'N/A', odns: [], pods: [], confirmed_count: 0, total_pods: 0 };
     }
     if (odn.odn_number) map[key].odns.push(odn.odn_number);
     if (odn.pod_number) {
@@ -65,7 +65,7 @@ const getPODStatus = (confirmed, total) => {
   return { label: 'Partially Confirmed', color: 'warning' };
 };
 
-const ODNPODDetailReport = () => {
+const ODNPODDetailReport = ({ branchCode = '' }) => {
   const [loading, setLoading] = useState(false);
   const [odnData, setOdnData] = useState([]);
   const [routes, setRoutes] = useState(['All']);
@@ -104,6 +104,7 @@ const ODNPODDetailReport = () => {
       if (processType !== 'vaccine') {
         params.reporting_month = `${selectedMonth} ${selectedYear}`;
       }
+      if (branchCode) params.branch_code = branchCode;
       const response = await api.get(`${api_url}/api/hp-odn-pod-details`, { params });
       setOdnData(response.data.odnDetails || []);
     } catch (err) {
@@ -131,7 +132,7 @@ const ODNPODDetailReport = () => {
     return matchesRoute && matchesStatus && matchesSearch;
   });
 
-  const totalODNs = odnData.length;
+  const totalODNs = facilityRows.length;
   const totalPODs = facilityRows.reduce((sum, r) => sum + r.total_pods, 0);
   const allConfirmedCount = facilityRows.filter(r => getPODStatus(r.confirmed_count, r.total_pods).label === 'All Confirmed').length;
   const partiallyConfirmedCount = facilityRows.filter(r => getPODStatus(r.confirmed_count, r.total_pods).label === 'Partially Confirmed').length;
@@ -159,10 +160,10 @@ const ODNPODDetailReport = () => {
             <AssignmentTurnedInIcon sx={{ fontSize: 56, color: 'white' }} />
             <Box>
               <Typography variant="h4" fontWeight="bold" color="white">
-                RRF/VRF Detail Report
+                ODN/POD Detail Report
               </Typography>
               <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                Health Program - RRF/VRF Dispatch & POD Confirmation
+                Health Program - ODN Dispatch & POD Confirmation
               </Typography>
             </Box>
           </Stack>
@@ -172,7 +173,7 @@ const ODNPODDetailReport = () => {
       {/* Stats */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {[
-          { label: 'Total ODNs', value: totalODNs, color: '#2196f3' },
+          { label: 'Processing Facilities', value: totalODNs, color: '#2196f3' },
           { label: 'Total PODs', value: totalPODs, color: '#9c27b0' },
           { label: 'All Confirmed', value: allConfirmedCount, color: '#4caf50', sub: 'facilities' },
           { label: 'Not Confirmed', value: notConfirmedCount, color: '#f44336', sub: 'facilities' },
@@ -263,6 +264,7 @@ const ODNPODDetailReport = () => {
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white', width: 50 }}>#</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>Facility Name</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>Route</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>Branch</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>ODNs</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>PODs</TableCell>
                   <TableCell sx={{ fontWeight: 'bold', bgcolor: '#1976d2 !important', color: 'white' }}>POD Status</TableCell>
@@ -278,6 +280,7 @@ const ODNPODDetailReport = () => {
                       <TableCell>
                         <Chip icon={<RouteIcon />} label={row.route} size="small" color="secondary" variant="outlined" />
                       </TableCell>
+                      <TableCell>{row.branch_name}</TableCell>
                       <TableCell sx={{ maxWidth: 260 }}>
                         <Stack direction="row" flexWrap="wrap" gap={0.5}>
                           {row.odns.length > 0
@@ -307,7 +310,7 @@ const ODNPODDetailReport = () => {
                   );
                 }) : (
                   <TableRow>
-                    <TableCell colSpan={6} align="center">
+                    <TableCell colSpan={7} align="center">
                       <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>No records found</Typography>
                     </TableCell>
                   </TableRow>

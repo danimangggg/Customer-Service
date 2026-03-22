@@ -6,8 +6,7 @@ import {
   FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area
+  ResponsiveContainer, PieChart, Pie, Cell, Legend, Tooltip as RTooltip
 } from 'recharts';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -18,10 +17,10 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CancelIcon from '@mui/icons-material/Cancel';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import InventoryIcon from '@mui/icons-material/Inventory';
 import SpeedIcon from '@mui/icons-material/Speed';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import StarIcon from '@mui/icons-material/Star';
+import BranchSelect from '../Settings/BranchSelect';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -32,6 +31,7 @@ const ethiopianMonths = [
 
 const formatDuration = (mins) => {
   if (mins == null || mins === 0) return '—';
+  mins = Math.round(mins);
   if (mins < 60) return `${mins}m`;
   if (mins < 1440) { const h = Math.floor(mins/60), m = mins%60; return m > 0 ? `${h}h ${m}m` : `${h}h`; }
   const d = Math.floor(mins/1440), rem = mins%1440, h = Math.floor(rem/60);
@@ -93,7 +93,6 @@ const G = {
   red:   `linear-gradient(135deg,${C.rose} 0%,#f43f5e 100%)`,
   card:  C.surface,
 };
-const CHART_COLORS = [C.indigo, C.teal, C.amber, C.rose, C.sky, C.violet, C.emerald, '#ea580c'];
 const tooltipStyle = { background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 8, color: '#0f172a', fontSize: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.1)' };
 
 const KpiCard = ({ title, value, subtitle, icon, gradient, loading }) => (
@@ -154,60 +153,56 @@ const ManagerDashboard = () => {
   const [rdfStats, setRdfStats] = useState(null);
   const [bestOf, setBestOf] = useState(null);
   const [bestOfHP, setBestOfHP] = useState(null);
-  const [timeTrend, setTimeTrend] = useState([]);
   const [hpLoading, setHpLoading] = useState(true);
   const [rdfLoading, setRdfLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
+  const currentAccountType = localStorage.getItem('AccountType') || '';
+  const currentJobTitle = localStorage.getItem('JobTitle') || '';
+  const isSuperAdmin = currentAccountType === 'Super Admin';
+  const isReportsRole = currentJobTitle === 'Reports';
+  const canSelectBranch = isSuperAdmin || isReportsRole;
+  const defaultBranch = canSelectBranch ? '' : (localStorage.getItem('branch_code') || '');
+  const [selectedBranch, setSelectedBranch] = useState(defaultBranch);
+
   const fetchHP = useCallback(async () => {
     try {
       setHpLoading(true);
-      const r = await api.get(`${API_URL}/api/hp-comprehensive-report`, { params: { month, year, process_type: processType } });
+      const params = { month, year, process_type: processType };
+      if (selectedBranch) params.branch_code = selectedBranch;
+      const r = await api.get(`${API_URL}/api/hp-comprehensive-report`, { params });
       setHpData(r.data);
     } catch (e) { console.error(e); }
     finally { setHpLoading(false); }
-  }, [month, year, processType]);
+  }, [month, year, processType, selectedBranch]);
 
   const fetchRDF = useCallback(async () => {
     try {
       setRdfLoading(true);
+      const branchParam = selectedBranch ? { branch_code: selectedBranch } : {};
       const [statsRes, bestRes] = await Promise.all([
-        api.get(`${API_URL}/api/rdf-dashboard-stats`),
-        api.get(`${API_URL}/api/best-of-week`),
+        api.get(`${API_URL}/api/rdf-dashboard-stats`, { params: branchParam }),
+        api.get(`${API_URL}/api/best-of-week`, { params: branchParam }),
       ]);
       if (statsRes.data.success) setRdfStats(statsRes.data.stats);
       if (bestRes.data.success) setBestOf(bestRes.data.data);
-
     } catch (e) { console.error('[RDF] fetch error:', e?.response?.data || e?.message || e); }
     finally { setRdfLoading(false); }
-  }, []);
+  }, [selectedBranch]);
 
   const fetchBestOfHP = useCallback(async () => {
     try {
-      const r = await api.get(`${API_URL}/api/best-of-hp`);
+      const params = {};
+      if (selectedBranch) params.branch_code = selectedBranch;
+      const r = await api.get(`${API_URL}/api/best-of-hp`, { params });
       if (r.data.success) setBestOfHP(r.data.data);
     } catch (e) { console.error(e); }
-  }, []);
+  }, [selectedBranch]);
 
-  const fetchTrend = useCallback(async () => {
-    try {
-      const r = await api.get(`${API_URL}/api/hp-report/time-trend`);
-      if (r.data?.trendData) {
-        setTimeTrend(
-          r.data.trendData.slice(-8).map(d => ({
-            month: d.reporting_month,
-            rrf_sent: parseInt(d.facilities_reported) || 0,
-            total_odns: parseInt(d.total_odns) || 0,
-          }))
-        );
-      }
-    } catch (e) { console.error(e); }
-  }, []);
-
-  useEffect(() => { fetchHP(); fetchTrend(); fetchBestOfHP(); }, [fetchHP, fetchTrend, fetchBestOfHP]);
+  useEffect(() => { fetchHP(); fetchBestOfHP(); }, [fetchHP, fetchBestOfHP]);
   useEffect(() => { fetchRDF(); }, [fetchRDF]);
 
-  const handleRefresh = () => { fetchHP(); fetchRDF(); fetchTrend(); fetchBestOfHP(); setLastRefresh(new Date()); };
+  const handleRefresh = () => { fetchHP(); fetchRDF(); fetchBestOfHP(); setLastRefresh(new Date()); };
 
   // ── derived HP ──
   const hp = hpData?.summary || {};
@@ -215,48 +210,47 @@ const ManagerDashboard = () => {
   const isVaccine = processType === 'vaccine';
   const rrfLabel = isVaccine ? 'VRF' : 'RRF';
   const hpRrfPct  = hp.expectedFacilities > 0 ? ((hp.rrfSent / hp.expectedFacilities) * 100).toFixed(1) : 0;
-  const hpPodPct  = hp.totalODNs > 0 ? ((hp.podConfirmed / hp.totalODNs) * 100).toFixed(1) : 0;
-  const hpQualPct = hp.totalODNs > 0 ? ((hp.qualityEvaluated / hp.totalODNs) * 100).toFixed(1) : 0;
+  const hpPodPct  = hp.expectedFacilities > 0 ? (((wp.documentation_stage||0) / hp.expectedFacilities) * 100).toFixed(1) : 0;
+  const hpQualPct = hp.expectedFacilities > 0 ? (((wp.quality_stage||0) / hp.expectedFacilities) * 100).toFixed(1) : 0;
 
   // ── derived RDF ──
   const rdfTotal   = rdfStats?.totalRegistrations || 0;
   const rdfCompPct = rdfTotal > 0 ? ((rdfStats?.completedCount / rdfTotal) * 100).toFixed(1) : 0;
 
   // ── chart data ──
-  const funnelData = [
-    { stage:'O2C',      count: wp.o2c_stage || 0 },
-    { stage:'EWM',      count: wp.ewm_phase1_facilities || 0 },
-    { stage:'PI',       count: wp.pi_facilities || 0 },
-    { stage:'TM',       count: wp.tm_phase1_facilities || 0 },
-    { stage:'Doc',      count: wp.documentation_stage || 0 },
-    { stage:'Quality',  count: wp.quality_stage || 0 },
-  ].filter(d => d.count > 0);
-
   const rrfPie = [
     { name:`${rrfLabel} Sent`,  value: hp.rrfSent || 0,    color: C.emerald },
     { name:'Not Sent',          value: hp.rrfNotSent || 0,  color: C.rose },
   ];
 
   const rdfPie = [
-    { name:'Completed',     value: rdfStats?.completedCount || 0,                                                color: C.emerald },
-    { name:'In Progress',   value: rdfStats?.inProgressCount || 0,                                               color: C.amber },
-    { name:'Cancelled',     value: (rdfStats?.cancelledCount || 0) + (rdfStats?.autoCancelledCount || 0),        color: C.rose },
+    { name:'Completed',     value: rdfStats?.completedCount || 0,                                          color: C.emerald },
+    { name:'In Progress',   value: rdfStats?.inProgressCount || 0,                                         color: C.amber },
+    { name:'Cancelled',     value: (rdfStats?.cancelledCount || 0) + (rdfStats?.autoCancelledCount || 0),  color: C.rose },
   ].filter(d => d.value > 0);
-
-  const topRoutes = (hpData?.routeStats || [])
-    .sort((a, b) => parseInt(b.facilities_count) - parseInt(a.facilities_count))
-    .slice(0, 8)
-    .map(r => ({ name: r.route_name, facilities: parseInt(r.facilities_count || 0), odns: parseInt(r.odns_count || 0) }));
 
   const years = Array.from({ length: 8 }, (_, i) => eth.year - 4 + i);
 
   return (
     <Box sx={{ minHeight: '100vh', background: C.bg, p: 3 }}>
 
+      {/* ── BRANCH FILTER ── */}
+      {canSelectBranch && (
+        <Box sx={{ mb: 2, maxWidth: 300 }}>
+          <BranchSelect
+            value={selectedBranch}
+            onChange={setSelectedBranch}
+            label="Filter by Branch"
+            size="small"
+            helperText="Leave empty to see all branches"
+          />
+        </Box>
+      )}
+
       {/* ── HEADER ── */}
       <Box sx={{ background: C.surface, borderRadius: 2, p: 2.5, mb: 3, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
 
-        <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ xs:'flex-start', md:'center' }} spacing={2}>
+        <Stack direction={{ xs:'column', md:'row' }} justifyContent="space-between" alignItems={{ xs:'flex-start', md:'center' }} spacing={2} flexWrap="wrap">
           <Stack direction="row" alignItems="center" spacing={2}>
             <Box sx={{ background: G.hp, borderRadius: 2, p: 1.2 }}>
               <SpeedIcon sx={{ color: '#fff', fontSize: 28 }} />
@@ -308,14 +302,14 @@ const ManagerDashboard = () => {
           <SectionLabel label={`Health Program — ${month} ${year} · ${processType === 'vaccine' ? 'Vaccine' : 'HP Regular'}`} gradient={G.hp} />
           <Grid container spacing={2} sx={{ mb:3 }}>
             {[
-              { title:'Total Facilities',    value:hp.totalFacilities,     subtitle:'All HP facilities',        icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.blue,   loading:hpLoading },
-              { title:'Expected This Month', value:hp.expectedFacilities,  subtitle:'This period',              icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp,    loading:hpLoading },
-              { title:`${rrfLabel} Sent`,      value:hp.rrfSent,             subtitle:`${hpRrfPct}% of expected`, icon:<AssignmentIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.green,  loading:hpLoading },
-              { title:'Total ODNs',          value:hp.totalODNs,           subtitle:'Orders generated',         icon:<InventoryIcon sx={{color:'#fff',fontSize:26}}/>,     gradient:G.blue,   loading:hpLoading },
-              { title:'POD Confirmed',       value:hp.podConfirmed,        subtitle:`${hpPodPct}% rate`,        icon:<VerifiedIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.green,  loading:hpLoading },
-              { title:'Quality Evaluated',   value:hp.qualityEvaluated,    subtitle:`${hpQualPct}% of ODNs`,   icon:<StarIcon sx={{color:'#fff',fontSize:26}}/>,          gradient:G.rdf,    loading:hpLoading },
-              { title:'Completion Rate',     value:`${hpRrfPct}%`,         subtitle:'Facility coverage',        icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.hp,     loading:hpLoading },
-              { title:'Avg Process Time',    value:formatDuration(hp.avgProcessDays), subtitle:'O2C to quality eval', icon:<AccessTimeIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.amber, loading:hpLoading },
+              { title:'Total Facilities',      value:hp.totalFacilities,                                                                                                                                                    subtitle:'All HP facilities',         icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.blue,  loading:hpLoading },
+              { title:'Expected This Month',  value:hp.expectedFacilities,                                                                                                                                                   subtitle:'This period',               icon:<LocalHospitalIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.hp,    loading:hpLoading },
+              { title:'Completed Facilities', value:(hp.rrfSent||0)+(hp.rrfNotSent||0), subtitle:`${hp.expectedFacilities > 0 ? (((hp.rrfSent||0)+(hp.rrfNotSent||0))/hp.expectedFacilities*100).toFixed(1) : 0}% of expected`, icon:<CheckCircleIcon sx={{color:'#fff',fontSize:26}}/>, gradient:G.green, loading:hpLoading },
+              { title:`${rrfLabel} Sent`,     value:hp.rrfSent,                                                                                                                                                              subtitle:`${hpRrfPct}% of expected`,  icon:<AssignmentIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.green, loading:hpLoading },
+              { title:`${rrfLabel} Not Sent`, value:hp.rrfNotSent,                                                                                                                                                           subtitle:'No stock to send',          icon:<CancelIcon sx={{color:'#fff',fontSize:26}}/>,        gradient:G.amber, loading:hpLoading },
+              { title:'POD Confirmed',        value:wp.documentation_stage,                                                                                                                                                  subtitle:`${hpPodPct}% of expected`,  icon:<VerifiedIcon sx={{color:'#fff',fontSize:26}}/>,      gradient:G.blue,  loading:hpLoading },
+              { title:'Completion Rate',      value:`${hpRrfPct}%`,                                                                                                                                                          subtitle:'Facility coverage',         icon:<TrendingUpIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.hp,    loading:hpLoading },
+              { title:'Avg Process Time',     value:formatDuration(hp.avgProcessDays),                                                                                                                                       subtitle:'O2C to quality eval',       icon:<AccessTimeIcon sx={{color:'#fff',fontSize:26}}/>,    gradient:G.amber, loading:hpLoading },
             ].map((k, i) => (
               <Grid item xs={6} sm={4} md={3} key={i}><KpiCard {...k} /></Grid>
             ))}
@@ -338,13 +332,13 @@ const ManagerDashboard = () => {
                       { label:'Documentation', val:wp.documentation_stage,   color: C.violet },
                       { label:'Quality',       val:wp.quality_stage,         color: C.teal },
                     ].map(({ label, val, color }) => {
-                      const pct = hp.totalODNs > 0 ? Math.round(((val||0) / hp.totalODNs) * 100) : 0;
+                      const pct = hp.expectedFacilities > 0 ? Math.round(((val||0) / hp.expectedFacilities) * 100) : 0;
                       return (
                         <Grid item xs={12} sm={6} key={label}>
                           <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
                             <Typography variant="caption" sx={{ color: C.textMuted, fontWeight: 600, fontSize: '0.92rem' }}>{label}</Typography>
                             <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: '0.92rem' }}>
-                              {val ?? 0} <span style={{ color: C.textDim }}>/ {hp.totalODNs ?? 0}</span> ({pct}%)
+                              {val ?? 0} <span style={{ color: C.textDim }}>/ {hp.expectedFacilities ?? 0}</span> ({pct}%)
                             </Typography>
                           </Stack>
                           <LinearProgress variant="determinate" value={pct}
@@ -372,69 +366,6 @@ const ManagerDashboard = () => {
             </Grid>
           </Grid>
 
-          {/* ══ HP CHARTS ══ */}
-          <Grid container spacing={2} sx={{ mb:3 }}>
-            <Grid item xs={12} md={8}>
-              <ChartCard title={`HP Monthly Trend — ${rrfLabel} Sent vs ODNs`} height={300}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={timeTrend} margin={{ top:10, right:20, left:0, bottom:5 }}>
-                    <defs>
-                      <linearGradient id="gRRF" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={C.indigo} stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor={C.indigo} stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="gODN" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={C.teal} stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor={C.teal} stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="month" tick={{ fill: C.textMuted, fontSize:11 }} axisLine={{ stroke: C.border }} tickLine={false} />
-                    <YAxis tick={{ fill: C.textMuted, fontSize:11 }} axisLine={false} tickLine={false} width={40} />
-                    <RTooltip contentStyle={tooltipStyle} />
-                    <Legend wrapperStyle={{ color: C.text, fontSize:12 }} />
-                    <Area type="monotone" dataKey="rrf_sent" name={`${rrfLabel} Sent`} stroke={C.indigo} fill="url(#gRRF)" strokeWidth={2} dot={{ fill: C.indigo, r:3 }} />
-                    <Area type="monotone" dataKey="total_odns" name="Total ODNs" stroke={C.teal} fill="url(#gODN)" strokeWidth={2} dot={{ fill: C.teal, r:3 }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <ChartCard title="HP Workflow Completion" height={300}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={funnelData} margin={{ top:10, right:10, left:0, bottom:5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="stage" tick={{ fill: C.textMuted, fontSize:10 }} axisLine={{ stroke: C.border }} tickLine={false} />
-                    <YAxis tick={{ fill: C.textMuted, fontSize:11 }} axisLine={false} tickLine={false} width={35} />
-                    <RTooltip contentStyle={tooltipStyle} />
-                    <Bar dataKey="count" name="Completed" radius={[4,4,0,0]}>
-                      {funnelData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </Grid>
-          </Grid>
-
-          {/* Top routes */}
-          {topRoutes.length > 0 && (
-            <Box sx={{ mb:3 }}>
-              <ChartCard title="Top Routes by Facilities & ODNs" height={300}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topRoutes} margin={{ top:10, right:20, left:0, bottom:60 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize:10 }} angle={-35} textAnchor="end" axisLine={{ stroke: C.border }} tickLine={false} />
-                    <YAxis tick={{ fill: C.textMuted, fontSize:11 }} axisLine={false} tickLine={false} width={35} />
-                    <RTooltip contentStyle={tooltipStyle} />
-                    <Legend verticalAlign="top" wrapperStyle={{ color: C.text, fontSize:12, paddingBottom: 8 }} />
-                    <Bar dataKey="facilities" name="Facilities" fill={C.indigo} radius={[4,4,0,0]} />
-                    <Bar dataKey="odns" name="ODNs" fill={C.teal} radius={[4,4,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </Box>
-          )}
-
           {/* ══ HP BEST OF LAST WEEK ══ */}
           <Box sx={{ mb:3 }}>
             <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -442,7 +373,7 @@ const ManagerDashboard = () => {
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb:2 }}>
                   <EmojiEventsIcon sx={{ color: C.amber, fontSize:18 }} />
                   <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem' }}>
-                    Best of Last Week — HP
+                    All-Time Best — HP
                   </Typography>
                 </Stack>
                 {hpLoading
@@ -468,8 +399,14 @@ const ManagerDashboard = () => {
                                 </Avatar>
                                 <Box>
                                   <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.92rem' }}>{person.full_name}</Typography>
-                                  <Chip label={`${person.process_count} tasks`} size="small"
-                                    sx={{ height: 16, fontSize: '0.72rem', background: C.indigoSoft, color: C.indigo, mt: 0.2, fontWeight: 600 }} />
+                                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.3, flexWrap: 'wrap', gap: 0.3 }}>
+                                    <Chip label={`${person.process_count} tasks`} size="small"
+                                      sx={{ height: 16, fontSize: '0.72rem', background: C.indigoSoft, color: C.indigo, fontWeight: 600 }} />
+                                    {!selectedBranch && person.branch_name && (
+                                      <Chip label={person.branch_name} size="small"
+                                        sx={{ height: 16, fontSize: '0.72rem', background: C.amberSoft, color: C.amber, fontWeight: 600 }} />
+                                    )}
+                                  </Stack>
                                 </Box>
                               </Stack>
                             </Box>
@@ -505,7 +442,7 @@ const ManagerDashboard = () => {
           {/* ══ RDF CHARTS + BEST OF WEEK ══ */}
           <Grid container spacing={2} sx={{ mb:3 }}>
             {/* Status pie */}
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={6}>
               <ChartCard title="RDF Customer Status" height={260}>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -520,7 +457,7 @@ const ManagerDashboard = () => {
             </Grid>
 
             {/* Completion bars */}
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={6}>
               <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', height: '100%' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem', display: 'block', mb: 2 }}>
@@ -549,47 +486,53 @@ const ManagerDashboard = () => {
                 </CardContent>
               </Card>
             </Grid>
-
-            {/* Best of week */}
-            <Grid item xs={12} md={4}>
-              <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', height: '100%' }}>
-                <CardContent sx={{ p: 3 }}>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-                    <EmojiEventsIcon sx={{ color: C.amber, fontSize: 18 }} />
-                    <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem' }}>
-                      Best of Last Week
-                    </Typography>
-                  </Stack>
-                  {rdfLoading
-                    ? <CircularProgress size={24} sx={{ color: C.indigo }} />
-                    : bestOf?.employees && Object.values(bestOf.employees).some(Boolean)
-                      ? (
-                        <Grid container spacing={1}>
-                          {Object.entries(bestOf.employees).map(([role, person]) => person && (
-                            <Grid item xs={12} key={role}>
-                              <Box sx={{ background: C.surfaceAlt, borderRadius: 1.5, p: 1.5, border: `1px solid ${C.border}` }}>
-                                <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.72rem', fontWeight: 600 }}>{role}</Typography>
-                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
-                                  <Avatar sx={{ width: 28, height: 28, background: G.rdf, fontSize: '0.75rem', fontWeight: 700 }}>
-                                    {(person.full_name||'?')[0]}
-                                  </Avatar>
-                                  <Box>
-                                    <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.92rem' }}>{person.full_name}</Typography>
-                                    <Chip label={`${person.process_count} tasks`} size="small"
-                                      sx={{ height: 16, fontSize: '0.72rem', background: C.violetSoft, color: C.violet, mt: 0.2, fontWeight: 600 }} />
-                                  </Box>
-                                </Stack>
-                              </Box>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      )
-                      : <Typography variant="body2" sx={{ color: C.textDim }}>No data for last week.</Typography>
-                  }
-                </CardContent>
-              </Card>
-            </Grid>
           </Grid>
+
+          {/* ══ RDF ALL-TIME BEST ══ */}
+          <Box sx={{ mb: 3 }}>
+            <Card sx={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                  <EmojiEventsIcon sx={{ color: C.amber, fontSize: 18 }} />
+                  <Typography variant="overline" fontWeight={700} sx={{ color: C.textMuted, letterSpacing: 1, fontSize: '0.67rem' }}>
+                    All-Time Best — RDF
+                  </Typography>
+                </Stack>
+                {rdfLoading
+                  ? <CircularProgress size={24} sx={{ color: C.indigo }} />
+                  : bestOf?.employees && Object.values(bestOf.employees).some(Boolean)
+                    ? (
+                      <Grid container spacing={1.5}>
+                        {Object.entries(bestOf.employees).map(([role, person]) => person && (
+                          <Grid item xs={12} sm={6} md={3} key={role}>
+                            <Box sx={{ background: C.surfaceAlt, borderRadius: 1.5, p: 1.5, border: `1px solid ${C.border}` }}>
+                              <Typography variant="caption" sx={{ color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '0.72rem', fontWeight: 600 }}>{role}</Typography>
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                                <Avatar sx={{ width: 28, height: 28, background: G.rdf, fontSize: '0.75rem', fontWeight: 700 }}>
+                                  {(person.full_name||'?')[0]}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600} sx={{ color: C.text, lineHeight: 1.2, fontSize: '0.92rem' }}>{person.full_name}</Typography>
+                                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.3, flexWrap: 'wrap', gap: 0.3 }}>
+                                    <Chip label={`${person.process_count} tasks`} size="small"
+                                      sx={{ height: 16, fontSize: '0.72rem', background: C.violetSoft, color: C.violet, fontWeight: 600 }} />
+                                    {!selectedBranch && person.branch_name && (
+                                      <Chip label={person.branch_name} size="small"
+                                        sx={{ height: 16, fontSize: '0.72rem', background: C.amberSoft, color: C.amber, fontWeight: 600 }} />
+                                    )}
+                                  </Stack>
+                                </Box>
+                              </Stack>
+                            </Box>
+                          </Grid>
+                        ))}
+                      </Grid>
+                    )
+                    : <Typography variant="body2" sx={{ color: C.textDim }}>No data available.</Typography>
+                }
+              </CardContent>
+            </Card>
+          </Box>
 
         </Box>
       </Fade>

@@ -310,8 +310,8 @@ const Sidebar = () => {
            </MenuTooltip>
          )}
 
-         {/* Finance Invoices - for Cashier/Finance */}
-         {(jobTitle === "Cashier" || jobTitle === "Finance") && (
+         {/* Invoice Records - Finance only */}
+         {jobTitle === "Finance" && (
            <MenuTooltip title={"Invoice Records"}>
              <ListItem
                button
@@ -327,6 +327,34 @@ const Sidebar = () => {
                  sx={{
                    '& .MuiListItemText-primary': {
                      fontWeight: isActivePath('/finance-invoices') ? 600 : 500,
+                     fontSize: '0.95rem',
+                     lineHeight: 1.2,
+                     whiteSpace: 'normal',
+                     wordWrap: 'break-word'
+                   }
+                 }}
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* Outstanding Process - Cashier only */}
+         {jobTitle === "Cashier" && (
+           <MenuTooltip title={"Outstanding Process"}>
+             <ListItem
+               button
+               component={Link}
+               to="/outstandingProcess"
+               sx={getActiveStyles('/outstandingProcess')}
+             >
+               <ListItemIcon>
+                 <Assignment sx={{ color: '#e53935' }} />
+               </ListItemIcon>
+               <ListItemText
+                 primary={"Outstanding Process"}
+                 sx={{
+                   '& .MuiListItemText-primary': {
+                     fontWeight: isActivePath('/outstandingProcess') ? 600 : 500,
                      fontSize: '0.95rem',
                      lineHeight: 1.2,
                      whiteSpace: 'normal',
@@ -731,7 +759,7 @@ const Sidebar = () => {
          )}
 
          {/* Settings Menu - Admin and Super Admin */}
-         {isAdminOrSuperAdmin && (
+         {isAdminOrSuperAdmin && jobTitle !== "Reports" && (
            <>
              <MenuTooltip title={"Settings"}>
                <ListItem 
@@ -1179,6 +1207,16 @@ const Sidebar = () => {
              </MenuTooltip>
              <Collapse in={reportsOpen} timeout="auto" unmountOnExit>
                <List component="div" disablePadding>
+                 {isSuperAdmin && (
+                   <MenuTooltip title={"Manager Dashboard"}>
+                     <ListItem button component={Link} to="/manager-dashboard"
+                       sx={{ ...getActiveStyles('/manager-dashboard'), pl: 4, ml: 2, mr: 1 }}>
+                       <ListItemIcon><Dashboard sx={{ color: '#c62828' }} /></ListItemIcon>
+                       <ListItemText primary={"Manager Dashboard"}
+                         sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/manager-dashboard') ? 600 : 500, fontSize: '0.95rem' } }} />
+                     </ListItem>
+                   </MenuTooltip>
+                 )}
                  <MenuTooltip title={"HP Report"}>
                    <ListItem button component={Link} to="/reports/hp-comprehensive"
                      sx={{ ...getActiveStyles('/reports/hp-comprehensive'), pl: 4, ml: 2, mr: 1 }}>
@@ -1279,7 +1317,7 @@ const Sidebar = () => {
          )}
 
          {/* HP Report - for HP users only */}
-         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") && (
+         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "Reports" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") && (
            <MenuTooltip title={"HP Report"}>
              <ListItem 
                button 

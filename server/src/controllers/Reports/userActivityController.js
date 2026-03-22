@@ -5,8 +5,12 @@ const { Op } = require('sequelize');
 const getUserActivityLog = async (req, res) => {
   try {
     const { startDate, endDate, userId, actionType } = req.query;
-    
-    // Build comprehensive activity log from service_time table
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+    const effectiveBranch = accountType !== 'Super Admin' ? branchCode : null;
+    const branchFilter = effectiveBranch ? `AND f.branch_code = '${effectiveBranch}'` : '';
+    const branchFilterCq = effectiveBranch ? `AND f.branch_code = '${effectiveBranch}'` : '';
+
     const activityQuery = `
       SELECT 
         st.id as activity_id,
@@ -51,6 +55,7 @@ const getUserActivityLog = async (req, res) => {
       LEFT JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN customer_queue cq ON cq.facility_id = f.id
       WHERE 1=1
+      ${branchFilter}
       ORDER BY st.end_time DESC
       LIMIT 1000
     `;
@@ -116,6 +121,7 @@ const getUserActivityLog = async (req, res) => {
       FROM customer_queue cq
       LEFT JOIN facilities f ON cq.facility_id = f.id
       WHERE cq.registration_completed_at IS NOT NULL
+      ${branchFilterCq}
       ORDER BY cq.registration_completed_at DESC
       LIMIT 500
     `;

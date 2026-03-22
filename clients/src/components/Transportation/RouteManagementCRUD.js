@@ -39,7 +39,6 @@ import api from '../../axiosInstance';
 import dayjs from 'dayjs';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import BranchSelect from '../Settings/BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -60,7 +59,7 @@ const RouteManagementCRUD = () => {
   // Form state
   const [formData, setFormData] = useState({
     route_name: '',
-    branch_code: ''
+    branch_code: localStorage.getItem('branch_code') || ''
   });
 
   useEffect(() => {
@@ -91,10 +90,10 @@ const RouteManagementCRUD = () => {
   const handleSubmit = async () => {
     try {
       if (editingRoute) {
-        await axios.put(`${API_URL}/api/routes-crud/${editingRoute.id}`, formData);
+        await api.put(`${API_URL}/api/routes-crud/${editingRoute.id}`, formData);
         showSnackbar('Route updated successfully', 'success');
       } else {
-        await axios.post(`${API_URL}/api/routes-crud`, formData);
+        await api.post(`${API_URL}/api/routes-crud`, formData);
         showSnackbar('Route created successfully', 'success');
       }
       handleCloseDialog();
@@ -152,7 +151,7 @@ const RouteManagementCRUD = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`${API_URL}/api/routes-crud/${route.id}`);
+        await api.delete(`${API_URL}/api/routes-crud/${route.id}`);
         
         // Success animation
         await MySwal.fire({
@@ -203,7 +202,7 @@ const RouteManagementCRUD = () => {
     setEditingRoute(null);
     setFormData({
       route_name: '',
-      branch_code: ''
+      branch_code: localStorage.getItem('branch_code') || ''
     });
     setOpenDialog(true);
   };
@@ -324,11 +323,9 @@ const RouteManagementCRUD = () => {
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Stack direction="row" alignItems="center" spacing={3}>
                   <Avatar sx={{ 
-                    bgcolor: 'rgba(255,255,255,0.2)', 
+                    bgcolor: '#1976d2', 
                     width: 64, 
                     height: 64,
-                    backdropFilter: 'blur(10px)',
-                    border: '2px solid rgba(255,255,255,0.3)'
                   }}>
                     <RouteIcon fontSize="large" />
                   </Avatar>
@@ -354,16 +351,14 @@ const RouteManagementCRUD = () => {
                   startIcon={<AddIcon />}
                   onClick={handleOpenDialog}
                   sx={{
-                    bgcolor: 'rgba(255,255,255,0.2)',
+                    bgcolor: '#1976d2',
                     color: 'white',
                     px: 4,
                     py: 1.5,
                     borderRadius: 3,
                     fontWeight: 'bold',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
                     '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.3)',
+                      bgcolor: '#1565c0',
                       transform: 'translateY(-2px)',
                       boxShadow: '0 8px 25px rgba(0,0,0,0.2)'
                     }
@@ -595,10 +590,7 @@ const RouteManagementCRUD = () => {
               placeholder="Enter route name (e.g., City Center Route)"
             />
             <Box sx={{ mt: 2 }}>
-              <BranchSelect
-                value={formData.branch_code}
-                onChange={(val) => setFormData({ ...formData, branch_code: val })}
-              />
+
             </Box>
           </DialogContent>
           <DialogActions>

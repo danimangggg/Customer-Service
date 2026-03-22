@@ -14,9 +14,9 @@ import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import BranchSelect from '../../Settings/BranchSelect';
 
 const MySwal = withReactContent(Swal);
 
@@ -38,7 +38,7 @@ const FacilityManager = () => {
     route: '', 
     period: '',
     is_vaccine_site: false,
-    branch_code: ''
+    branch_code: localStorage.getItem('branch_code') || ''
   });
 
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -47,8 +47,8 @@ const FacilityManager = () => {
   const fetchFacilities = async () => {
     try {
       const [facRes, routesRes] = await Promise.all([
-        axios.get(`${api_url}/api/facilities`),
-        axios.get(`${api_url}/api/routes`)
+        api.get(`${api_url}/api/facilities`),
+        api.get(`${api_url}/api/routes`)
       ]);
       setFacilities(Array.isArray(facRes.data) ? facRes.data : []);
       setRoutes(routesRes.data || []);
@@ -75,6 +75,15 @@ const FacilityManager = () => {
   };
 
   const handleUpdate = async () => {
+    if (!selectedFacility.route || !selectedFacility.route.trim()) {
+      await MySwal.fire({
+        title: 'Route Required',
+        text: 'Please select a route before saving.',
+        icon: 'warning',
+        confirmButtonColor: '#ed6c02',
+      });
+      return;
+    }
     try {
       const payload = {
         route: selectedFacility.route,
@@ -83,7 +92,7 @@ const FacilityManager = () => {
         is_vaccine_site: selectedFacility.is_vaccine_site ? 1 : 0,
         branch_code: selectedFacility.branch_code || null
       };
-      const res = await axios.put(`${api_url}/api/update-facilities/${selectedFacility.id}`, payload);
+      const res = await api.put(`${api_url}/api/update-facilities/${selectedFacility.id}`, payload);
       
       if (res.status === 200) {
         setOpenEdit(false);
@@ -176,7 +185,7 @@ const FacilityManager = () => {
 
     if (result.isConfirmed) {
       try {
-        await axios.delete(`${api_url}/api/facilities/${facility.id}`);
+        await api.delete(`${api_url}/api/facilities/${facility.id}`);
         
         // Success animation
         await MySwal.fire({
@@ -227,6 +236,7 @@ const FacilityManager = () => {
   const handleDownloadTemplate = () => {
     const templateData = [
       {
+        customer_id: 'HC001',
         facility_name: 'Example Health Center',
         facility_type: 'Health Center',
         region_name: 'Addis Ababa',
@@ -262,8 +272,8 @@ const FacilityManager = () => {
         return;
       }
 
-      const res = await axios.post(`${api_url}/api/facilities/bulk-import`, rows);
-      const { created, updated, errors } = res.data;
+      const res = await api.post(`${api_url}/api/facilities/bulk-import`, rows);
+      const { created, updated, skipped = [], errors } = res.data;
 
       await MySwal.fire({
         title: 'Import Complete',
@@ -271,7 +281,11 @@ const FacilityManager = () => {
           <div style="text-align:center;padding:10px">
             <p>✅ Created: <strong>${created}</strong></p>
             <p>🔄 Updated: <strong>${updated}</strong></p>
-            ${errors.length > 0 ? `<p>❌ Errors: <strong>${errors.length}</strong></p><p style="font-size:12px;color:#999">${errors.map(e => `Row ${e.row}: ${e.message}`).join('<br/>')}</p>` : ''}
+            ${skipped.length > 0 ? `<p>⏭️ Skipped (already exist): <strong>${skipped.length}</strong></p>
+              <div style="max-height:120px;overflow-y:auto;text-align:left;font-size:11px;background:#f9f9f9;padding:6px;border-radius:4px">
+                ${skipped.map(s => `<div>${s.customer_id} — ${s.facility_name}</div>`).join('')}
+              </div>` : ''}
+            ${errors.length > 0 ? `<p>❌ Errors: <strong>${errors.length}</strong></p><p style="font-size:12px;color:red">${errors[0]?.message || ''}</p>` : ''}
           </div>
         `,
         icon: errors.length > 0 ? 'warning' : 'success',
@@ -473,12 +487,14 @@ const FacilityManager = () => {
 
           <TextField
             select
-            label="Route"
+            label="Route *"
             fullWidth
             value={selectedFacility.route}
             onChange={(e) => setSelectedFacility({...selectedFacility, route: e.target.value})}
+            error={!selectedFacility.route}
+            helperText={!selectedFacility.route ? 'Route is required' : ''}
           >
-            <MenuItem value="">-- None --</MenuItem>
+            <MenuItem value="">-- Select Route --</MenuItem>
             {routes.map(r => (
               <MenuItem key={r.id} value={r.route_name}>{r.route_name}</MenuItem>
             ))}
@@ -501,10 +517,7 @@ const FacilityManager = () => {
               </Box>
             }
           />
-          <BranchSelect
-            value={selectedFacility.branch_code}
-            onChange={(val) => setSelectedFacility({...selectedFacility, branch_code: val})}
-          />
+
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid #eee' }}>
           <Button onClick={() => setOpenEdit(false)} color="inherit">Cancel</Button>

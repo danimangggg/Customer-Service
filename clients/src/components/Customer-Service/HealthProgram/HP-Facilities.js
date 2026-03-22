@@ -26,6 +26,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import CloseIcon from '@mui/icons-material/Close';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
 import withReactContent from 'sweetalert2-react-content';
@@ -143,9 +144,9 @@ const HpFacilities = () => {
         setLoading(true);
         setError(null);
         const [facRes, procRes, routesRes] = await Promise.all([
-          axios.get(`${api_url}/api/facilities`),
-          axios.get(`${api_url}/api/active-processes`),
-          axios.get(`${api_url}/api/routes`) // Fetch routes from routes table
+          api.get(`${api_url}/api/facilities`),
+          api.get(`${api_url}/api/active-processes`),
+          api.get(`${api_url}/api/routes`)
         ]);
         const allFacilities = facRes.data || [];
         setFacilities(allFacilities); // Store all facilities, not just those with routes
@@ -183,8 +184,8 @@ const HpFacilities = () => {
     const silentRefresh = async () => {
       try {
         const [procRes, facRes] = await Promise.all([
-          axios.get(`${api_url}/api/active-processes`),
-          axios.get(`${api_url}/api/facilities`),
+          api.get(`${api_url}/api/active-processes`),
+          api.get(`${api_url}/api/facilities`),
         ]);
         const processes = procRes.data || [];
         setActiveProcesses(processes);
@@ -510,9 +511,9 @@ const HpFacilities = () => {
           odn_number: notSentLabel
         });
         setProcessODNCounts(prev => ({ ...prev, [processId]: 1 }));
-        await axios.post(`${api_url}/api/complete-process`, { process_id: processId });
+        await axios.post(`${api_url}/api/complete-process`, { process_id: processId, rrf_not_sent: true });
         setActiveProcesses(prev =>
-          prev.map(p => p.id === processId ? { ...p, status: 'o2c_completed' } : p)
+          prev.map(p => p.id === processId ? { ...p, status: 'biller_completed' } : p)
         );
         successToast(`Process completed with "${isVaccine ? 'VRF' : 'RRF'} not sent" status.`);
       } catch (err) {
@@ -1129,8 +1130,6 @@ const HpFacilities = () => {
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 >
                   <MenuItem value="Regular">HP Regular</MenuItem>
-                  <MenuItem value="Emergency">Emergency</MenuItem>
-                  <MenuItem value="Breakdown">Breakdown</MenuItem>
                   <MenuItem value="Vaccine">Vaccine</MenuItem>
                 </TextField>
               </Grid>

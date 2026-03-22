@@ -6,23 +6,29 @@ const Facility = db.facility;
 exports.getGoodsIssueProcesses = async (req, res) => {
   try {
     const { month, year, process_type = 'regular' } = req.query;
-    
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+    const facilityWhere = (accountType !== 'Super Admin' && branchCode)
+      ? { branch_code: branchCode }
+      : {};
+
     const whereClause = { status: 'tm_confirmed', process_type };
     if (process_type === 'regular') {
       whereClause.reporting_month = `${month} ${year}`;
     }
-    
+
     const processes = await Process.findAll({
       where: whereClause,
       include: [{
         model: Facility,
         as: 'facility',
         attributes: ['id', 'facility_name', 'region_name', 'route'],
-        required: false
+        where: Object.keys(facilityWhere).length ? facilityWhere : undefined,
+        required: Object.keys(facilityWhere).length > 0
       }],
       order: [['created_at', 'DESC']]
     });
-    
+
     res.json({ success: true, processes });
   } catch (error) {
     console.error('Get goods issue processes error:', error);

@@ -110,7 +110,7 @@ const EmployeeManager = () => {
         return;
       }
 
-      const res = await axios.post(`${API_URL}/api/employees/bulk-import`, rows);
+      const res = await api.post(`${API_URL}/api/employees/bulk-import`, rows);
       const { updated, notFound, errors } = res.data;
 
       const msg = `Updated: ${updated}${notFound.length ? ` | Not found: ${notFound.length}` : ''}${errors.length ? ` | Errors: ${errors.length}` : ''}`;

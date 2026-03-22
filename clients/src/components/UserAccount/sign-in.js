@@ -200,7 +200,8 @@ export default function SignIn() {
         } else if (jobTitle === 'TM Manager')               { navigate('/tm-manager');
         } else if (jobTitle === 'Biller')                   { navigate('/biller');
         } else if (jobTitle === 'Dispatcher')               { navigate('/dispatch');
-        } else if (jobTitle === 'Cashier' || jobTitle === 'Finance') { navigate('/finance-invoices');
+        } else if (jobTitle === 'Cashier') { navigate('/outstandingProcess');
+        } else if (jobTitle === 'Finance')                  { navigate('/finance-invoices');
         } else if (jobTitle === 'Dispatcher - HP')          { navigate('/dispatch-management');
         } else if (jobTitle === 'Dispatch-Documentation')   { navigate('/exit-permit');
         } else if (jobTitle === 'EWM-Documentation')        { navigate('/ewm-documentation');

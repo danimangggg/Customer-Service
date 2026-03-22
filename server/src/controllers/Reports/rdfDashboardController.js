@@ -9,7 +9,7 @@ const getRDFDashboardStats = async (req, res) => {
     const queryBranch  = req.query.branch_code || null;
     const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
     const branchWhere  = branchCode 
-      ? `AND EXISTS (SELECT 1 FROM odns_rdf o INNER JOIN stores s ON o.store_id = s.id WHERE o.process_id = cq.id AND s.branch_code = '${branchCode}')`
+      ? `AND EXISTS (SELECT 1 FROM facilities f WHERE f.id = cq.facility_id AND f.branch_code = '${branchCode}')`
       : '';
 
     const [totalResult] = await db.sequelize.query(
@@ -18,13 +18,13 @@ const getRDFDashboardStats = async (req, res) => {
     );
 
     const [completedResult] = await db.sequelize.query(
-      `SELECT COUNT(*) as count FROM customer_queue cq WHERE cq.status = 'Completed' ${branchWhere}`,
+      `SELECT COUNT(*) as count FROM customer_queue cq WHERE cq.status = 'completed' ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 
     const [inProgressResult] = await db.sequelize.query(
       `SELECT COUNT(*) as count FROM customer_queue cq
-       WHERE cq.status NOT IN ('Completed', 'Canceled', 'Auto-Canceled') ${branchWhere}`,
+       WHERE cq.status NOT IN ('completed', 'Canceled', 'Auto-Canceled') ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }
     );
 

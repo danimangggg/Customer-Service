@@ -1,23 +1,46 @@
 const db = require('../../models');
 const Process = db.process;
 const Facility = db.facility;
+const { Op } = require('sequelize');
 
-// Get processes ready for Biller (EWM goods issued)
+// Get processes ready for Biller (EWM goods issued), scoped to the Biller's store
 exports.getBillerProcesses = async (req, res) => {
   try {
     const { month, year, process_type = 'regular' } = req.query;
-    
+    const billerStore = req.headers['x-store'] || null;
+
     // Vaccine can come from tm_confirmed (skips EWM goods issue step)
     const validStatuses = process_type === 'vaccine'
       ? ['ewm_goods_issued', 'tm_confirmed']
       : ['ewm_goods_issued'];
 
-    const { Op } = require('sequelize');
     const whereClause = { status: { [Op.in]: validStatuses }, process_type };
     if (process_type === 'regular') {
       whereClause.reporting_month = `${month} ${year}`;
     }
-    
+
+    // If a store is provided, filter processes whose EWM officer belongs to that store
+    if (billerStore) {
+      // Get employee IDs that belong to this store
+      const storeEmployeesQuery = `
+        SELECT e.id FROM employees e
+        INNER JOIN stores s ON e.store_id = s.id
+        WHERE s.store_name = ?
+      `;
+      const storeEmployees = await db.sequelize.query(storeEmployeesQuery, {
+        replacements: [billerStore],
+        type: db.sequelize.QueryTypes.SELECT
+      });
+      const employeeIds = storeEmployees.map(e => e.id);
+
+      if (employeeIds.length > 0) {
+        whereClause.ewm_goods_issued_by_id = { [Op.in]: employeeIds };
+      } else {
+        // No employees in this store — return empty
+        return res.json({ success: true, processes: [] });
+      }
+    }
+
     const processes = await Process.findAll({
       where: whereClause,
       include: [{
@@ -27,7 +50,7 @@ exports.getBillerProcesses = async (req, res) => {
       }],
       order: [['created_at', 'DESC']]
     });
-    
+
     res.json({ success: true, processes });
   } catch (error) {
     console.error('Get Biller processes error:', error);

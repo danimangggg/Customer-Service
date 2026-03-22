@@ -27,18 +27,14 @@ const getAllStores = async (req, res) => {
 const createStore = async (req, res) => {
   try {
     const { store_name, description } = req.body;
+    const branch_code = req.headers['x-branch-code'] || null;
 
-    // Check if store name already exists
     const existing = await Store.findOne({ where: { store_name } });
     if (existing) {
       return res.status(400).json({ message: 'Store name already exists' });
     }
 
-    const store = await Store.create({
-      store_name,
-      description
-    });
-
+    const store = await Store.create({ store_name, description, branch_code });
     res.status(201).json(store);
   } catch (error) {
     console.error('Error creating store:', error);
@@ -51,25 +47,17 @@ const updateStore = async (req, res) => {
   try {
     const { id } = req.params;
     const { store_name, description } = req.body;
+    const branch_code = req.headers['x-branch-code'] || null;
 
     const store = await Store.findByPk(id);
-    if (!store) {
-      return res.status(404).json({ message: 'Store not found' });
-    }
+    if (!store) return res.status(404).json({ message: 'Store not found' });
 
-    // Check if new store name conflicts with another store
     if (store_name !== store.store_name) {
       const existing = await Store.findOne({ where: { store_name } });
-      if (existing) {
-        return res.status(400).json({ message: 'Store name already exists' });
-      }
+      if (existing) return res.status(400).json({ message: 'Store name already exists' });
     }
 
-    await store.update({
-      store_name,
-      description
-    });
-
+    await store.update({ store_name, description, branch_code });
     res.status(200).json(store);
   } catch (error) {
     console.error('Error updating store:', error);

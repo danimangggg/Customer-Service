@@ -48,7 +48,7 @@ const getCurrentEthiopianMonth = () => {
   return { year: ethYear, monthIndex: Math.max(0, Math.min(ethMonthIndex, 12)) };
 };
 
-const HPCustomerDetailReport = () => {
+const HPCustomerDetailReport = ({ branchCode = '' }) => {
   const [customers, setCustomers] = useState([]);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -85,7 +85,8 @@ const HPCustomerDetailReport = () => {
         statusFilter,
         process_type: processType,
         month: selectedMonth,
-        year: selectedYear
+        year: selectedYear,
+        ...(branchCode ? { branch_code: branchCode } : {})
       };
       const response = await api.get(`${API_URL}/api/hp-customers-detail-report`, { params });
       if (response.data.success && response.data.customers) {
@@ -102,7 +103,7 @@ const HPCustomerDetailReport = () => {
     } finally {
       setCustomersLoading(false);
     }
-  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter, processType, selectedMonth, selectedYear]);
+  }, [page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter, processType, selectedMonth, selectedYear, branchCode]);
 
   useEffect(() => {
     fetchHPCustomers();
@@ -238,11 +239,9 @@ const HPCustomerDetailReport = () => {
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 130 }}>
               <InputLabel>Type</InputLabel>
-              <Select value={processType} label="Type" onChange={e => { setProcessType(e.target.value); setPage(0); }}>
+              <Select value={processType} label="Type" onChange={e => { setProcessType(e.target.value); setPage(0); if (statusFilter === 'rrf_not_sent') setStatusFilter(''); }}>
                 <MenuItem value="regular">HP Regular</MenuItem>
                 <MenuItem value="vaccine">Vaccine</MenuItem>
-                <MenuItem value="breakdown">Breakdown</MenuItem>
-                <MenuItem value="emergency">Emergency</MenuItem>
               </Select>
             </FormControl>
             <FormControl size="small" sx={{ minWidth: 130 }}>
@@ -260,6 +259,11 @@ const HPCustomerDetailReport = () => {
                 <MenuItem value="dispatched">At Documentation</MenuItem>
                 <MenuItem value="dispatch_completed">Dispatch Completed</MenuItem>
                 <MenuItem value="documentation_completed">Completed</MenuItem>
+                {processType === 'vaccine'
+                  ? <MenuItem value="rrf_not_sent">VRF Not Sent</MenuItem>
+                  : processType === 'regular' || processType === ''
+                    ? <MenuItem value="rrf_not_sent">RRF Not Sent</MenuItem>
+                    : null}
               </Select>
             </FormControl>
             <TextField
@@ -348,6 +352,15 @@ const HPCustomerDetailReport = () => {
                       <TableCell sx={{ 
                         color: 'white', 
                         fontWeight: 'bold', 
+                        minWidth: 120,
+                        fontSize: '0.9rem',
+                        bgcolor: '#1976d2 !important'
+                      }}>
+                        Branch
+                      </TableCell>
+                      <TableCell sx={{ 
+                        color: 'white', 
+                        fontWeight: 'bold', 
                         minWidth: 150,
                         maxWidth: 150,
                         fontSize: '0.9rem',
@@ -385,7 +398,7 @@ const HPCustomerDetailReport = () => {
                   <TableBody>
                     {customers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                           <Typography color="text.secondary">
                             {searchTerm ? 'No HP customers found matching your search.' : 'No HP customers found. Make sure HP customers are registered in the system.'}
                           </Typography>
@@ -403,6 +416,7 @@ const HPCustomerDetailReport = () => {
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.9rem' }}>{customer.woreda_name || 'N/A'}</TableCell>
+                          <TableCell sx={{ fontSize: '0.9rem' }}>{customer.branch_name || customer.branch_code || 'N/A'}</TableCell>
                           <TableCell sx={{ 
                             fontSize: '0.85rem',
                             maxWidth: 150,
@@ -415,17 +429,23 @@ const HPCustomerDetailReport = () => {
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ fontSize: '0.9rem' }}>
-                            {customer.total_waiting_time ? (
+                            {customer.rrf_not_sent_label ? (
+                              <Chip
+                                label={customer.rrf_not_sent_label.startsWith('VRF') ? 'VRF Not Sent' : 'RRF Not Sent'}
+                                size="small"
+                                sx={{ bgcolor: '#ff9800', color: 'white', fontWeight: 'bold' }}
+                              />
+                            ) : customer.total_waiting_time ? (
                               <Typography 
                                 variant="body2" 
                                 fontWeight="bold"
                                 sx={{
-                                  color: customer.total_waiting_time < 1440 ? '#2e7d32' : // Green: < 1 day (1440 min)
-                                         customer.total_waiting_time < 2880 ? '#ed6c02' : // Yellow: 1-2 days (2880 min)
-                                         '#d32f2f', // Red: > 2 days
-                                  bgcolor: customer.total_waiting_time < 1440 ? '#e8f5e9' : // Light green
-                                           customer.total_waiting_time < 2880 ? '#fff3e0' : // Light yellow
-                                           '#ffebee', // Light red
+                                  color: customer.total_waiting_time < 1440 ? '#2e7d32' :
+                                         customer.total_waiting_time < 2880 ? '#ed6c02' :
+                                         '#d32f2f',
+                                  bgcolor: customer.total_waiting_time < 1440 ? '#e8f5e9' :
+                                           customer.total_waiting_time < 2880 ? '#fff3e0' :
+                                           '#ffebee',
                                   px: 1.5,
                                   py: 0.5,
                                   borderRadius: 1,
@@ -565,6 +585,14 @@ const HPCustomerDetailReport = () => {
                           </Box>
                           <Box>
                             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                              O2C Officer
+                            </Typography>
+                            <Typography variant="body1" fontWeight="bold">
+                              {selectedCustomer.o2c_officer_name || 'N/A'}
+                            </Typography>
+                          </Box>
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                               Process Status
                             </Typography>
                             <Chip 
@@ -602,15 +630,29 @@ const HPCustomerDetailReport = () => {
                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                             Total Waiting Time
                           </Typography>
-                          <Chip 
-                            label={formatDuration(selectedCustomer.total_time_minutes) || 'Not Available'}
-                            color={
-                              selectedCustomer.total_time_minutes >= 1440 ? 'error' :
-                              selectedCustomer.total_time_minutes >= 480 ? 'warning' :
-                              'success'
-                            }
-                            sx={{ mt: 0.5, fontWeight: 'bold', fontSize: '1rem' }}
-                          />
+                          {selectedCustomer.rrf_not_sent_label ? (
+                            <Box sx={{ mt: 0.5 }}>
+                              <Chip
+                                label={selectedCustomer.rrf_not_sent_label.startsWith('VRF') ? 'VRF Not Sent' : 'RRF Not Sent'}
+                                sx={{ bgcolor: '#ff9800', color: 'white', fontWeight: 'bold', fontSize: '1rem' }}
+                              />
+                              {selectedCustomer.rrf_not_sent_officer && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                  Labelled by: {selectedCustomer.rrf_not_sent_officer}
+                                </Typography>
+                              )}
+                            </Box>
+                          ) : (
+                            <Chip 
+                              label={formatDuration(selectedCustomer.total_time_minutes) || 'Not Available'}
+                              color={
+                                selectedCustomer.total_time_minutes >= 1440 ? 'error' :
+                                selectedCustomer.total_time_minutes >= 480 ? 'warning' :
+                                'success'
+                              }
+                              sx={{ mt: 0.5, fontWeight: 'bold', fontSize: '1rem' }}
+                            />
+                          )}
                         </Box>
                       </Grid>
                     </Grid>

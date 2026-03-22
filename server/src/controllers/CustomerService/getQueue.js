@@ -15,9 +15,7 @@ const retriveQueue = async (req, res) => {
     const queryBranch  = req.query.branch_code || null;
     const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
     const branchFilter = branchCode ? `AND s.branch_code = '${branchCode}'` : '';
-    const branchFilterCq = branchCode
-      ? `AND EXISTS (SELECT 1 FROM odns_rdf odn2 INNER JOIN stores s2 ON odn2.store_id = s2.id WHERE odn2.process_id = cq.id AND s2.branch_code = '${branchCode}')`
-      : '';
+    const branchFilterCq = branchCode ? `AND EXISTS (SELECT 1 FROM facilities f WHERE f.id = cq.facility_id AND f.branch_code = '${branchCode}')` : '';
 
     let query, replacements;
     

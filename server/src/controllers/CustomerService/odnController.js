@@ -233,24 +233,30 @@ const deleteODN = async (req, res) => {
 
 const completeProcess = async (req, res) => {
   try {
-    const { process_id, o2c_officer_id, o2c_officer_name } = req.body;
+    const { process_id, o2c_officer_id, o2c_officer_name, rrf_not_sent } = req.body;
     
     if (!process_id) {
-      return res.status(400).send({ 
-        message: 'process_id is required' 
-      });
+      return res.status(400).send({ message: 'process_id is required' });
     }
 
-    // Verify that the process exists
     const process = await Process.findByPk(process_id);
     if (!process) {
-      return res.status(404).send({ 
-        message: 'Process not found' 
-      });
+      return res.status(404).send({ message: 'Process not found' });
     }
 
-    // Update process status to completed
-    await process.update({ status: 'o2c_completed' });
+    // RRF/VRF not sent → skip all intermediate steps, go straight to biller_completed
+    const newStatus = rrf_not_sent ? 'biller_completed' : 'o2c_completed';
+    await process.update({ status: newStatus });
+
+    // Create the marker ODN so reports can detect and count it
+    if (rrf_not_sent) {
+      const label = process.process_type === 'vaccine' ? 'VRF not sent' : 'RRF not sent';
+      await ODN.create({
+        process_id: process_id,
+        odn_number: label,
+        status: 'rrf_not_sent',
+      });
+    }
 
     return res.status(200).send({ 
       message: 'Process completed successfully',
@@ -259,10 +265,7 @@ const completeProcess = async (req, res) => {
 
   } catch (err) {
     console.error('completeProcess error:', err);
-    return res.status(500).send({ 
-      message: 'Internal server error', 
-      error: err.message 
-    });
+    return res.status(500).send({ message: 'Internal server error', error: err.message });
   }
 };
 

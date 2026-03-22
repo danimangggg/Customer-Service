@@ -6,12 +6,19 @@ const getPIVehicleRequests = async (req, res) => {
   try {
     const { month, year, page = 1, limit = 10, search = '' } = req.query;
     const offset = (page - 1) * limit;
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
 
     // Build the reporting month string
     const reportingMonth = `${month} ${year}`;
 
+    // Branch filter clause for facilities
+    const branchFilter = (accountType !== 'Super Admin' && branchCode)
+      ? `AND f.branch_code = '${branchCode}'`
+      : '';
+
     console.log('=== PI Vehicle Requests API Called ===');
-    console.log('Request params:', { month, year, page, limit, search });
+    console.log('Request params:', { month, year, page, limit, search, branchCode });
     console.log('Reporting month:', reportingMonth);
     console.log('==========================================');
 
@@ -37,8 +44,6 @@ const getPIVehicleRequests = async (req, res) => {
     const isEvenMonth = (monthIndex + 1) % 2 === 0;
     const currentPeriod = isEvenMonth ? 'Even' : 'Odd';
 
-    // Query to show ALL routes with their current status
-    // PI should only see routes where ALL facilities have biller_completed status
     const query = `
       SELECT 
         r.id as route_id,
@@ -48,11 +53,18 @@ const getPIVehicleRequests = async (req, res) => {
         COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as vehicle_requested_facilities,
         COUNT(DISTINCT CASE WHEN p.status IS NULL OR (p.status != 'biller_completed' AND p.status != 'vehicle_requested') THEN f.id END) as pending_facilities,
         CASE WHEN pvr.route_id IS NOT NULL OR MAX(CASE WHEN p.status = 'vehicle_requested' THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END as vehicle_requested,
-        CASE WHEN COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE WHEN p.status = 'biller_completed' THEN f.id END) + COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) THEN 1 ELSE 0 END as all_facilities_ready
+        -- A facility is "ready" if: biller_completed, vehicle_requested, OR has an RRF/VRF not sent ODN
+        CASE WHEN COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE 
+          WHEN p.status = 'biller_completed' OR p.status = 'vehicle_requested'
+            OR (rrf_odn.id IS NOT NULL)
+          THEN f.id END) THEN 1 ELSE 0 END as all_facilities_ready
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
         AND (f.period = 'Monthly' OR f.period = ?)
+        ${branchFilter}
       LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+      LEFT JOIN odns rrf_odn ON rrf_odn.process_id = p.id
+        AND (rrf_odn.odn_number LIKE 'RRF not sent%' OR rrf_odn.odn_number LIKE 'VRF not sent%')
       LEFT JOIN pi_vehicle_requests pvr ON pvr.route_id = r.id AND pvr.month = ? AND pvr.year = ?
       WHERE f.route IS NOT NULL 
         ${search ? 'AND r.route_name LIKE ?' : ''}
@@ -63,15 +75,8 @@ const getPIVehicleRequests = async (req, res) => {
     `;
 
     let queryParams = [currentPeriod, reportingMonth, month, year];
-
-    if (search) {
-      const searchPattern = `%${search}%`;
-      queryParams.push(searchPattern);
-    }
-
+    if (search) queryParams.push(`%${search}%`);
     queryParams.push(parseInt(limit), parseInt(offset));
-
-    console.log('Executing query with params:', queryParams);
 
     const routes = await db.sequelize.query(query, {
       replacements: queryParams,
@@ -82,21 +87,24 @@ const getPIVehicleRequests = async (req, res) => {
     
     // Add detailed logging for debugging
     routes.forEach(route => {
-      console.log(`Route: ${route.route_name}, Total Facilities: ${route.total_facilities_in_route}, Biller Completed: ${route.biller_completed_facilities}, Vehicle Requested: ${route.vehicle_requested_facilities}`);
+      console.log(`Route: ${route.route_name}, Total: ${route.total_facilities_in_route}, Biller: ${route.biller_completed_facilities}, VehReq: ${route.vehicle_requested_facilities}, AllReady: ${route.all_facilities_ready}`);
     });
 
     // For each route, get the facilities and their ODNs
     const routesWithDetails = await Promise.all(routes.map(async (route) => {
-      // Get ALL facilities for this route with their process status (including those without processes)
       const facilitiesQuery = `
         SELECT DISTINCT 
           f.id,
           f.facility_name,
-          COALESCE(p.status, 'no_process') as process_status
+          COALESCE(p.status, 'no_process') as process_status,
+          CASE WHEN rrf_odn.id IS NOT NULL THEN 1 ELSE 0 END as rrf_not_sent
         FROM facilities f
         LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+        LEFT JOIN odns rrf_odn ON rrf_odn.process_id = p.id
+          AND (rrf_odn.odn_number LIKE 'RRF not sent%' OR rrf_odn.odn_number LIKE 'VRF not sent%')
         WHERE f.route = ?
           AND (f.period = 'Monthly' OR f.period = ?)
+          ${branchFilter}
         ORDER BY f.facility_name
       `;
 
@@ -126,6 +134,7 @@ const getPIVehicleRequests = async (req, res) => {
           id: facility.id,
           facility_name: facility.facility_name,
           process_status: facility.process_status,
+          rrf_not_sent: facility.rrf_not_sent,
           odns: odns
         };
       }));
@@ -144,6 +153,7 @@ const getPIVehicleRequests = async (req, res) => {
         FROM routes r
         INNER JOIN facilities f ON f.route = r.route_name
           AND (f.period = 'Monthly' OR f.period = ?)
+          ${branchFilter}
         WHERE f.route IS NOT NULL 
           ${search ? 'AND r.route_name LIKE ?' : ''}
         GROUP BY r.id
@@ -183,15 +193,16 @@ const getPIVehicleRequests = async (req, res) => {
   }
 };
 
-// Get statistics for PI vehicle requests
 const getPIVehicleRequestStats = async (req, res) => {
   try {
     const { month, year } = req.query;
     const reportingMonth = `${month} ${year}`;
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+    const branchFilter = (accountType !== 'Super Admin' && branchCode)
+      ? `AND f.branch_code = '${branchCode}'`
+      : '';
 
-    console.log('PI Vehicle Request Stats - Request params:', { month, year, reportingMonth });
-
-    // Determine current period
     const ethiopianMonths = [
       'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
     ];
@@ -199,7 +210,6 @@ const getPIVehicleRequestStats = async (req, res) => {
     const isEvenMonth = (monthIndex + 1) % 2 === 0;
     const currentPeriod = isEvenMonth ? 'Even' : 'Odd';
 
-    // Get total routes ready for vehicle request (ALL facilities ewm_completed) or already requested (ALL facilities vehicle_requested)
     const totalRoutesQuery = `
       SELECT COUNT(*) as count
       FROM (
@@ -207,6 +217,7 @@ const getPIVehicleRequestStats = async (req, res) => {
         FROM routes r
         INNER JOIN facilities f ON f.route = r.route_name
           AND (f.period = 'Monthly' OR f.period = ?)
+          ${branchFilter}
         LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
         WHERE f.route IS NOT NULL
         GROUP BY r.id
@@ -214,11 +225,12 @@ const getPIVehicleRequestStats = async (req, res) => {
       ) as route_count
     `;
 
-    // Get requested routes count
     const requestedRoutesQuery = `
-      SELECT COUNT(DISTINCT route_id) as count
-      FROM pi_vehicle_requests
-      WHERE month = ? AND year = ?
+      SELECT COUNT(DISTINCT pvr.route_id) as count
+      FROM pi_vehicle_requests pvr
+      INNER JOIN routes r ON r.id = pvr.route_id
+      INNER JOIN facilities f ON f.route = r.route_name ${branchFilter}
+      WHERE pvr.month = ? AND pvr.year = ?
     `;
 
     const [totalResult, requestedResult] = await Promise.all([
@@ -232,22 +244,14 @@ const getPIVehicleRequestStats = async (req, res) => {
       })
     ]);
 
-    const stats = {
+    res.json({
       totalRoutes: totalResult[0]?.count || 0,
       requestedRoutes: requestedResult[0]?.count || 0
-    };
-
-    console.log('PI Vehicle Request Stats result:', stats);
-
-    res.json(stats);
+    });
 
   } catch (error) {
     console.error('Error fetching PI vehicle request stats:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ 
-      error: 'Failed to fetch stats',
-      details: error.message
-    });
+    res.status(500).json({ error: 'Failed to fetch stats', details: error.message });
   }
 };
 
@@ -293,8 +297,13 @@ const submitVehicleRequest = async (req, res) => {
     const verificationQuery = `
       SELECT 
         COUNT(DISTINCT f.id) as total_facilities,
-        COUNT(DISTINCT CASE WHEN p.status = 'biller_completed' THEN f.id END) as biller_completed_facilities,
-        COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as vehicle_requested_facilities
+        COUNT(DISTINCT CASE 
+          WHEN p.status = 'biller_completed' OR p.status = 'vehicle_requested'
+            OR EXISTS (
+              SELECT 1 FROM odns o2 WHERE o2.process_id = p.id
+              AND (o2.odn_number LIKE 'RRF not sent%' OR o2.odn_number LIKE 'VRF not sent%')
+            )
+          THEN f.id END) as ready_facilities
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
         AND (f.period = 'Monthly' OR f.period = ?)
@@ -315,14 +324,13 @@ const submitVehicleRequest = async (req, res) => {
       });
     }
 
-    // Check if ALL facilities have biller_completed status (not vehicle_requested yet)
-    if (verification[0].total_facilities !== verification[0].biller_completed_facilities) {
+    // Check if ALL facilities are ready (biller_completed, vehicle_requested, or RRF not sent)
+    if (verification[0].total_facilities !== verification[0].ready_facilities) {
       return res.status(400).json({ 
-        error: `Not all facilities in this route have completed Biller process. Total: ${verification[0].total_facilities}, Biller Completed: ${verification[0].biller_completed_facilities}`,
+        error: `Not all facilities in this route are ready. Total: ${verification[0].total_facilities}, Ready: ${verification[0].ready_facilities}`,
         details: {
           total_facilities: verification[0].total_facilities,
-          biller_completed: verification[0].biller_completed_facilities,
-          vehicle_requested: verification[0].vehicle_requested_facilities
+          ready_facilities: verification[0].ready_facilities
         }
       });
     }
@@ -581,10 +589,14 @@ const deleteVehicleRequest = async (req, res) => {
   }
 };
 
-// Get facilities with biller_completed status for emergency/breakdown processes
 const getPIVehicleRequestsByFacility = async (req, res) => {
   try {
     const { process_type } = req.query;
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+    const branchFilter = (accountType !== 'Super Admin' && branchCode)
+      ? `AND f.branch_code = '${branchCode}'`
+      : '';
 
     if (!process_type || !['emergency', 'breakdown', 'vaccine'].includes(process_type)) {
       return res.status(400).json({ error: 'process_type must be emergency, breakdown, or vaccine' });
@@ -598,7 +610,7 @@ const getPIVehicleRequestsByFacility = async (req, res) => {
         p.process_type,
         CASE WHEN pvr.process_id IS NOT NULL THEN 1 ELSE 0 END as vehicle_requested
       FROM processes p
-      INNER JOIN facilities f ON f.id = p.facility_id
+      INNER JOIN facilities f ON f.id = p.facility_id ${branchFilter}
       LEFT JOIN pi_vehicle_requests pvr ON pvr.process_id = p.id
       WHERE p.process_type = ? AND p.status = 'biller_completed'
       ORDER BY p.created_at DESC

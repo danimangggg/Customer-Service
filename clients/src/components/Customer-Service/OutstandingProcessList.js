@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import axios from 'axios';
 import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../utils/toast';
@@ -54,7 +53,7 @@ const OutstandingCustomers = () => {
         };
         console.log("Payload sent to update-service-point:", payload);
         try {
-            await axios.put(`${api_url}/api/update-service-point`, payload);
+            await api.put(`/api/update-service-point`, payload);
             // Only re-fetch if the status change was successful
             fetchData();
             successToast(`Customer status updated to ${newStatus}.`);
@@ -103,7 +102,7 @@ const OutstandingCustomers = () => {
             console.log(`Auto-cancelling ${overdueCustomers.length} overdue customer(s).`);
             for (const customer of overdueCustomers) {
                 try {
-                    await axios.put(`${api_url}/api/update-service-point`, {
+                    await api.put(`/api/update-service-point`, {
                         id: customer.id,
                         status: 'Canceled',
                         next_service_point: "Auto-Canceled",
@@ -120,7 +119,7 @@ const OutstandingCustomers = () => {
 
     const fetchData = async () => {
         try {
-            const customerRes = await axios.get(`${api_url}/api/serviceList`, {
+            const customerRes = await api.get(`/api/serviceList`, {
                 params: { store: normalizedUserStore }
             });
             const fetchedCustomers = customerRes.data;
@@ -147,7 +146,7 @@ const OutstandingCustomers = () => {
         try {
             // Fetch ODNs for each customer
             const odnPromises = customerIds.map(customerId => 
-                axios.get(`${api_url}/api/rdf-odns/${customerId}`)
+                api.get(`/api/rdf-odns/${customerId}`)
                     .then(res => ({ customerId, odns: res.data.odns || [] }))
                     .catch(err => {
                         console.error(`Failed to fetch ODNs for customer ${customerId}:`, err);
@@ -225,7 +224,7 @@ const OutstandingCustomers = () => {
             filtered = [];
         } else {
             const jobTitleToServicePointMap = {
-                "Customer Service Officer": "customer service", "EWM Officer": "ewm", "Finance": "finance", "Cashier": "finance"
+                "Customer Service Officer": "customer service", "EWM Officer": "ewm", "Finance": "finance", "Cashier": "cashier"
             };
             const normalizedJobTitle = jobTitleToServicePointMap[jobTitle] || jobTitle.toLowerCase();
             
@@ -242,6 +241,12 @@ const OutstandingCustomers = () => {
                     const dateB = new Date(b.started_at || 0);
                     return dateA - dateB; // Ascending order: oldest first
                 });
+            } else if (jobTitle === "Cashier") {
+                // Match both 'cashier' (new) and 'finance' (legacy name before rename)
+                filtered = customers.filter(c =>
+                    c.next_service_point?.toLowerCase() === 'cashier' ||
+                    c.next_service_point?.toLowerCase() === 'finance'
+                );
             } else {
                 filtered = customers.filter(c => c.next_service_point?.toLowerCase() === normalizedJobTitle);
             }
@@ -251,7 +256,7 @@ const OutstandingCustomers = () => {
     
     // Fetch ODNs when filtered customers change (for EWM Officers only)
     useEffect(() => {
-        if (jobTitle === 'EWM Officer' && filterAndSortCustomers.length > 0) {
+        if ((jobTitle === 'EWM Officer' || jobTitle === 'O2C Officer') && filterAndSortCustomers.length > 0) {
             const customerIds = filterAndSortCustomers.map(c => c.id);
             fetchOdnsForCustomers(customerIds);
         }
@@ -310,7 +315,7 @@ const OutstandingCustomers = () => {
             const ewmEndTime = new Date().toISOString();
             
             // Update ODN status to 'ewm_completed' for this store
-            const response = await axios.put(`${api_url}/api/odns-rdf/complete-ewm`, {
+            const response = await api.put(`/api/odns-rdf/complete-ewm`, {
                 process_id: customer.id,
                 store: normalizedUserStore,
                 officer_id: localStorage.getItem('EmployeeID'),
@@ -349,7 +354,7 @@ const OutstandingCustomers = () => {
                     notes: `Completed EWM process for store ${normalizedUserStore}`
                 };
                 
-                const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+                const serviceTimeResponse = await api.post(`/api/service-time`, serviceTimeData);
                 console.log('✅ EWM service time recorded:', serviceTimeResponse.data);
             } catch (err) {
                 console.error('❌ Failed to record EWM service time:', err);
@@ -357,7 +362,7 @@ const OutstandingCustomers = () => {
             }
 
             // Check if all stores have completed their ODNs
-            const allOdnsResponse = await axios.get(`${api_url}/api/rdf-odns/${customer.id}`);
+            const allOdnsResponse = await api.get(`/api/rdf-odns/${customer.id}`);
             const allOdns = allOdnsResponse.data.odns;
             const allCompleted = allOdns.every(odn => odn.ewm_status === 'completed');
 
@@ -448,7 +453,7 @@ const OutstandingCustomers = () => {
 
         // For EWM orders, check if any ODN has started or completed the process
         try {
-            const odnResponse = await axios.get(`${api_url}/api/rdf-odns/${customer.id}`);
+            const odnResponse = await api.get(`/api/rdf-odns/${customer.id}`);
             const odns = odnResponse.data.odns || [];
             
             const hasStarted = odns.some(odn => 
@@ -600,7 +605,7 @@ const OutstandingCustomers = () => {
             if (customer.customer_type === 'Credit') {
                 nextOptions = { EWM: 'EWM' };
             } else if (customer.customer_type === 'Cash') {
-                nextOptions = { Finance: 'Finance', EWM: 'EWM' };
+                nextOptions = { Cashier: 'Cashier', EWM: 'EWM' };
             } else {
                 Swal.fire("Error", "Customer type not recognized.", "error");
                 return;
@@ -633,7 +638,7 @@ const OutstandingCustomers = () => {
                 // Check if at least one ODN exists for this process
                 let existingOdns = [];
                 try {
-                    const odnResponse = await axios.get(`${api_url}/api/rdf-odns/${customer.id}`);
+                    const odnResponse = await api.get(`/api/rdf-odns/${customer.id}`);
                     if (!odnResponse.data.success || odnResponse.data.odns.length === 0) {
                         Swal.fire({
                             icon: 'warning',
@@ -736,7 +741,7 @@ const OutstandingCustomers = () => {
                         notes: `Completed O2C process, forwarded to ${nextServicePoint}`
                     };
                     
-                    const serviceTimeResponse = await axios.post(`${api_url}/api/service-time`, serviceTimeData);
+                    const serviceTimeResponse = await api.post(`/api/service-time`, serviceTimeData);
                     console.log('✅ O2C service time recorded:', serviceTimeResponse.data);
                 } catch (err) {
                     console.error('❌ Failed to record O2C service time:', err);
@@ -751,49 +756,48 @@ const OutstandingCustomers = () => {
                 Swal.fire('Error', 'Failed to update service point', 'error');
             }
 
-        } else if (jobTitle === 'Finance' || jobTitle === 'Cashier') {
-            const nextOptions = { O2C: 'O2C', Manager: 'Manager', 'Customer Service': 'Customer Service' };
-            const { value: selectedRole, isConfirmed } = await Swal.fire({
-                title: 'Select next service point',
-                input: 'select',
-                inputOptions: nextOptions,
-                inputPlaceholder: 'Select',
-                showCancelButton: true,
-            });
-            if (!isConfirmed) return;
-
-            let assignedOfficerId = customer.assigned_officer_id;
-            let newStatus = customer.status;
-
-            if (selectedRole === 'O2C') {
-                if (!customer.assigned_officer_id) {
-                    const { value: selectedUserId, isConfirmed: userConfirmedAssignment } = await Swal.fire({
-                        title: 'Assign O2C Officer',
-                        input: 'select',
-                        inputOptions: employees.filter(emp => emp.jobTitle === 'O2C Officer').reduce((acc, emp) => { acc[emp.id] = emp.full_name; return acc; }, {}),
-                        inputPlaceholder: 'Select an O2C Officer',
-                        showCancelButton: true,
-                    });
-                    if (!userConfirmedAssignment) {
-                        Swal.fire('Cancelled', 'No O2C Officer assigned. Action cancelled.', 'info');
-                        return;
-                    }
-                    assignedOfficerId = selectedUserId;
-                } else {
-                    Swal.fire('Info', 'O2C Officer is already assigned. Keeping current assignment.', 'info');
-                }
-                newStatus = 'started';
-            }
-
+        } else if (jobTitle === 'Finance') {
+            // Finance has its own reporting flow — no action here
+            successToast('Finance action not applicable here.');
+        } else if (jobTitle === 'Cashier') {
+            // No dialog — just send back to the O2C officer who forwarded this
             try {
                 await updateServiceStatus(
                     customer,
-                    newStatus,
+                    'started',
                     customer.started_at,
-                    assignedOfficerId,
-                    selectedRole,
+                    customer.assigned_officer_id,
+                    'O2C',
                 );
-                successToast(`Service point updated to ${selectedRole}.`);
+
+                // Record Cashier service time
+                try {
+                    const cashierEndTime = new Date().toISOString();
+                    const formatForMySQL = (dateValue) => {
+                        if (!dateValue) return null;
+                        const d = new Date(dateValue);
+                        return d.getFullYear() + '-' +
+                               String(d.getMonth() + 1).padStart(2, '0') + '-' +
+                               String(d.getDate()).padStart(2, '0') + ' ' +
+                               String(d.getHours()).padStart(2, '0') + ':' +
+                               String(d.getMinutes()).padStart(2, '0') + ':' +
+                               String(d.getSeconds()).padStart(2, '0');
+                    };
+                    await api.post(`/api/service-time`, {
+                        process_id: customer.id,
+                        service_unit: 'Cashier',
+                        end_time: formatForMySQL(cashierEndTime),
+                        officer_id: localStorage.getItem('EmployeeID'),
+                        officer_name: localStorage.getItem('FullName'),
+                        status: 'completed',
+                        notes: 'Completed Cashier process, sent back to O2C'
+                    });
+                    console.log('✅ Cashier service time recorded');
+                } catch (err) {
+                    console.error('❌ Failed to record Cashier service time:', err);
+                }
+
+                successToast('Sent back to O2C Officer.');
                 fetchData();
             } catch (error) {
                 console.error("Error updating service point:", error.response ? error.response.data : error.message);
@@ -867,7 +871,7 @@ const OutstandingCustomers = () => {
         fetchData();
         // Re-fetch ODNs for this customer so the Complete button state updates
         if (closingCustomerId) {
-            axios.get(`${api_url}/api/rdf-odns/${closingCustomerId}`)
+            api.get(`/api/rdf-odns/${closingCustomerId}`)
                 .then(res => {
                     setCustomerOdns(prev => ({
                         ...prev,
@@ -881,7 +885,7 @@ const OutstandingCustomers = () => {
     const handleRevert = async (customer) => {
         try {
             // Revert ODN status to 'pending' for this store
-            const response = await axios.put(`${api_url}/api/odns-rdf/revert-ewm`, {
+            const response = await api.put(`/api/odns-rdf/revert-ewm`, {
                 process_id: customer.id,
                 store: normalizedUserStore
             });
@@ -901,7 +905,7 @@ const OutstandingCustomers = () => {
     const handleEWMStart = async (customer) => {
         // Update ODN status to 'ewm_started' for this store
         try {
-            const response = await axios.put(`${api_url}/api/odns-rdf/start-ewm`, {
+            const response = await api.put(`/api/odns-rdf/start-ewm`, {
                 process_id: customer.id,
                 store: normalizedUserStore,
                 officer_id: localStorage.getItem('EmployeeID'),
@@ -1098,9 +1102,11 @@ const OutstandingCustomers = () => {
                                             {jobTitle === 'Customer Service Officer' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
                                             {jobTitle === 'Customer Service Officer' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
 
-                                            {(jobTitle === 'Finance' || jobTitle === 'Cashier') && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Current Service Point</TableCell>}
-                                            {(jobTitle === 'Finance' || jobTitle === 'Cashier') && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
-                                            {(jobTitle === 'Finance' || jobTitle === 'Cashier') && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
+                                            {jobTitle === 'Cashier' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
+
+                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Current Service Point</TableCell>}
+                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
+                                            {jobTitle === 'Finance' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -1337,7 +1343,19 @@ const OutstandingCustomers = () => {
                                                 </TableCell>
                                             </>
                                         )}
-                                        {(jobTitle === 'Finance' || jobTitle === 'Cashier') && (
+                                        {jobTitle === 'Cashier' && (
+                                            <TableCell>
+                                                <Button
+                                                    variant="contained"
+                                                    color="success"
+                                                    onClick={() => handleComplete(customer)}
+                                                    size="small"
+                                                >
+                                                    Complete
+                                                </Button>
+                                            </TableCell>
+                                        )}
+                                        {jobTitle === 'Finance' && (
                                             <>
                                                 <TableCell>{customer.next_service_point || "N/A"}</TableCell>
                                                 <TableCell>

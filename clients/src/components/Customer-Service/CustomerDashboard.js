@@ -26,7 +26,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import dayjs from 'dayjs';
 import PeopleIcon from '@mui/icons-material/People';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -62,7 +62,7 @@ const CustomerServiceDashboard = () => {
       setLoading(true);
       try {
         const [customerRes] = await Promise.all([
-          axios.get(`${api_url}/api/serviceList`),
+          api.get(`/api/serviceList`),
         ]);
         const fetchedCustomers = customerRes.data;
 

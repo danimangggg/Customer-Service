@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
 import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../utils/toast';
@@ -66,7 +65,7 @@ const PickListDetail = () => {
     setLoading(true);
     setError(null);
     try {
-      const serviceRes = await axios.get(`${api_url}/api/serviceList`);
+      const serviceRes = await api.get(`/api/serviceList`);
       const services = Array.isArray(serviceRes.data) ? serviceRes.data : [];
 
       const processItem = services.find(item => String(item.id) === process_id);
@@ -78,7 +77,7 @@ const PickListDetail = () => {
 
       // Fetch ODNs from the new odns_rdf table
       try {
-        const odnRes = await axios.get(`${api_url}/api/rdf-odns/${process_id}`);
+        const odnRes = await api.get(`/api/rdf-odns/${process_id}`);
         if (odnRes.data.success && odnRes.data.odns) {
           // Filter ODNs for the current user's store
           const storeOdns = odnRes.data.odns
@@ -96,12 +95,12 @@ const PickListDetail = () => {
         setOdnOptions([]);
       }
 
-      const facilitiesRes = await api.get(`${api_url}/api/facilities`);
+      const facilitiesRes = await api.get(`/api/facilities`);
       const facilities = Array.isArray(facilitiesRes.data) ? facilitiesRes.data : [];
       const fac = processItem ? facilities.find(f => String(f.id) === String(processItem.facility_id)) : null;
       setFacility(fac || null);
 
-      const picklistsRes = await axios.get(`${api_url}/api/getPicklists`);
+      const picklistsRes = await api.get(`/api/getPicklists`);
       // Handle both old format (array) and new format (object with data property)
       let allPicklists = Array.isArray(picklistsRes.data) 
         ? picklistsRes.data 
@@ -123,7 +122,7 @@ const PickListDetail = () => {
       setSubmittedPicklists(filtered);
 
       // ✅ Fetch WIM Operators filtered by store
-      const empRes = await api.get(`${api_url}/api/get-employee`);
+      const empRes = await api.get(`/api/get-employee`);
       const employees = Array.isArray(empRes.data) ? empRes.data : [];
       const wimOps = employees.filter(
         emp => {
@@ -174,7 +173,7 @@ const PickListDetail = () => {
         formData.append('store', userStore);
         formData.append('operator_id', selectedOperator);
 
-        await axios.post(`${api_url}/api/uploadPicklist`, formData, {
+        await api.post(`/api/uploadPicklist`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       }
@@ -226,7 +225,7 @@ const PickListDetail = () => {
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`${api_url}/api/deletePicklist/${id}`, { data: { fileUrl } });
+      await api.delete(`/api/deletePicklist/${id}`, { data: { fileUrl } });
       successToast('Deleted');
       setSubmittedPicklists(prev => prev.filter(p => p.id !== id));
     } catch (err) {
@@ -254,7 +253,7 @@ const PickListDetail = () => {
 
     try {
       console.log('📤 Sending PUT request to:', `${api_url}/api/completePicklist/${id}`);
-      const response = await axios.put(`${api_url}/api/completePicklist/${id}`);
+      const response = await api.put(`/api/completePicklist/${id}`);
       console.log('✅ Server response:', response.data);
       
       successToast('Completed');

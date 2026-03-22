@@ -13,13 +13,16 @@ const TvMainMenu = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const accountType = localStorage.getItem('AccountType') || '';
+  const jobTitle = localStorage.getItem('JobTitle') || '';
   const isSuperAdmin = accountType === 'Super Admin';
+  const isReportsRole = jobTitle === 'Reports';
+  const canSelectBranch = isSuperAdmin || isReportsRole;
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('');
   const api_url = process.env.REACT_APP_API_URL;
 
   useEffect(() => {
-    if (isSuperAdmin) {
+    if (canSelectBranch) {
       api.get(`${api_url}/api/branches`)
         .then(res => {
           const list = res.data || [];
@@ -28,7 +31,7 @@ const TvMainMenu = () => {
         })
         .catch(() => {});
     }
-  }, [isSuperAdmin]);
+  }, [canSelectBranch]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -81,7 +84,7 @@ const TvMainMenu = () => {
   ];
 
   const handleMenuClick = (route) => {
-    if (isSuperAdmin && selectedBranch) {
+    if (canSelectBranch && selectedBranch) {
       navigate(`${route}?branch_code=${selectedBranch}`);
     } else {
       navigate(route);
@@ -301,8 +304,8 @@ const TvMainMenu = () => {
                   </Stack>
                 </Box>
 
-                {/* Branch selector for Super Admin */}
-                {isSuperAdmin && (
+                {/* Branch selector for Super Admin and Reports role */}
+                {canSelectBranch && (
                   <FormControl size="small" sx={{ minWidth: 200 }}>
                     <InputLabel sx={{ color: 'rgba(255,255,255,0.8)' }}>Select Branch</InputLabel>
                     <Select

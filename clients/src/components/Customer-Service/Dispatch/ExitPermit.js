@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import api from '../../../axiosInstance';
 import { recordServiceTimeAuto, formatTimestamp } from '../../../utils/serviceTimeHelper';
 import { 
   Box, Typography, Button, Table, TableBody, TableCell, 
@@ -99,7 +100,7 @@ const ExitPermit = () => {
       // Fetch from TV display endpoint which has ODN-based data
       const [serviceRes, facilityRes, usersRes] = await Promise.all([
         axios.get(`${API_URL}/api/tv-display-customers`),
-        axios.get(`${API_URL}/api/facilities`),
+        api.get(`${API_URL}/api/facilities`),
         axios.get(`${API_URL}/api/users`)
       ]);
       

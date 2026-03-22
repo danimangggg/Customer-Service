@@ -43,7 +43,7 @@ const getCurrentEthiopianMonth = () => {
   return { year: ethYear, monthIndex: Math.max(0, Math.min(ethMonthIndex, 12)) };
 };
 
-const RouteAnalysis = () => {
+const RouteAnalysis = ({ branchCode = '' }) => {
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   const initialEth = getCurrentEthiopianMonth();
@@ -65,6 +65,7 @@ const RouteAnalysis = () => {
       setError(null);
       const params = { month: selectedMonth, year: selectedYear };
       if (processType) params.process_type = processType;
+      if (branchCode) params.branch_code = branchCode;
       const response = await api.get(`${api_url}/api/hp-comprehensive-report`, { params });
       setRouteStats(response.data.routeStats || []);
       setExpectedFacilities(response.data.expectedFacilities || 0);
@@ -78,7 +79,7 @@ const RouteAnalysis = () => {
 
   useEffect(() => {
     fetchRouteStats();
-  }, [selectedMonth, selectedYear, processType]);
+  }, [selectedMonth, selectedYear, processType, branchCode]);
 
   const filteredData = routeStats.filter(route =>
     (route.route_name || '').toLowerCase().includes(searchTerm.toLowerCase())
