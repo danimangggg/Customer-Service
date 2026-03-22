@@ -77,7 +77,7 @@ const ServiceDebug = () => {
         <Typography>Records with Exit Permit Data: {records.filter(r => 
           r.status === 'archived' && r.receipt_count && r.vehicle_plate && r.total_amount && r.measurement_unit
         ).length}</Typography>
-        <Typography>Records Ready for Gate Keeper: {records.filter(r => 
+        <Typography>Records Ready for Security: {records.filter(r => 
           r.status === 'archived' && r.receipt_count && r.vehicle_plate && r.total_amount && r.measurement_unit && !r.gate_status
         ).length}</Typography>
       </Box>

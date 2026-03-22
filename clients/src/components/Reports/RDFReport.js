@@ -998,8 +998,8 @@ const RDFReport = () => {
                     let label, color;
                     if (st === 'completed') { label = 'Completed'; color = '#2e7d32'; }
                     else if (st === 'canceled') { label = 'Cancelled'; color = '#c62828'; }
-                    else if (st === 'archived') { label = 'At Gate Keeper'; color = '#e65100'; }
-                    else if (nsp === 'gate-keeper') { label = 'At Gate Keeper'; color = '#e65100'; }
+                    else if (st === 'archived') { label = 'At Security'; color = '#e65100'; }
+                    else if (nsp === 'gate-keeper') { label = 'At Security'; color = '#e65100'; }
                     else if (nsp === 'dispatch' || nsp === 'exit-permit') { label = 'At Dispatch'; color = '#1565c0'; }
                     else if (nsp === 'ewm') { label = 'At EWM'; color = '#6a1b9a'; }
                     else if (nsp === 'o2c') { label = 'At O2C'; color = '#0277bd'; }

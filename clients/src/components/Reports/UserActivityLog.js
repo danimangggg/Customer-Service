@@ -65,7 +65,8 @@ const UserActivityLog = () => {
       'Quality Evaluator': '#00bcd4',
       'Dispatcher': '#ff5722',
       'Dispatch-Documentation': '#795548',
-      'Gate Keeper': '#607d8b'
+      'Gate Keeper': '#607d8b',
+      'Security': '#607d8b'
     };
     return colors[role] || '#757575';
   };

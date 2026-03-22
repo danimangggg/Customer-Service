@@ -484,13 +484,13 @@ const GateKeeper = () => {
           Access Denied
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          This page is restricted to Gate Keeper users only.
+          This page is restricted to Security users only.
         </Typography>
         <Typography variant="body2" sx={{ mt: 2 }}>
           Your current job title: <strong>{userJobTitle || 'Not Set'}</strong>
         </Typography>
         <Typography variant="body2">
-          Required job title: <strong>Gate Keeper</strong>
+          Required job title: <strong>Security</strong>
         </Typography>
       </Box>
     );
