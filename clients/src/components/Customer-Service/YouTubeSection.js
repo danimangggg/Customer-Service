@@ -44,8 +44,8 @@ const YouTubeSection = ({ videoPlaylist, setShowSettings }) => {
   );
 };
 
-// Only re-render if videoPlaylist length or first video changes
+// Re-render when any video in the playlist changes
 export default React.memo(YouTubeSection, (prevProps, nextProps) => {
-  return prevProps.videoPlaylist.length === nextProps.videoPlaylist.length &&
-         prevProps.videoPlaylist[0]?.id === nextProps.videoPlaylist[0]?.id;
+  if (prevProps.videoPlaylist.length !== nextProps.videoPlaylist.length) return false;
+  return prevProps.videoPlaylist.every((v, i) => v.id === nextProps.videoPlaylist[i]?.id);
 });

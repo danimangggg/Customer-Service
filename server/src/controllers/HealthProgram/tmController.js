@@ -1,367 +1,236 @@
 const db = require('../../models');
 const Process = db.process;
 const Facility = db.facility;
+const { Op } = require('sequelize');
 
-// Get processes ready for TM Phase 1 (ewm_completed status)
-exports.getTMProcesses = async (req, res) => {
+const READY_STATUSES = [
+  'biller_completed','ewm_completed','tm_notified','tm_confirmed',
+  'freight_order_sent_to_ewm','ewm_goods_issued','driver_assigned','dispatched','vehicle_requested'
+];
+
+const ETH_MONTHS = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
+
+// Get routes with all facilities (regular + vaccine combined) for TM Phase 1
+exports.getTMRoutes = async (req, res) => {
   try {
-    const { month, year, process_type = 'regular' } = req.query;
+    const { month, year } = req.query;
     const branchCode = req.headers['x-branch-code'] || null;
     const accountType = req.headers['x-account-type'] || null;
+    const reportingMonth = `${month} ${year}`;
+    const branchFilter = (accountType !== 'Super Admin' && branchCode) ? `AND f.branch_code = '${branchCode}'` : '';
 
-    const whereClause = { status: 'ewm_completed', process_type };
-    if (process_type === 'regular') {
-      whereClause.reporting_month = `${month} ${year}`;
-    }
+    const monthIndex = ETH_MONTHS.indexOf(month);
+    const isEvenMonth = (monthIndex + 1) % 2 === 0;
+    const currentPeriod = isEvenMonth ? 'Even' : 'Odd';
 
-    const facilityWhere = (accountType !== 'Super Admin' && branchCode)
-      ? { branch_code: branchCode }
-      : {};
-
-    const processes = await Process.findAll({
-      where: whereClause,
-      include: [{
-        model: Facility,
-        as: 'facility',
-        attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
-        where: Object.keys(facilityWhere).length ? facilityWhere : undefined,
-        required: Object.keys(facilityWhere).length > 0
-      }],
-      order: [['created_at', 'DESC']]
-    });
-
-    res.json({ success: true, processes });
-  } catch (error) {
-    console.error('Get TM processes error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Notify TM that goods are ready
-exports.notifyTM = async (req, res) => {
-  try {
-    const { process_id } = req.body;
-    
-    await Process.update({
-      tm_notified_at: new Date(),
-      status: 'tm_notified'
-    }, {
-      where: { id: process_id }
-    });
-    
-    res.json({ success: true, message: 'TM notified successfully' });
-  } catch (error) {
-    console.error('Notify TM error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// TM Phase 1: Assign vehicle only
-exports.createFreightOrder = async (req, res) => {
-  try {
-    const { process_id, vehicle_id, vehicle_name, tm_officer_id, tm_officer_name } = req.body;
-    
-    console.log('=== TM PHASE 1: VEHICLE ASSIGNMENT ===');
-    console.log('Process ID:', process_id);
-    console.log('Vehicle:', vehicle_name);
-    console.log('TM Officer:', tm_officer_name);
-    console.log('Setting status to: tm_confirmed');
-    
-    await Process.update({
-      vehicle_id,
-      vehicle_name,
-      tm_confirmed_at: new Date(),
-      tm_officer_id,
-      tm_officer_name,
-      status: 'tm_confirmed'
-    }, {
-      where: { id: process_id }
-    });
-    
-    // Record service time for TM Phase 1 - Vehicle Assignment
-    try {
-      // Fetch officer name from employees table, fall back to tm_officer_name param
-      let finalOfficerName = 'Unknown Officer';
-      if (tm_officer_id) {
-        try {
-          const employeeQuery = `SELECT full_name FROM employees WHERE id = ?`;
-          const [employee] = await db.sequelize.query(employeeQuery, {
-            replacements: [tm_officer_id],
-            type: db.sequelize.QueryTypes.SELECT
-          });
-          if (employee && employee.full_name) {
-            finalOfficerName = employee.full_name;
-          } else if (tm_officer_name && tm_officer_name !== 'null') {
-            finalOfficerName = tm_officer_name;
-          }
-        } catch (err) {
-          console.error('Failed to fetch TM officer name:', err);
-          if (tm_officer_name && tm_officer_name !== 'null') finalOfficerName = tm_officer_name;
-        }
-      } else if (tm_officer_name && tm_officer_name !== 'null') {
-        finalOfficerName = tm_officer_name;
-      }
-      let waitingMinutes = 0;
-      try {
-        const lastServiceQuery = `
-          SELECT end_time 
-          FROM service_time_hp
-          WHERE process_id = ? AND service_unit = 'EWM - Passed to TM Manager'
-          ORDER BY created_at DESC 
-          LIMIT 1
-        `;
-        
-        const [lastService] = await db.sequelize.query(lastServiceQuery, {
-          replacements: [process_id],
-          type: db.sequelize.QueryTypes.SELECT
-        });
-        
-        if (lastService && lastService.end_time) {
-          const prevTime = new Date(lastService.end_time);
-          const currTime = new Date();
-          const diffMs = currTime - prevTime;
-          waitingMinutes = Math.floor(diffMs / 60000);
-          waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
-        }
-      } catch (err) {
-        console.error('Failed to calculate TM Phase 1 waiting time:', err);
-      }
-      
-      const insertQuery = `
-        INSERT INTO service_time_hp 
-        (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
-        VALUES (?, ?, NOW(), ?, ?, ?, ?)
-      `;
-      
-      await db.sequelize.query(insertQuery, {
-        replacements: [
-          process_id,
-          'TM - Vehicle Assignment',
-          tm_officer_id,
-          finalOfficerName,
-          'completed',
-          `Vehicle: ${vehicle_name}, waiting time: ${waitingMinutes} minutes`
-        ],
-        type: db.sequelize.QueryTypes.INSERT
-      });
-      
-      console.log(`✅ TM Phase 1 service time recorded: ${waitingMinutes} minutes`);
-    } catch (err) {
-      console.error('❌ Failed to record TM Phase 1 service time:', err);
-      // Don't fail the confirmation if service time recording fails
-    }
-    
-    console.log('✓ TM Phase 1 vehicle assignment completed');
-    
-    res.json({ success: true, message: 'Vehicle assigned successfully' });
-  } catch (error) {
-    console.error('TM Phase 1 error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Send freight order back to EWM
-exports.sendToEWM = async (req, res) => {
-  try {
-    const { process_id } = req.body;
-    
-    await Process.update({
-      freight_order_sent_to_ewm_at: new Date(),
-      status: 'freight_order_sent_to_ewm'
-    }, {
-      where: { id: process_id }
-    });
-    
-    res.json({ success: true, message: 'Freight order sent to EWM successfully' });
-  } catch (error) {
-    console.error('Send to EWM error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Get processes ready for vehicle assignment (PI Officer has requested vehicle)
-exports.getVehicleAssignmentProcesses = async (req, res) => {
-  try {
-    const { month, year, process_type = 'regular' } = req.query;
-    const branchCode = req.headers['x-branch-code'] || null;
-    const accountType = req.headers['x-account-type'] || null;
-    const facilityWhere = (accountType !== 'Super Admin' && branchCode)
-      ? { branch_code: branchCode }
-      : {};
-
-    if (process_type === 'regular') {
-      const piRequestsQuery = `
-        SELECT DISTINCT pvr.route_id, r.route_name, pvr.requested_at
-        FROM pi_vehicle_requests pvr
-        INNER JOIN routes r ON r.id = pvr.route_id
-        WHERE pvr.month = ? AND pvr.year = ?
-        ORDER BY pvr.requested_at DESC
-      `;
-      const piRequests = await db.sequelize.query(piRequestsQuery, {
-        replacements: [month, year],
-        type: db.sequelize.QueryTypes.SELECT
-      });
-
-      if (piRequests.length === 0) return res.json({ success: true, processes: [] });
-
-      const routeNames = piRequests.map(r => r.route_name);
-
-      const processes = await Process.findAll({
-        where: { status: 'biller_completed', process_type: 'regular', reporting_month: `${month} ${year}` },
-        include: [{
-          model: Facility,
-          as: 'facility',
-          attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
-          where: { route: routeNames, ...facilityWhere },
-          required: true
-        }],
-        order: [['created_at', 'DESC']]
-      });
-
-      return res.json({ success: true, processes });
-    }
-
-    // Emergency / Breakdown: show processes that have a PI vehicle request (by process_id)
-    const piRequestsQuery = `
-      SELECT pvr.process_id
-      FROM pi_vehicle_requests pvr
-      WHERE pvr.process_id IS NOT NULL
+    const routesQuery = `
+      SELECT
+        r.id as route_id,
+        r.route_name,
+        COUNT(DISTINCT f.id) as total_facilities,
+        COUNT(DISTINCT CASE
+          WHEN p.status IN (${READY_STATUSES.map(() => '?').join(',')})
+            OR EXISTS (
+              SELECT 1 FROM odns o JOIN processes op ON op.id = o.process_id
+              WHERE op.facility_id = f.id AND op.reporting_month = ?
+              AND (o.odn_number LIKE 'RRF not sent%' OR o.odn_number LIKE 'VRF not sent%')
+            )
+            OR EXISTS (
+              SELECT 1 FROM odns o JOIN processes op ON op.id = o.process_id
+              WHERE op.facility_id = f.id AND op.reporting_month = ?
+              AND o.quality_confirmed = 1
+            )
+          THEN f.id END) as ready_facilities
+      FROM routes r
+      INNER JOIN facilities f ON f.route = r.route_name
+        AND (f.period = 'Monthly' OR f.period = ?)
+        ${branchFilter}
+      LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+        AND p.vehicle_id IS NULL
+      WHERE f.route IS NOT NULL
+      GROUP BY r.id, r.route_name
+      HAVING total_facilities > 0 AND ready_facilities > 0
+      ORDER BY (total_facilities = ready_facilities) DESC, r.route_name
     `;
-    const piRequests = await db.sequelize.query(piRequestsQuery, {
+
+    const params = [...READY_STATUSES, reportingMonth, reportingMonth, currentPeriod, reportingMonth];
+
+    const routes = await db.sequelize.query(routesQuery, {
+      replacements: params,
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    const requestedProcessIds = piRequests.map(r => r.process_id);
+    const routesWithFacilities = await Promise.all(routes.map(async (route) => {
+      const facilitiesQuery = `
+        SELECT
+          f.id, f.facility_name,
+          COALESCE(p_reg.status, p_vac.status, 'no_process') as process_status,
+          CASE WHEN p_vac.id IS NOT NULL AND p_reg.id IS NULL THEN 'vaccine'
+               WHEN p_reg.id IS NOT NULL THEN 'regular'
+               ELSE NULL END as process_type,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM odns o JOIN processes op ON op.id = o.process_id
+            WHERE op.facility_id = f.id AND op.reporting_month = ?
+            AND (o.odn_number LIKE 'RRF not sent%' OR o.odn_number LIKE 'VRF not sent%')
+          ) THEN 1 ELSE 0 END as rrf_not_sent,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM odns o JOIN processes op ON op.id = o.process_id
+            WHERE op.facility_id = f.id AND op.reporting_month = ?
+            AND o.quality_confirmed = 1
+          ) THEN 1 ELSE 0 END as quality_confirmed
+        FROM facilities f
+        LEFT JOIN processes p_reg ON p_reg.facility_id = f.id AND p_reg.reporting_month = ? AND p_reg.process_type = 'regular'
+        LEFT JOIN processes p_vac ON p_vac.facility_id = f.id AND p_vac.reporting_month = ? AND p_vac.process_type = 'vaccine'
+        WHERE f.route = ? AND (f.period = 'Monthly' OR f.period = ?)
+        ${branchFilter}
+        ORDER BY f.facility_name
+      `;
+      const facilities = await db.sequelize.query(facilitiesQuery, {
+        replacements: [reportingMonth, reportingMonth, reportingMonth, reportingMonth, route.route_name, currentPeriod],
+        type: db.sequelize.QueryTypes.SELECT
+      });
 
-    if (requestedProcessIds.length === 0) return res.json({ success: true, processes: [] });
+      return { ...route, facilities };
+    }));
 
-    const { Op } = require('sequelize');
-    const processes = await Process.findAll({
-      where: {
-        status: 'biller_completed',
-        process_type,
-        id: { [Op.in]: requestedProcessIds }
-      },
-      include: [{
-        model: Facility,
-        as: 'facility',
-        attributes: ['id', 'facility_name', 'region_name', 'route', 'period'],
-        where: Object.keys(facilityWhere).length ? facilityWhere : undefined,
-        required: Object.keys(facilityWhere).length > 0
-      }],
-      order: [['created_at', 'DESC']]
-    });
-
-    res.json({ success: true, processes });
+    res.json({ success: true, routes: routesWithFacilities });
   } catch (error) {
-    console.error('Get vehicle assignment processes error:', error);
+    console.error('getTMRoutes error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// TM Phase 2: Assign driver and deliverer
+// Get routes for Phase 2 (vehicle assigned, need driver) — all process types
+exports.getTMPhase2Routes = async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const branchCode = req.headers['x-branch-code'] || null;
+    const accountType = req.headers['x-account-type'] || null;
+    const reportingMonth = `${month} ${year}`;
+    const branchFilter = (accountType !== 'Super Admin' && branchCode) ? `AND f.branch_code = '${branchCode}'` : '';
+
+    const monthIndex = ETH_MONTHS.indexOf(month);
+    const isEvenMonth = (monthIndex + 1) % 2 === 0;
+    const currentPeriod = isEvenMonth ? 'Even' : 'Odd';
+
+    const routesQuery = `
+      SELECT
+        r.id as route_id,
+        r.route_name,
+        COUNT(DISTINCT f.id) as total_facilities,
+        COUNT(DISTINCT CASE
+          WHEN p_rep.status = 'biller_completed' AND p_rep.vehicle_id IS NOT NULL
+          THEN f.id END) as ready_facilities,
+        MAX(p_rep.vehicle_name) as vehicle_name,
+        MAX(p_rep.vehicle_id) as vehicle_id
+      FROM routes r
+      INNER JOIN facilities f ON f.route = r.route_name
+        AND (f.period = 'Monthly' OR f.period = ?)
+        ${branchFilter}
+      LEFT JOIN processes p_rep ON p_rep.facility_id = f.id
+        AND p_rep.reporting_month = ?
+      WHERE f.route IS NOT NULL
+      GROUP BY r.id, r.route_name
+      HAVING ready_facilities > 0
+      ORDER BY r.route_name
+    `;
+
+    const routes = await db.sequelize.query(routesQuery, {
+      replacements: [currentPeriod, reportingMonth],
+      type: db.sequelize.QueryTypes.SELECT
+    });
+
+    const routesWithFacilities = await Promise.all(routes.map(async (route) => {
+      const facilitiesQuery = `
+        SELECT f.id, f.facility_name,
+          COALESCE(p_reg.status, p_vac.status, 'no_process') as process_status,
+          CASE WHEN p_vac.id IS NOT NULL AND p_reg.id IS NULL THEN 'vaccine'
+               WHEN p_reg.id IS NOT NULL THEN 'regular'
+               ELSE NULL END as process_type
+        FROM facilities f
+        LEFT JOIN processes p_reg ON p_reg.facility_id = f.id AND p_reg.reporting_month = ? AND p_reg.process_type = 'regular'
+        LEFT JOIN processes p_vac ON p_vac.facility_id = f.id AND p_vac.reporting_month = ? AND p_vac.process_type = 'vaccine'
+        WHERE f.route = ? AND (f.period = 'Monthly' OR f.period = ?)
+        ${branchFilter}
+        ORDER BY f.facility_name
+      `;
+      const facilities = await db.sequelize.query(facilitiesQuery, {
+        replacements: [reportingMonth, reportingMonth, route.route_name, currentPeriod],
+        type: db.sequelize.QueryTypes.SELECT
+      });
+
+      return { ...route, facilities };
+    }));
+
+    res.json({ success: true, routes: routesWithFacilities });
+  } catch (error) {
+    console.error('getTMPhase2Routes error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// TM Phase 1: Assign vehicle to ALL ready processes in a route
+exports.createFreightOrder = async (req, res) => {
+  try {
+    const { route_name, reporting_month, vehicle_id, vehicle_name, tm_officer_id, tm_officer_name } = req.body;
+
+    const facilitiesInRoute = await Facility.findAll({ where: { route: route_name }, attributes: ['id'] });
+    const facilityIds = facilitiesInRoute.map(f => f.id);
+
+    await Process.update(
+      { vehicle_id, vehicle_name, tm_confirmed_at: new Date(), tm_officer_id, tm_officer_name, status: 'freight_order_sent_to_ewm' },
+      { where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: { [Op.in]: READY_STATUSES } } }
+    );
+
+    try {
+      const procs = await Process.findAll({ where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: 'freight_order_sent_to_ewm' } });
+      for (const p of procs) {
+        await db.sequelize.query(
+          `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes) VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
+          { replacements: [p.id, 'TM - Vehicle Assignment', tm_officer_id, tm_officer_name || 'TM Manager', 'completed', `Vehicle: ${vehicle_name}`], type: db.sequelize.QueryTypes.INSERT }
+        );
+      }
+    } catch (e) { console.error('Service time error:', e); }
+
+    res.json({ success: true, message: 'Vehicle assigned to all route processes' });
+  } catch (error) {
+    console.error('createFreightOrder error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// TM Phase 2: Assign driver/deliverer to ALL tm_confirmed processes in a route
 exports.assignVehicle = async (req, res) => {
   try {
-    const { process_id, driver_id, driver_name, deliverer_id, deliverer_name, departure_kilometer, tm_officer_id, tm_officer_name } = req.body;
-    
-    console.log('=== TM PHASE 2: DRIVER & DELIVERER ASSIGNMENT ===');
-    console.log('Process ID:', process_id);
-    console.log('Driver:', driver_name);
-    console.log('Deliverer:', deliverer_name);
-    console.log('Departure Kilometer:', departure_kilometer);
-    console.log('TM Officer:', tm_officer_name);
-    
-    await Process.update({
-      driver_id,
-      driver_name,
-      deliverer_id,
-      deliverer_name,
-      departure_kilometer: departure_kilometer ? parseFloat(departure_kilometer) : null,
-      driver_assigned_at: new Date(),
-      status: 'driver_assigned'
-    }, {
-      where: { id: process_id }
-    });
-    
-    // Record service time for TM Phase 2 - Driver & Deliverer Assignment
+    const { route_name, reporting_month, driver_id, driver_name, deliverer_id, deliverer_name, departure_kilometer, tm_officer_id, tm_officer_name } = req.body;
+
+    const facilitiesInRoute = await Facility.findAll({ where: { route: route_name }, attributes: ['id'] });
+    const facilityIds = facilitiesInRoute.map(f => f.id);
+
+    await Process.update(
+      { driver_id, driver_name, deliverer_id: deliverer_id || null, deliverer_name: deliverer_name || null, departure_kilometer: departure_kilometer ? parseFloat(departure_kilometer) : null, driver_assigned_at: new Date(), status: 'driver_assigned' },
+      { where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: 'biller_completed', vehicle_id: { [Op.ne]: null } } }
+    );
+
     try {
-      // Fetch officer name from employees table, fall back to tm_officer_name param
-      let finalOfficerName = 'Unknown Officer';
-      if (tm_officer_id) {
-        try {
-          const employeeQuery = `SELECT full_name FROM employees WHERE id = ?`;
-          const [employee] = await db.sequelize.query(employeeQuery, {
-            replacements: [tm_officer_id],
-            type: db.sequelize.QueryTypes.SELECT
-          });
-          if (employee && employee.full_name) {
-            finalOfficerName = employee.full_name;
-          } else if (tm_officer_name && tm_officer_name !== 'null') {
-            finalOfficerName = tm_officer_name;
-          }
-        } catch (err) {
-          console.error('Failed to fetch TM officer name:', err);
-          if (tm_officer_name && tm_officer_name !== 'null') finalOfficerName = tm_officer_name;
-        }
-      } else if (tm_officer_name && tm_officer_name !== 'null') {
-        finalOfficerName = tm_officer_name;
+      const procs = await Process.findAll({ where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: 'driver_assigned', vehicle_id: { [Op.ne]: null } } });
+      for (const p of procs) {
+        await db.sequelize.query(
+          `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes) VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
+          { replacements: [p.id, 'TM - Driver & Deliverer Assignment', tm_officer_id, tm_officer_name || 'TM Manager', 'completed', `Driver: ${driver_name}`], type: db.sequelize.QueryTypes.INSERT }
+        );
       }
-      
-      // Calculate waiting time from EWM Phase 2 completion
-      let waitingMinutes = 0;
-      try {
-        const lastServiceQuery = `
-          SELECT end_time 
-          FROM service_time_hp
-          WHERE process_id = ? AND service_unit = 'EWM - Goods Issue'
-          ORDER BY created_at DESC 
-          LIMIT 1
-        `;
-        
-        const [lastService] = await db.sequelize.query(lastServiceQuery, {
-          replacements: [process_id],
-          type: db.sequelize.QueryTypes.SELECT
-        });
-        
-        if (lastService && lastService.end_time) {
-          const prevTime = new Date(lastService.end_time);
-          const currTime = new Date();
-          const diffMs = currTime - prevTime;
-          waitingMinutes = Math.floor(diffMs / 60000);
-          waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
-        }
-      } catch (err) {
-        console.error('Failed to calculate TM Phase 2 waiting time:', err);
-      }
-      
-      const insertQuery = `
-        INSERT INTO service_time_hp 
-        (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
-        VALUES (?, ?, NOW(), ?, ?, ?, ?)
-      `;
-      
-      await db.sequelize.query(insertQuery, {
-        replacements: [
-          process_id,
-          'TM - Driver & Deliverer Assignment',
-          tm_officer_id,
-          finalOfficerName,
-          'completed',
-          `Driver: ${driver_name}, Deliverer: ${deliverer_name}, waiting time: ${waitingMinutes} minutes`
-        ],
-        type: db.sequelize.QueryTypes.INSERT
-      });
-      
-      console.log(`✅ TM Phase 2 service time recorded: ${waitingMinutes} minutes`);
-    } catch (err) {
-      console.error('❌ Failed to record TM Phase 2 service time:', err);
-    }
-    
-    console.log('✓ TM Phase 2 driver & deliverer assignment completed');
-    
-    res.json({ success: true, message: 'Driver and deliverer assigned successfully' });
+    } catch (e) { console.error('Service time error:', e); }
+
+    res.json({ success: true, message: 'Driver assigned to all route processes' });
   } catch (error) {
-    console.error('TM Phase 2 error:', error);
+    console.error('assignVehicle error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Legacy stubs
+exports.getTMProcesses = async (req, res) => res.json({ success: true, processes: [] });
+exports.notifyTM = async (req, res) => res.json({ success: true });
+exports.sendToEWM = async (req, res) => res.json({ success: true });
+exports.getVehicleAssignmentProcesses = async (req, res) => res.json({ success: true, processes: [] });

@@ -36,7 +36,7 @@ const getDispatchedODNs = async (req, res) => {
         r.id as route_id,
         p.reporting_month,
         ra.id as route_assignment_id,
-        COALESCE(ra.arrival_kilometer, MAX(p.arrival_kilometer)) as arrival_kilometer,
+        ra.arrival_kilometer,
         COUNT(DISTINCT o.id) as total_odns,
         SUM(CASE WHEN o.pod_confirmed = 1 THEN 1 ELSE 0 END) as confirmed_pods,
         SUM(CASE WHEN o.pod_confirmed = 1 AND o.documents_signed = 1 AND o.documents_handover = 1 THEN 1 ELSE 0 END) as fully_completed_odns,
@@ -301,21 +301,14 @@ const bulkUpdatePODConfirmation = async (req, res) => {
             transaction
           });
 
-          // Save arrival_kilometer directly on the process record
-          if (arrival_kilometer !== undefined && arrival_kilometer !== null) {
-            // Get process_id from ODN
-            const [odnRow] = await db.sequelize.query(
-              `SELECT process_id FROM odns WHERE id = ?`,
-              { replacements: [odn_id], type: db.sequelize.QueryTypes.SELECT, transaction }
+          // Save arrival_kilometer to route_assignments
+          if (arrival_kilometer !== undefined && arrival_kilometer !== null && route_assignment_id) {
+            await db.sequelize.query(
+              `UPDATE route_assignments SET arrival_kilometer = ? WHERE id = ?`,
+              { replacements: [arrival_kilometer, route_assignment_id], type: db.sequelize.QueryTypes.UPDATE, transaction }
             );
-            if (odnRow) {
-              await db.sequelize.query(
-                `UPDATE processes SET arrival_kilometer = ? WHERE id = ?`,
-                { replacements: [arrival_kilometer, odnRow.process_id], type: db.sequelize.QueryTypes.UPDATE, transaction }
-              );
-              routeKilometerUpdates.set(odnRow.process_id, arrival_kilometer);
-              console.log(`Updated process ${odnRow.process_id} with arrival_kilometer: ${arrival_kilometer}`);
-            }
+            routeKilometerUpdates.set(route_assignment_id, arrival_kilometer);
+            console.log(`Updated route_assignment ${route_assignment_id} with arrival_kilometer: ${arrival_kilometer}`);
           }
 
           // Commit the transaction
@@ -608,11 +601,34 @@ const bulkUpdateFacilityPODConfirmation = async (req, res) => {
   }
 };
 
+// Get arrival_kilometer for a route from route_assignments
+const getRouteKilometer = async (req, res) => {
+  try {
+    const { route_name, month, year } = req.query;
+    if (!route_name || !month || !year) {
+      return res.status(400).json({ error: 'route_name, month, and year are required' });
+    }
+    const [row] = await db.sequelize.query(`
+      SELECT ra.arrival_kilometer
+      FROM route_assignments ra
+      INNER JOIN routes r ON r.id = ra.route_id
+      WHERE r.route_name = ? AND ra.ethiopian_month = ? AND ra.arrival_kilometer IS NOT NULL
+      LIMIT 1
+    `, { replacements: [route_name, month], type: db.sequelize.QueryTypes.SELECT });
+
+    res.json({ arrival_kilometer: row?.arrival_kilometer || null });
+  } catch (error) {
+    console.error('getRouteKilometer error:', error);
+    res.status(500).json({ error: 'Failed to fetch route kilometer' });
+  }
+};
+
 module.exports = {
   getDispatchedODNs,
   getDocumentationStats,
   updatePODConfirmation,
   bulkUpdatePODConfirmation,
   bulkUpdateFacilityPODConfirmation,
-  getAvailableMonths
+  getAvailableMonths,
+  getRouteKilometer
 };

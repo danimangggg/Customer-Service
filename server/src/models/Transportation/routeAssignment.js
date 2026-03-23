@@ -98,13 +98,9 @@ module.exports = (sequelize, DataTypes) => {
       comment: 'When the dispatch was completed'
     },
     completed_by: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING(255),
       allowNull: true,
-      references: {
-        model: 'employees',
-        key: 'id'
-      },
-      comment: 'Employee ID who completed the dispatch'
+      comment: 'Name or ID of employee who completed the dispatch'
     },
     arrival_kilometer: {
       type: DataTypes.DECIMAL(15, 2),

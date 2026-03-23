@@ -2,35 +2,40 @@ import React, { useState, useEffect } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Typography, Card, Button, Container,
-  TablePagination, Stack, Box, Chip, Avatar, Divider, LinearProgress, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel, Grid
+  TablePagination, Stack, Box, Chip, Avatar, LinearProgress, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Select, MenuItem, FormControl, InputLabel
 } from '@mui/material';
 import {
   LocalShipping as TruckIcon,
   DirectionsCar as CarIcon,
   Person as PersonIcon,
-  Download as DownloadIcon,
-  Speed as SpeedIcon,
   Groups as GroupsIcon,
-  Undo as UndoIcon,
+  CheckCircle as CheckIcon,
+  HourglassEmpty as PendingIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
 import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
-import * as XLSX from 'xlsx';
+
+const READY_STATUSES = [
+  'biller_completed','ewm_completed','tm_notified','tm_confirmed',
+  'freight_order_sent_to_ewm','ewm_goods_issued','driver_assigned','dispatched','vehicle_requested'
+];
 
 const TMManager = () => {
-  const [phase1Processes, setPhase1Processes] = useState([]);
-  const [phase2Processes, setPhase2Processes] = useState([]);
+  const [phase1Routes, setPhase1Routes] = useState([]);
+  const [phase2Routes, setPhase2Routes] = useState([]);
   const [page1, setPage1] = useState(0);
   const [page2, setPage2] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Action dialog
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogType, setDialogType] = useState('phase1');
-  const [selectedProcess, setSelectedProcess] = useState(null);
+  const [selectedRoute, setSelectedRoute] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [deliverers, setDeliverers] = useState([]);
@@ -38,7 +43,9 @@ const TMManager = () => {
   const [selectedDriver, setSelectedDriver] = useState('');
   const [selectedDeliverer, setSelectedDeliverer] = useState('');
   const [departureKilometer, setDepartureKilometer] = useState('');
-  const [processType, setProcessType] = useState('regular');
+
+  // Details dialog
+  const [detailRoute, setDetailRoute] = useState(null);
 
   const loggedInUserId = localStorage.getItem('UserId');
   const loggedInUserName = localStorage.getItem('FullName');
@@ -68,114 +75,92 @@ const TMManager = () => {
 
   const currentEthiopian = getCurrentEthiopianMonth();
 
-  useEffect(() => {
-    fetchPhase1Processes();
-    fetchPhase2Processes();
-    fetchVehicles();
-    fetchDriversAndDeliverers();
-  }, [processType]);
-
-  // Silent background polling every 5s
-  useEffect(() => {
-    const silentFetch = async () => {
-      try {
-        const [r1, r2] = await Promise.all([
-          api.get(`${api_url}/api/tm-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } }),
-          api.get(`${api_url}/api/tm-vehicle-assignment-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } })
-        ]);
-        setPhase1Processes(r1.data.processes || []);
-        setPhase2Processes(r2.data.processes || []);
-      } catch (_) {}
-    };
-    const interval = setInterval(silentFetch, 5000);
-    return () => clearInterval(interval);
-  }, [processType]);
-
-  const fetchPhase1Processes = async () => {
+  const fetchAll = async () => {
     try {
       setLoading(true); setError(null);
-      const res = await api.get(`${api_url}/api/tm-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } });
-      setPhase1Processes(res.data.processes || []);
-    } catch (err) { setError("Failed to load Phase 1 processes."); } finally { setLoading(false); }
+      const params = { month: currentEthiopian.month, year: currentEthiopian.year };
+      const [r1, r2] = await Promise.all([
+        api.get(`${api_url}/api/tm-routes`, { params }),
+        api.get(`${api_url}/api/tm-phase2-routes`, { params })
+      ]);
+      setPhase1Routes(r1.data.routes || []);
+      setPhase2Routes(r2.data.routes || []);
+    } catch (err) { setError('Failed to load TM data.'); }
+    finally { setLoading(false); }
   };
 
-  const fetchPhase2Processes = async () => {
-    try {
-      const res = await api.get(`${api_url}/api/tm-vehicle-assignment-processes`, { params: { month: currentEthiopian.month, year: currentEthiopian.year, process_type: processType } });
-      setPhase2Processes(res.data.processes || []);
-    } catch (err) { console.error(err); }
-  };
+  useEffect(() => { fetchAll(); fetchVehicles(); fetchDriversAndDeliverers(); }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const params = { month: currentEthiopian.month, year: currentEthiopian.year };
+        const [r1, r2] = await Promise.all([
+          api.get(`${api_url}/api/tm-routes`, { params }),
+          api.get(`${api_url}/api/tm-phase2-routes`, { params })
+        ]);
+        setPhase1Routes(r1.data.routes || []);
+        setPhase2Routes(r2.data.routes || []);
+      } catch (_) {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchVehicles = async () => {
-    try { const res = await api.get(`${api_url}/api/vehicles/available`); setVehicles(res.data || []); } catch (err) { console.error(err); }
+    try { const res = await api.get(`${api_url}/api/vehicles/available`); setVehicles(res.data || []); } catch (e) {}
   };
-
   const fetchDriversAndDeliverers = async () => {
     try {
-      const [drvRes, dlvRes] = await Promise.all([
-        api.get(`${api_url}/api/drivers/available`),
-        api.get(`${api_url}/api/deliverers/available`)
-      ]);
-      setDrivers(drvRes.data || []);
-      setDeliverers(dlvRes.data || []);
-    } catch (err) { console.error(err); }
+      const [d, dl] = await Promise.all([api.get(`${api_url}/api/drivers/available`), api.get(`${api_url}/api/deliverers/available`)]);
+      setDrivers(d.data || []); setDeliverers(dl.data || []);
+    } catch (e) {}
   };
 
-  const handleCreateFreightOrder = (process) => { setSelectedProcess(process); setSelectedVehicle(''); setDialogType('phase1'); setOpenDialog(true); };
-  const handleAssignDriver = (process) => { setSelectedProcess(process); setSelectedDriver(''); setSelectedDeliverer(''); setDepartureKilometer(''); setDialogType('phase2'); setOpenDialog(true); };
+  const isFacilityReady = (f) =>
+    READY_STATUSES.includes(f.process_status) || f.rrf_not_sent === 1 || f.quality_confirmed === 1;
 
-  const handleRevert = async (process, label) => {
-    const result = await Swal.fire({
-      title: 'Return to Previous Step?',
-      text: `This will return "${process.facility?.facility_name}" back to the previous step.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, Return',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#f44336'
-    });
-    if (result.isConfirmed) {
-      try {
-        await api.post(`${api_url}/api/hp-revert-process`, { process_id: process.id });
-        successToast('Process returned to previous step');
-        fetchPhase1Processes();
-        fetchPhase2Processes();
-      } catch (err) {
-        Swal.fire('Error', err.response?.data?.error || 'Failed to revert process', 'error');
-      }
-    }
+  const isRouteReady = (route) =>
+    route.total_facilities > 0 && Number(route.total_facilities) === Number(route.ready_facilities);
+
+  const handleAssignVehicle = (route) => {
+    setSelectedRoute(route); setSelectedVehicle(''); setDialogType('phase1'); setOpenDialog(true);
+  };
+  const handleAssignDriver = (route) => {
+    setSelectedRoute(route); setSelectedDriver(''); setSelectedDeliverer(''); setDepartureKilometer(''); setDialogType('phase2'); setOpenDialog(true);
   };
 
-  const handleSaveFreightOrder = async () => {
+  const handleSaveVehicle = async () => {
     if (!selectedVehicle) { Swal.fire('Error', 'Please select a vehicle', 'error'); return; }
     try {
       const vehicle = vehicles.find(v => v.id === selectedVehicle);
-      await api.post(`${api_url}/api/tm-create-freight-order`, { process_id: selectedProcess.id, vehicle_id: vehicle.id, vehicle_name: vehicle.vehicle_name, tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName });
-      try { await api.post(`${api_url}/api/service-time-hp`, { process_id: selectedProcess.id, service_unit: 'TM Manager - HP', end_time: new Date().toISOString(), officer_id: loggedInUserId, officer_name: loggedInUserName, status: 'completed', notes: `Vehicle assigned: ${vehicle.vehicle_name}` }); } catch (e) {}
-      successToast('Vehicle assigned successfully');
-      setOpenDialog(false); fetchPhase1Processes(); fetchPhase2Processes();
+      await api.post(`${api_url}/api/tm-create-freight-order`, {
+        route_name: selectedRoute.route_name,
+        reporting_month: `${currentEthiopian.month} ${currentEthiopian.year}`,
+        vehicle_id: vehicle.id, vehicle_name: vehicle.vehicle_name,
+        tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName
+      });
+      successToast('Vehicle assigned to all route facilities');
+      setOpenDialog(false); fetchAll();
     } catch (err) { Swal.fire('Error', 'Failed to assign vehicle', 'error'); }
   };
 
-  const handleSaveDriverAssignment = async () => {
-    if (!selectedDriver || !selectedDeliverer) { Swal.fire('Error', 'Please select both driver and deliverer', 'error'); return; }
+  const handleSaveDriver = async () => {
+    if (!selectedDriver) { Swal.fire('Error', 'Please select a driver', 'error'); return; }
     if (!departureKilometer || isNaN(departureKilometer)) { Swal.fire('Error', 'Please enter valid departure kilometer', 'error'); return; }
     try {
       const driver = drivers.find(d => d.id === selectedDriver);
-      const deliverer = deliverers.find(d => d.id === selectedDeliverer);
-      await api.post(`${api_url}/api/tm-assign-vehicle`, { process_id: selectedProcess.id, driver_id: driver.id, driver_name: driver.full_name, deliverer_id: deliverer.id, deliverer_name: deliverer.full_name, departure_kilometer: parseFloat(departureKilometer), tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName });
-      try { await api.post(`${api_url}/api/service-time-hp`, { process_id: selectedProcess.id, service_unit: 'TM Manager - HP', end_time: new Date().toISOString(), officer_id: loggedInUserId, officer_name: loggedInUserName, status: 'completed', notes: 'Driver & deliverer assigned' }); } catch (e) {}
-      successToast('Driver and deliverer assigned successfully');
-      setOpenDialog(false); fetchPhase1Processes(); fetchPhase2Processes();
-    } catch (err) { Swal.fire('Error', 'Failed to assign driver and deliverer', 'error'); }
-  };
-
-  const handleExportExcel = () => {
-    const rows = phase1Processes.map((p, i) => ({ '#': i+1, 'Facility': p.facility?.facility_name || 'Unknown', 'Route': p.facility?.route || 'N/A', 'Region': p.facility?.region_name || 'N/A', 'Reporting Month': p.reporting_month || 'N/A', 'Process Type': p.process_type || 'N/A', 'Status': p.status || 'N/A' }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'EWM Completed');
-    XLSX.writeFile(wb, `EWM_Completed_${processType}_${Date.now()}.xlsx`);
+      const deliverer = selectedDeliverer ? deliverers.find(d => d.id === selectedDeliverer) : null;
+      await api.post(`${api_url}/api/tm-assign-vehicle`, {
+        route_name: selectedRoute.route_name,
+        reporting_month: `${currentEthiopian.month} ${currentEthiopian.year}`,
+        driver_id: driver.id, driver_name: driver.full_name,
+        deliverer_id: deliverer?.id || null, deliverer_name: deliverer?.full_name || null,
+        departure_kilometer: parseFloat(departureKilometer),
+        tm_officer_id: loggedInUserId, tm_officer_name: loggedInUserName
+      });
+      successToast('Driver assigned to all route facilities');
+      setOpenDialog(false); fetchAll();
+    } catch (err) { Swal.fire('Error', 'Failed to assign driver', 'error'); }
   };
 
   if (!isTMManager) return (
@@ -184,62 +169,75 @@ const TMManager = () => {
     </Container>
   );
 
-  const PhaseTable = ({ processes, page, setPage, color, actionLabel, actionIcon, onAction, onRevert }) => (
+  const RouteTable = ({ routes, page, setPage, color, phase, onAction, actionLabel, actionIcon }) => (
     <TableContainer>
       <Table>
         <TableHead>
-          <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: color, color: 'white', fontWeight: 700, fontSize: '0.95rem' } }}>
-            <TableCell>#</TableCell>
-            <TableCell>Facility</TableCell>
+          <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: color, color: 'white', fontWeight: 700 } }}>
             <TableCell>Route</TableCell>
-            <TableCell>Region</TableCell>
+            <TableCell align="center">Facilities</TableCell>
+            <TableCell align="center">Ready</TableCell>
+            {phase === 2 && <TableCell>Vehicle</TableCell>}
+            <TableCell align="center">Details</TableCell>
             <TableCell align="center">Action</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {processes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((process, index) => (
-            <TableRow key={process.id} hover sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
-              <TableCell>
-                <Avatar sx={{ width: 32, height: 32, bgcolor: color, fontSize: '0.8rem' }}>
-                  {page * rowsPerPage + index + 1}
-                </Avatar>
-              </TableCell>
-              <TableCell>
-                <Typography variant="subtitle2" fontWeight={700} color="primary.dark">
-                  {process.facility?.facility_name || 'Unknown Facility'}
-                </Typography>
-              </TableCell>
-              <TableCell>
-                {process.facility?.route
-                  ? <Chip label={process.facility.route} size="small" variant="outlined" color="secondary" />
-                  : <Typography variant="caption" color="text.disabled">N/A</Typography>}
-              </TableCell>
-              <TableCell>
-                <Typography variant="body2" color="text.secondary">{process.facility?.region_name || 'N/A'}</Typography>
-              </TableCell>
-              <TableCell align="center">
-                <Stack direction="row" spacing={1} justifyContent="center">
-                  <Button variant="contained" size="small" startIcon={actionIcon} onClick={() => onAction(process)} disabled={!process.facility}
-                    sx={{ bgcolor: color, '&:hover': { filter: 'brightness(0.9)' }, borderRadius: 2, px: 2 }}>
+          {routes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route) => {
+            const ready = isRouteReady(route);
+            return (
+              <TableRow key={route.route_name} hover>
+                <TableCell>
+                  <Chip label={route.route_name} size="small" variant="outlined" color="secondary" />
+                </TableCell>
+                <TableCell align="center">
+                  <Typography variant="body2" fontWeight={600}>{route.total_facilities}</Typography>
+                </TableCell>
+                <TableCell align="center">
+                  <Chip
+                    label={`${route.ready_facilities || 0} / ${route.total_facilities}`}
+                    size="small"
+                    color={ready ? 'success' : 'warning'}
+                  />
+                </TableCell>
+                {phase === 2 && (
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">{route.vehicle_name || '—'}</Typography>
+                  </TableCell>
+                )}
+                <TableCell align="center">
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<InfoIcon />}
+                    onClick={() => setDetailRoute(route)}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Details
+                  </Button>
+                </TableCell>
+                <TableCell align="center">
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={actionIcon}
+                    disabled={!ready}
+                    onClick={() => onAction(route)}
+                    sx={{ bgcolor: color, '&:hover': { filter: 'brightness(0.9)' }, borderRadius: 2 }}
+                  >
                     {actionLabel}
                   </Button>
-                  {onRevert && (
-                    <Button variant="outlined" color="error" size="small" startIcon={<UndoIcon />} onClick={() => onRevert(process)} disabled={!process.facility}
-                      sx={{ borderRadius: 2 }}>
-                      Return
-                    </Button>
-                  )}
-                </Stack>
-              </TableCell>
-            </TableRow>
-          ))}
-          {processes.length === 0 && (
-            <TableRow><TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary' }}>No processes found</TableCell></TableRow>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+          {routes.length === 0 && (
+            <TableRow><TableCell colSpan={phase === 2 ? 6 : 5} align="center" sx={{ py: 6, color: 'text.secondary' }}>No routes found</TableCell></TableRow>
           )}
         </TableBody>
       </Table>
-      <TablePagination component="div" count={processes.length} rowsPerPage={rowsPerPage} page={page}
-        onPageChange={(_, p) => setPage(p)} onRowsPerPageChange={e => setRowsPerPage(parseInt(e.target.value, 10))} rowsPerPageOptions={[5, 10, 25, 50]} />
+      <TablePagination component="div" count={routes.length} rowsPerPage={rowsPerPage} page={page}
+        onPageChange={(_, p) => setPage(p)} rowsPerPageOptions={[5, 10, 25]} />
     </TableContainer>
   );
 
@@ -250,7 +248,7 @@ const TMManager = () => {
         <Box sx={{ background: 'linear-gradient(135deg, #1565c0 0%, #42a5f5 100%)', p: 4 }}>
           <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 64, height: 64, border: '2px solid rgba(255,255,255,0.4)' }}>
+              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 64, height: 64 }}>
                 <TruckIcon sx={{ fontSize: 36 }} />
               </Avatar>
               <Box>
@@ -261,21 +259,21 @@ const TMManager = () => {
               </Box>
             </Stack>
             <Stack direction="row" spacing={2}>
-              <Card sx={{ px: 3, py: 1.5, bgcolor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 2 }}>
+              <Card sx={{ px: 3, py: 1.5, bgcolor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 2 }}>
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <CarIcon sx={{ color: 'white' }} />
                   <Box>
-                    <Typography variant="h5" fontWeight="bold" color="white">{phase1Processes.length}</Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>Phase 1</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="white">{phase1Routes.length}</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>Phase 1 Routes</Typography>
                   </Box>
                 </Stack>
               </Card>
-              <Card sx={{ px: 3, py: 1.5, bgcolor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 2 }}>
+              <Card sx={{ px: 3, py: 1.5, bgcolor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 2 }}>
                 <Stack direction="row" alignItems="center" spacing={1}>
                   <GroupsIcon sx={{ color: 'white' }} />
                   <Box>
-                    <Typography variant="h5" fontWeight="bold" color="white">{phase2Processes.length}</Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>Phase 2</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="white">{phase2Routes.length}</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>Phase 2 Routes</Typography>
                   </Box>
                 </Stack>
               </Card>
@@ -287,35 +285,17 @@ const TMManager = () => {
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
       {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
 
-      {/* Type Filter */}
-      <Card sx={{ mb: 3, p: 2, borderRadius: 2, border: '1px solid #e0e0e0' }}>
-        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
-          <SpeedIcon color="primary" />
-          <Typography variant="body2" fontWeight={600} color="text.secondary">Process Type:</Typography>
-          <TextField select size="small" value={processType} onChange={e => setProcessType(e.target.value)} sx={{ minWidth: 160 }}>
-            <MenuItem value="regular">HP Regular</MenuItem>
-            <MenuItem value="vaccine">Vaccine</MenuItem>
-          </TextField>
-        </Stack>
-      </Card>
-
       {/* Phase 1 */}
       <Card sx={{ mb: 3, borderRadius: 3, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
         <Box sx={{ background: 'linear-gradient(90deg, #1565c0 0%, #1976d2 100%)', px: 3, py: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <CarIcon sx={{ color: 'white' }} />
-              <Typography variant="h6" fontWeight="bold" color="white">Phase 1 — Vehicle Assignment</Typography>
-              <Chip label={`${phase1Processes.length} pending`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
-            </Stack>
-            <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={handleExportExcel}
-              disabled={phase1Processes.length === 0}
-              sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)', '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' } }}>
-              Export
-            </Button>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <CarIcon sx={{ color: 'white' }} />
+            <Typography variant="h6" fontWeight="bold" color="white">Phase 1 — Vehicle Assignment</Typography>
+            <Chip label={`${phase1Routes.length} routes`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
           </Stack>
         </Box>
-        <PhaseTable processes={phase1Processes} page={page1} setPage={setPage1} color="#1565c0" actionLabel="Assign Vehicle" actionIcon={<CarIcon />} onAction={handleCreateFreightOrder} onRevert={handleRevert} />
+        <RouteTable routes={phase1Routes} page={page1} setPage={setPage1} color="#1565c0" phase={1}
+          onAction={handleAssignVehicle} actionLabel="Assign Vehicle" actionIcon={<CarIcon />} />
       </Card>
 
       {/* Phase 2 */}
@@ -324,20 +304,64 @@ const TMManager = () => {
           <Stack direction="row" alignItems="center" spacing={2}>
             <GroupsIcon sx={{ color: 'white' }} />
             <Typography variant="h6" fontWeight="bold" color="white">Phase 2 — Driver & Deliverer Assignment</Typography>
-            <Chip label={`${phase2Processes.length} pending`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
+            <Chip label={`${phase2Routes.length} routes`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
           </Stack>
         </Box>
-        <PhaseTable processes={phase2Processes} page={page2} setPage={setPage2} color="#2e7d32" actionLabel="Assign Driver" actionIcon={<PersonIcon />} onAction={handleAssignDriver} onRevert={handleRevert} />
+        <RouteTable routes={phase2Routes} page={page2} setPage={setPage2} color="#2e7d32" phase={2}
+          onAction={handleAssignDriver} actionLabel="Assign Driver" actionIcon={<PersonIcon />} />
       </Card>
 
-      {/* Phase 1 Dialog */}
+      {/* Details Dialog */}
+      <Dialog open={!!detailRoute} onClose={() => setDetailRoute(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Route: {detailRoute?.route_name}
+          <Typography variant="body2" color="text.secondary">
+            {detailRoute?.ready_facilities || 0} / {detailRoute?.total_facilities} facilities ready
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1}>
+            {(detailRoute?.facilities || []).map((f, i) => {
+              const isReady = READY_STATUSES.includes(f.process_status) || f.rrf_not_sent === 1 || f.quality_confirmed === 1;
+              return (
+                <Stack key={i} direction="row" alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography variant="body2">{f.facility_name}</Typography>
+                    {f.process_type && (
+                      <Chip
+                        label={f.process_type === 'vaccine' ? 'Vaccine' : 'HP'}
+                        size="small"
+                        color={f.process_type === 'vaccine' ? 'secondary' : 'primary'}
+                        variant="outlined"
+                        sx={{ height: 18, fontSize: '0.65rem' }}
+                      />
+                    )}
+                  </Stack>
+                  <Chip
+                    label={isReady ? (f.rrf_not_sent ? 'Not Sent ✓' : f.process_status) : (f.process_status === 'no_process' ? 'Not Started' : 'Pending')}
+                    size="small"
+                    icon={isReady ? <CheckIcon style={{ fontSize: 14 }} /> : <PendingIcon style={{ fontSize: 14 }} />}
+                    color={isReady ? 'success' : 'warning'}
+                    variant={isReady ? 'filled' : 'outlined'}
+                  />
+                </Stack>
+              );
+            })}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailRoute(null)} variant="outlined">Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Phase 1 — Assign Vehicle Dialog */}
       <Dialog open={openDialog && dialogType === 'phase1'} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <Box sx={{ background: 'linear-gradient(135deg, #1565c0 0%, #42a5f5 100%)', p: 3 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
             <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}><CarIcon /></Avatar>
             <Box>
               <Typography variant="h6" fontWeight="bold" color="white">Assign Vehicle</Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>{selectedProcess?.facility?.facility_name}</Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>Route: {selectedRoute?.route_name}</Typography>
             </Box>
           </Stack>
         </Box>
@@ -351,41 +375,43 @@ const TMManager = () => {
         </DialogContent>
         <DialogActions sx={{ p: 2.5, gap: 1 }}>
           <Button onClick={() => setOpenDialog(false)} variant="outlined" color="inherit">Cancel</Button>
-          <Button onClick={handleSaveFreightOrder} variant="contained" startIcon={<CarIcon />} sx={{ bgcolor: '#1565c0' }}>Assign Vehicle</Button>
+          <Button onClick={handleSaveVehicle} variant="contained" startIcon={<CarIcon />} sx={{ bgcolor: '#1565c0' }}>Assign Vehicle</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Phase 2 Dialog */}
+      {/* Phase 2 — Assign Driver Dialog */}
       <Dialog open={openDialog && dialogType === 'phase2'} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <Box sx={{ background: 'linear-gradient(135deg, #2e7d32 0%, #43a047 100%)', p: 3 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
             <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)' }}><GroupsIcon /></Avatar>
             <Box>
               <Typography variant="h6" fontWeight="bold" color="white">Assign Driver & Deliverer</Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>{selectedProcess?.facility?.facility_name}</Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>Route: {selectedRoute?.route_name}</Typography>
             </Box>
           </Stack>
         </Box>
         <DialogContent sx={{ pt: 3 }}>
           <Stack spacing={2.5}>
             <FormControl fullWidth>
-              <InputLabel>Driver</InputLabel>
-              <Select value={selectedDriver} onChange={e => setSelectedDriver(e.target.value)} label="Driver">
+              <InputLabel>Driver *</InputLabel>
+              <Select value={selectedDriver} onChange={e => setSelectedDriver(e.target.value)} label="Driver *">
                 {drivers.map(d => <MenuItem key={d.id} value={d.id}>{d.full_name}</MenuItem>)}
               </Select>
             </FormControl>
             <FormControl fullWidth>
-              <InputLabel>Deliverer</InputLabel>
-              <Select value={selectedDeliverer} onChange={e => setSelectedDeliverer(e.target.value)} label="Deliverer">
+              <InputLabel>Deliverer (Optional)</InputLabel>
+              <Select value={selectedDeliverer} onChange={e => setSelectedDeliverer(e.target.value)} label="Deliverer (Optional)">
+                <MenuItem value=""><em>None</em></MenuItem>
                 {deliverers.map(d => <MenuItem key={d.id} value={d.id}>{d.full_name}</MenuItem>)}
               </Select>
             </FormControl>
-            <TextField fullWidth label="Departure Kilometer" type="number" value={departureKilometer} onChange={e => setDepartureKilometer(e.target.value)} inputProps={{ step: '0.01', min: '0' }} />
+            <TextField fullWidth label="Departure Kilometer" type="number" value={departureKilometer}
+              onChange={e => setDepartureKilometer(e.target.value)} inputProps={{ step: '0.01', min: '0' }} />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2.5, gap: 1 }}>
           <Button onClick={() => setOpenDialog(false)} variant="outlined" color="inherit">Cancel</Button>
-          <Button onClick={handleSaveDriverAssignment} variant="contained" color="success" startIcon={<PersonIcon />}>Assign Driver & Deliverer</Button>
+          <Button onClick={handleSaveDriver} variant="contained" color="success" startIcon={<PersonIcon />}>Assign Driver & Deliverer</Button>
         </DialogActions>
       </Dialog>
     </Container>

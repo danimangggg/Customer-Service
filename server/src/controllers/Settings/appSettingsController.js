@@ -5,12 +5,6 @@ const getSetting = async (req, res) => {
   try {
     const { key } = req.params;
 
-    // For youtube_playlist, scope by branch if provided
-    const branchCode = req.query.branch_code || req.headers['x-branch-code'] || null;
-    const resolvedKey = (key === 'youtube_playlist' && branchCode)
-      ? `youtube_playlist_${branchCode}`
-      : key;
-
     const query = `
       SELECT setting_key, setting_value, description
       FROM app_settings
@@ -18,21 +12,21 @@ const getSetting = async (req, res) => {
     `;
     
     const [results] = await db.sequelize.query(query, {
-      replacements: [resolvedKey],
+      replacements: [key],
       type: db.sequelize.QueryTypes.SELECT
     });
 
     if (!results) {
-      // For youtube_playlist with a branch, return empty array instead of 404
-      if (key === 'youtube_playlist' && branchCode) {
-        return res.json({ success: true, key: resolvedKey, value: [], description: null });
+      // For youtube_playlist keys, return empty array instead of 404
+      if (key.startsWith('youtube_playlist')) {
+        return res.json({ success: true, key, value: [], description: null });
       }
       return res.status(404).json({ success: false, message: 'Setting not found' });
     }
     
-    // Parse JSON if it's the youtube_playlist
+    // Parse JSON if it's a youtube_playlist key
     let value = results.setting_value;
-    if (key === 'youtube_playlist' && value) {
+    if (key.startsWith('youtube_playlist') && value) {
       try {
         value = JSON.parse(value);
       } catch (e) {
@@ -63,12 +57,6 @@ const updateSetting = async (req, res) => {
     const { key } = req.params;
     const { value, description } = req.body;
 
-    // For youtube_playlist, scope by branch if provided
-    const branchCode = req.query.branch_code || req.headers['x-branch-code'] || null;
-    const resolvedKey = (key === 'youtube_playlist' && branchCode)
-      ? `youtube_playlist_${branchCode}`
-      : key;
-
     // Convert value to JSON string if it's an object/array
     let settingValue = value;
     if (typeof value === 'object') {
@@ -85,13 +73,13 @@ const updateSetting = async (req, res) => {
     `;
     
     await db.sequelize.query(query, {
-      replacements: [resolvedKey, settingValue, description || null]
+      replacements: [key, settingValue, description || null]
     });
     
     res.json({
       success: true,
       message: 'Setting updated successfully',
-      key: resolvedKey
+      key: key
     });
     
   } catch (error) {

@@ -4,7 +4,8 @@ import {
   Typography, Card, CardContent, CardHeader, Button, Container, 
   TablePagination, Stack, Box, Chip, Avatar, Divider, Grid, LinearProgress, Alert,
   Checkbox, TextField, FormControl, InputLabel, Select, MenuItem, InputAdornment,
-  Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel
+  Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel,
+  useMediaQuery, useTheme
 } from '@mui/material';
 import {
   Description as DocumentIcon,
@@ -24,6 +25,8 @@ import { formatTimestamp } from '../../utils/serviceTimeHelper';
 const MySwal = withReactContent(Swal);
 
 const DocumentationHP = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [facilityData, setFacilityData] = useState([]);
   const [filterType, setFilterType] = useState('Regular');
   const [page, setPage] = useState(0);
@@ -153,12 +156,10 @@ const DocumentationHP = () => {
   const handleEditClick = async (facility) => {
     setSelectedFacility(facility);
     
-    // Parse ODN data from facility (already loaded from backend)
     try {
       const odnIds = facility.odn_ids ? facility.odn_ids.split(',') : [];
       const odnNumbers = facility.odn_numbers ? facility.odn_numbers.split(',') : [];
       
-      // Create ODN details array from the data we already have
       const odnDetails = odnIds.map((id, index) => ({
         odn_id: parseInt(id.trim()),
         odn_number: odnNumbers[index] ? odnNumbers[index].trim() : `ODN-${id}`,
@@ -166,12 +167,35 @@ const DocumentationHP = () => {
         documents_handover: false
       }));
       
-      // Check if all ODNs are already confirmed (facility level check)
       const allPodReceived = facility.confirmed_pods === facility.total_odns;
+
+      // Pre-fill arrival_kilometer: use facility's own value first,
+      // then fall back to any sibling in facilityData, then fetch from server
+      let prefillKm = facility.arrival_kilometer || '';
+
+      if (!prefillKm && facility.route_name) {
+        // Check in-memory list first (unconfirmed siblings)
+        const sibling = facilityData.find(
+          f => f.route_name === facility.route_name &&
+               f.facility_id !== facility.facility_id &&
+               f.arrival_kilometer
+        );
+        if (sibling) {
+          prefillKm = sibling.arrival_kilometer;
+        } else {
+          // Fetch from server — includes completed facilities not in current list
+          try {
+            const res = await api.get(`${api_url}/api/documentation/route-km`, {
+              params: { route_name: facility.route_name, month: selectedMonth, year: selectedYear }
+            });
+            if (res.data.arrival_kilometer) prefillKm = res.data.arrival_kilometer;
+          } catch (e) { /* non-critical */ }
+        }
+      }
       
       setEditFormData({
         pod_numbers: facility.pod_numbers || '',
-        arrival_kilometer: facility.arrival_kilometer || '',
+        arrival_kilometer: prefillKm,
         all_pod_received: allPodReceived,
         odns: odnDetails
       });
@@ -523,7 +547,7 @@ const DocumentationHP = () => {
       </Card>
 
       {/* Edit Dialog */}
-      <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="md" fullWidth>
+      <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="md" fullWidth fullScreen={isMobile}>
         <DialogTitle>
           <Typography variant="h6">Edit Documentation</Typography>
           <Typography variant="body2" color="text.secondary">

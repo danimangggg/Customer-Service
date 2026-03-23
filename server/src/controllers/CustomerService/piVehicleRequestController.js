@@ -53,18 +53,29 @@ const getPIVehicleRequests = async (req, res) => {
         COUNT(DISTINCT CASE WHEN p.status = 'vehicle_requested' THEN f.id END) as vehicle_requested_facilities,
         COUNT(DISTINCT CASE WHEN p.status IS NULL OR (p.status != 'biller_completed' AND p.status != 'vehicle_requested') THEN f.id END) as pending_facilities,
         CASE WHEN pvr.route_id IS NOT NULL OR MAX(CASE WHEN p.status = 'vehicle_requested' THEN 1 ELSE 0 END) = 1 THEN 1 ELSE 0 END as vehicle_requested,
-        -- A facility is "ready" if: biller_completed, vehicle_requested, OR has an RRF/VRF not sent ODN
+        -- A facility is "ready" if: past biller stage, vehicle_requested, OR has an RRF/VRF not sent ODN (any process type)
         CASE WHEN COUNT(DISTINCT f.id) = COUNT(DISTINCT CASE 
-          WHEN p.status = 'biller_completed' OR p.status = 'vehicle_requested'
-            OR (rrf_odn.id IS NOT NULL)
+          WHEN p.status IN ('biller_completed','vehicle_requested','ewm_completed','tm_notified','tm_confirmed','freight_order_sent_to_ewm','ewm_goods_issued','driver_assigned','dispatched')
+            OR EXISTS (
+              SELECT 1 FROM odns rrf_sub
+              JOIN processes rrf_p ON rrf_p.id = rrf_sub.process_id
+              WHERE rrf_p.facility_id = f.id
+                AND rrf_p.reporting_month = ?
+                AND (rrf_sub.odn_number LIKE 'RRF not sent%' OR rrf_sub.odn_number LIKE 'VRF not sent%')
+            )
+            OR EXISTS (
+              SELECT 1 FROM odns qc_sub
+              JOIN processes qc_p ON qc_p.id = qc_sub.process_id
+              WHERE qc_p.facility_id = f.id
+                AND qc_p.reporting_month = ?
+                AND qc_sub.quality_confirmed = 1
+            )
           THEN f.id END) THEN 1 ELSE 0 END as all_facilities_ready
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
         AND (f.period = 'Monthly' OR f.period = ?)
         ${branchFilter}
       LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-      LEFT JOIN odns rrf_odn ON rrf_odn.process_id = p.id
-        AND (rrf_odn.odn_number LIKE 'RRF not sent%' OR rrf_odn.odn_number LIKE 'VRF not sent%')
       LEFT JOIN pi_vehicle_requests pvr ON pvr.route_id = r.id AND pvr.month = ? AND pvr.year = ?
       WHERE f.route IS NOT NULL 
         ${search ? 'AND r.route_name LIKE ?' : ''}
@@ -74,7 +85,7 @@ const getPIVehicleRequests = async (req, res) => {
       LIMIT ? OFFSET ?
     `;
 
-    let queryParams = [currentPeriod, reportingMonth, month, year];
+    let queryParams = [reportingMonth, reportingMonth, currentPeriod, reportingMonth, month, year];
     if (search) queryParams.push(`%${search}%`);
     queryParams.push(parseInt(limit), parseInt(offset));
 
@@ -93,15 +104,27 @@ const getPIVehicleRequests = async (req, res) => {
     // For each route, get the facilities and their ODNs
     const routesWithDetails = await Promise.all(routes.map(async (route) => {
       const facilitiesQuery = `
-        SELECT DISTINCT 
+        SELECT 
           f.id,
           f.facility_name,
-          COALESCE(p.status, 'no_process') as process_status,
-          CASE WHEN rrf_odn.id IS NOT NULL THEN 1 ELSE 0 END as rrf_not_sent
+          COALESCE(p_reg.status, p_vac.status, 'no_process') as process_status,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM odns rrf_odn
+            JOIN processes rrf_p ON rrf_p.id = rrf_odn.process_id
+            WHERE rrf_p.facility_id = f.id
+              AND rrf_p.reporting_month = ?
+              AND (rrf_odn.odn_number LIKE 'RRF not sent%' OR rrf_odn.odn_number LIKE 'VRF not sent%')
+          ) THEN 1 ELSE 0 END as rrf_not_sent,
+          CASE WHEN EXISTS (
+            SELECT 1 FROM odns qc_odn
+            JOIN processes qc_p ON qc_p.id = qc_odn.process_id
+            WHERE qc_p.facility_id = f.id
+              AND qc_p.reporting_month = ?
+              AND qc_odn.quality_confirmed = 1
+          ) THEN 1 ELSE 0 END as quality_confirmed
         FROM facilities f
-        LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-        LEFT JOIN odns rrf_odn ON rrf_odn.process_id = p.id
-          AND (rrf_odn.odn_number LIKE 'RRF not sent%' OR rrf_odn.odn_number LIKE 'VRF not sent%')
+        LEFT JOIN processes p_reg ON p_reg.facility_id = f.id AND p_reg.reporting_month = ? AND p_reg.process_type = 'regular'
+        LEFT JOIN processes p_vac ON p_vac.facility_id = f.id AND p_vac.reporting_month = ? AND p_vac.process_type = 'vaccine'
         WHERE f.route = ?
           AND (f.period = 'Monthly' OR f.period = ?)
           ${branchFilter}
@@ -109,10 +132,10 @@ const getPIVehicleRequests = async (req, res) => {
       `;
 
       const facilities = await db.sequelize.query(facilitiesQuery, {
-        replacements: [reportingMonth, route.route_name, currentPeriod],
+        replacements: [reportingMonth, reportingMonth, reportingMonth, reportingMonth, route.route_name, currentPeriod],
         type: db.sequelize.QueryTypes.SELECT
       });
-      
+
       console.log(`Route ${route.route_name} facilities:`, facilities.map(f => `${f.facility_name} (${f.process_status})`).join(', '));
 
       // For each facility, get its ODNs
@@ -135,6 +158,7 @@ const getPIVehicleRequests = async (req, res) => {
           facility_name: facility.facility_name,
           process_status: facility.process_status,
           rrf_not_sent: facility.rrf_not_sent,
+          quality_confirmed: facility.quality_confirmed,
           odns: odns
         };
       }));

@@ -26,9 +26,7 @@ const AddCustomerQueue = async (req, res) => {
     console.log('✅ Customer registration successful:', result.id);
     res.status(200).send({ message: "Task created successfully", task: result });
   } catch (error) {
-    console.error("❌ Error saving customer registration:", error);
-    console.error("❌ Error details:", error.message);
-    console.error("❌ Request body was:", req.body);
+    console.error("❌ Error saving customer registration:", error.message);
     res.status(500).send({ message: "Failed to save task", error: error.message });
   }
 };

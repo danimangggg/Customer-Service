@@ -15,7 +15,8 @@ app.use(cors({
     'https://www.epss-mt.et',
     'http://epss-mt.et',
     'http://10.2.32.150:3000',
-    'http://www.epss-mt.et'
+    'http://www.epss-mt.et',
+    'http://10.110.97.2:3000'
   ]
   // Removed credentials: true since we're using JWT in localStorage, not cookies
 }));

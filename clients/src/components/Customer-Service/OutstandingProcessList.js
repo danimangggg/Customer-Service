@@ -200,11 +200,16 @@ const OutstandingCustomers = () => {
         if (jobTitle === "Admin") {
             filtered = customers;
         } else if (jobTitle === "O2C Officer") {
-            filtered = customers.filter(c =>
-                String(c.assigned_officer_id) === String(userId) &&
-                (c.next_service_point?.toLowerCase() === 'o2c' || c.next_service_point?.toLowerCase() === 'ewm') &&
-                c.status?.toLowerCase() !== 'completed'
-            );
+            filtered = customers.filter(c => {
+                const sp = c.next_service_point?.toLowerCase();
+                const st = c.status?.toLowerCase();
+                const isAssigned = String(c.assigned_officer_id) === String(userId);
+                // Normal O2C/EWM work — exclude completed
+                const normalCase = isAssigned && (sp === 'o2c' || sp === 'ewm') && st !== 'completed';
+                // Returned for corrections — completed status but next_service_point is o2c
+                const returnedCase = isAssigned && sp === 'o2c' && st === 'completed';
+                return normalCase || returnedCase;
+            });
             filtered.sort((a, b) => {
                 const statusA = a.status?.toLowerCase();
                 const statusB = b.status?.toLowerCase();

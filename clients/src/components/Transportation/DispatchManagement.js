@@ -1,548 +1,284 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  Typography, Card, CardContent, CardHeader, Button, Container, 
-  TablePagination, Stack, Box, Chip, Avatar, Divider, Grid, LinearProgress, Alert,
-  Dialog, DialogTitle, DialogContent, DialogActions, TextField, IconButton,
-  FormControl, Select, MenuItem
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Typography, Card, Button, Container,
+  TablePagination, Stack, Box, Chip, Avatar, LinearProgress, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import {
   LocalShipping as DispatchIcon,
-  Route as RouteIcon,
-  Business as BusinessIcon,
-  Assignment as AssignmentIcon,
-  CalendarToday as CalendarTodayIcon,
-  CheckCircle as CompleteIcon,
-  Person as DriverIcon,
-  PersonOutline as DelivererIcon,
-  DirectionsCar as VehicleIcon
+  CheckCircle as CheckIcon,
+  HourglassEmpty as PendingIcon,
+  Info as InfoIcon,
+  LocalHospital as HPIcon,
+  Vaccines as VaccineIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
+import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../utils/toast';
-import withReactContent from 'sweetalert2-react-content';
-import { formatTimestamp } from '../../utils/serviceTimeHelper';
-
-const MySwal = withReactContent(Swal);
 
 const DispatchManagement = () => {
-  const [routeData, setRouteData] = useState([]);
-  const [filterType, setFilterType] = useState('Regular');
+  const [routes, setRoutes] = useState([]);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({});
+  const [detailRoute, setDetailRoute] = useState(null);
 
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const isDispatcher = userJobTitle === 'Dispatcher - HP';
   const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-  // Ethiopian calendar function
   const getCurrentEthiopianMonth = () => {
-    const ethiopianMonths = [
-      'Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'
-    ];
-    
+    const ethiopianMonths = ['Meskerem','Tikimt','Hidar','Tahsas','Tir','Yekatit','Megabit','Miyazya','Ginbot','Sene','Hamle','Nehase','Pagume'];
     const gDate = new Date();
-    const gy = gDate.getFullYear();
-    const gm = gDate.getMonth();
-    const gd = gDate.getDate();
-    
+    const gy = gDate.getFullYear(), gm = gDate.getMonth(), gd = gDate.getDate();
     const isLeap = (gy % 4 === 0 && gy % 100 !== 0) || (gy % 400 === 0);
     const newYearDay = isLeap ? 12 : 11;
-    
     let ethYear, ethMonthIndex;
-    
     if (gm > 8 || (gm === 8 && gd >= newYearDay)) {
       ethYear = gy - 7;
-      const newYearDate = new Date(gy, 8, newYearDay);
-      const diffDays = Math.floor((gDate - newYearDate) / (24 * 60 * 60 * 1000));
-      
-      if (diffDays < 360) {
-        ethMonthIndex = Math.floor(diffDays / 30);
-      } else {
-        ethMonthIndex = 12;
-      }
+      const diffDays = Math.floor((gDate - new Date(gy, 8, newYearDay)) / 86400000);
+      ethMonthIndex = diffDays < 360 ? Math.floor(diffDays / 30) : 12;
     } else {
       ethYear = gy - 8;
-      const prevIsLeap = ((gy - 1) % 4 === 0 && (gy - 1) % 100 !== 0) || ((gy - 1) % 400 === 0);
-      const prevNewYearDay = prevIsLeap ? 12 : 11;
-      const prevNewYearDate = new Date(gy - 1, 8, prevNewYearDay);
-      const diffDays = Math.floor((gDate - prevNewYearDate) / (24 * 60 * 60 * 1000));
-      
-      if (diffDays < 360) {
-        ethMonthIndex = Math.floor(diffDays / 30);
-      } else {
-        ethMonthIndex = 12;
-      }
+      const prevIsLeap = ((gy-1) % 4 === 0 && (gy-1) % 100 !== 0) || ((gy-1) % 400 === 0);
+      const diffDays = Math.floor((gDate - new Date(gy-1, 8, prevIsLeap ? 12 : 11)) / 86400000);
+      ethMonthIndex = diffDays < 360 ? Math.floor(diffDays / 30) : 12;
     }
-    
-    ethMonthIndex = Math.max(0, Math.min(ethMonthIndex, 12));
-    
-    return {
-      month: ethiopianMonths[ethMonthIndex],
-      year: ethYear,
-      monthIndex: ethMonthIndex
-    };
+    return { month: ethiopianMonths[Math.max(0, Math.min(ethMonthIndex, 12))], year: ethYear };
   };
 
   const currentEthiopian = getCurrentEthiopianMonth();
-  const currentEthiopianMonth = currentEthiopian.month;
-  const currentEthiopianYear = currentEthiopian.year;
+
+  const fetchRoutes = async () => {
+    try {
+      setLoading(true); setError(null);
+      const res = await api.get(`${api_url}/api/dispatch-routes`, {
+        params: { month: currentEthiopian.month, year: currentEthiopian.year }
+      });
+      setRoutes(res.data.routes || []);
+    } catch (err) { setError('Failed to load dispatch routes.'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchRoutes(); }, []);
 
   useEffect(() => {
-    fetchAssignedRoutes();
-    fetchStats();
-  }, [currentEthiopianMonth, currentEthiopianYear, filterType]);
-
-  // Silent background polling every 5s
-  useEffect(() => {
-    const silentFetch = async () => {
+    const interval = setInterval(async () => {
       try {
-        const res = await axios.get(`${api_url}/api/dispatch-routes`, {
-          params: { month: currentEthiopianMonth, year: currentEthiopianYear, process_type: filterType.toLowerCase(), includeAll: true }
+        const res = await api.get(`${api_url}/api/dispatch-routes`, {
+          params: { month: currentEthiopian.month, year: currentEthiopian.year }
         });
-        setRouteData(res.data.routes || []);
+        setRoutes(res.data.routes || []);
       } catch (_) {}
-    };
-    const interval = setInterval(silentFetch, 5000);
+    }, 5000);
     return () => clearInterval(interval);
-  }, [currentEthiopianMonth, currentEthiopianYear, filterType]);
+  }, []);
 
-  const fetchAssignedRoutes = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await axios.get(`${api_url}/api/dispatch-routes`, {
-        params: {
-          month: currentEthiopianMonth,
-          year: currentEthiopianYear,
-          process_type: filterType.toLowerCase(),
-          includeAll: true
-        }
-      });
-      
-      setRouteData(response.data.routes || []);
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setError("Failed to load assigned routes. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isRouteReady = (route) =>
+    Number(route.ready_facilities) > 0 &&
+    Number(route.ready_facilities) === Number(route.total_facilities);
 
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${api_url}/api/dispatch-routes/stats`, {
-        params: {
-          month: currentEthiopianMonth,
-          year: currentEthiopianYear
-        }
-      });
-      setStats(response.data);
-    } catch (err) {
-      console.error("Stats fetch error:", err);
-    }
-  };
+  const handleCompleteDispatch = async (route) => {
+    const confirm = await Swal.fire({
+      title: 'Complete Dispatch?',
+      text: `Mark all facilities in route "${route.route_name}" as dispatch completed?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#4caf50',
+      confirmButtonText: 'Yes, Complete'
+    });
+    if (!confirm.isConfirmed) return;
 
-  const handleCompleteDispatch = async (routeId, routeName) => {
     try {
-      // routeId is now process_id from the new API
-      const processId = routeId;
-      
-      // Update process status to dispatch_completed
-      await axios.put(`${api_url}/api/processes/${processId}/complete-dispatch`, {
+      await api.post(`${api_url}/api/complete-dispatch-hp`, {
+        route_name: route.route_name,
+        reporting_month: `${currentEthiopian.month} ${currentEthiopian.year}`,
         completed_by: loggedInUserId
       });
-      
-      // Record service time for Dispatcher - HP
-      try {
-        const dispatchEndTime = new Date().toISOString();
-        
-        // Calculate waiting time from TM Phase 2 end time
-        let waitingMinutes = 0;
-        try {
-          const lastServiceQuery = `
-            SELECT end_time 
-            FROM service_time_hp
-            WHERE process_id = ? AND service_unit = 'TM - Driver & Deliverer Assignment'
-            ORDER BY created_at DESC 
-            LIMIT 1
-          `;
-          
-          const lastServiceResponse = await axios.get(`${api_url}/api/service-time-hp/last-end-time`, {
-            params: {
-              process_id: processId,
-              service_unit: 'TM - Driver & Deliverer Assignment'
-            }
-          });
-          
-          if (lastServiceResponse.data.end_time) {
-            const prevTime = new Date(lastServiceResponse.data.end_time);
-            const currTime = new Date(dispatchEndTime);
-            const diffMs = currTime - prevTime;
-            waitingMinutes = Math.floor(diffMs / 60000);
-            waitingMinutes = waitingMinutes > 0 ? waitingMinutes : 0;
-          }
-        } catch (err) {
-          console.error('Failed to get TM end time:', err);
-        }
-        
-        await axios.post(`${api_url}/api/service-time-hp`, {
-          process_id: processId,
-          service_unit: 'Dispatcher - HP',
-          end_time: dispatchEndTime,
-          officer_id: loggedInUserId,
-          officer_name: localStorage.getItem('FullName'),
-          status: 'completed',
-          notes: `Dispatch completed for route: ${routeName}, waiting time: ${waitingMinutes} minutes`
-        });
-        
-        console.log(`✅ Dispatcher - HP service time recorded for process ${processId}: ${waitingMinutes} minutes`);
-      } catch (err) {
-        console.error('❌ Failed to record Dispatcher service time:', err);
-        // Don't fail the completion if service time recording fails
-      }
-      
-      successToast('Route completed successfully.');
-      fetchAssignedRoutes();
-      fetchStats();
-      
+      successToast('Dispatch completed for all facilities in route');
+      fetchRoutes();
     } catch (err) {
-      console.error('Complete dispatch error:', err);
-      MySwal.fire('Error', 'Failed to complete route.', 'error');
+      Swal.fire('Error', err.response?.data?.error || 'Failed to complete dispatch', 'error');
     }
   };
 
-  // Access control
-  if (!isDispatcher) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          <Typography variant="h6" gutterBottom>Access Denied</Typography>
-          <Typography>
-            This page is restricted to Dispatcher - HP role only.
-          </Typography>
-          <Typography sx={{ mt: 2 }}>
-            <strong>Current JobTitle:</strong> "{userJobTitle}"
-          </Typography>
-        </Alert>
-      </Container>
-    );
-  }
+  if (!isDispatcher) return (
+    <Container maxWidth="xl" sx={{ mt: 4 }}>
+      <Alert severity="error">
+        <Typography variant="h6">Access Denied</Typography>
+        <Typography>This page is restricted to Dispatcher - HP role only.</Typography>
+      </Alert>
+    </Container>
+  );
 
   return (
-    <>
-      <style>
-        {`
-          .dispatch-card {
-            transition: all 0.3s ease;
-            border-left: 4px solid transparent;
-          }
-          .dispatch-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border-left-color: #4caf50;
-          }
-          .stats-card {
-            background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .stats-card-2 {
-            background: linear-gradient(135deg, #ff9800 0%, #ffb74d 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .stats-card-3 {
-            background: linear-gradient(135deg, #2196f3 0%, #42a5f5 100%);
-            color: white;
-            border-radius: 16px;
-          }
-          .header-gradient {
-            background: #f5f5f5;
-            color: #333;
-            border-bottom: 1px solid #e0e0e0;
-            padding: 24px;
-            border-radius: 16px 16px 0 0;
-          }
-        `}
-      </style>
-      
-      <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
-        {/* Header Section */}
-        <Card sx={{ mb: 3, overflow: 'hidden' }}>
-          <Box className="header-gradient">
+    <Container maxWidth="xl" sx={{ mt: 2, mb: 4 }}>
+      {/* Header */}
+      <Card sx={{ mb: 3, borderRadius: 3, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.1)' }}>
+        <Box sx={{ background: 'linear-gradient(135deg, #e65100 0%, #ff9800 100%)', p: 4 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 56, height: 56 }}>
-                <DispatchIcon fontSize="large" />
+              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 64, height: 64 }}>
+                <DispatchIcon sx={{ fontSize: 36 }} />
               </Avatar>
               <Box>
-                <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ mb: 0 }}>
-                  Dispatch Management
-                </Typography>
-                <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                  Manage assigned routes and mark them as completed
+                <Typography variant="h4" fontWeight="bold" color="white">Dispatch Management</Typography>
+                <Typography variant="subtitle1" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+                  {currentEthiopian.month} {currentEthiopian.year}
                 </Typography>
               </Box>
             </Stack>
-          </Box>
-        </Card>
-
-        {/* Statistics Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <RouteIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.totalAssigned || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Assigned Routes
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-2" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <CompleteIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.completedDispatches || 0}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Completed
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Card className="stats-card-3" sx={{ p: 3 }}>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.2)', width: 48, height: 48 }}>
-                  <CalendarTodayIcon />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {currentEthiopianMonth}
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    {currentEthiopianYear}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Card>
-          </Grid>
-        </Grid>
-
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-
-        {/* Loading Progress */}
-        {loading && <LinearProgress sx={{ mb: 2 }} />}
-
-        {/* Type Filter */}
-        <Card sx={{ mb: 2, p: 2 }}>
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <Typography variant="body2" fontWeight="bold" color="text.secondary">Process Type:</Typography>
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <Select
-                value={filterType}
-                onChange={(e) => { setFilterType(e.target.value); setPage(0); }}
-              >
-                <MenuItem value="Regular">HP Regular</MenuItem>
-                <MenuItem value="Emergency">Emergency</MenuItem>
-                <MenuItem value="Breakdown">Breakdown</MenuItem>
-                <MenuItem value="Vaccine">Vaccine</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </Card>
-
-        {/* Routes Table */}
-        <Card className="dispatch-card">
-          <CardHeader 
-            title={
+            <Card sx={{ px: 3, py: 1.5, bgcolor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1}>
-                <RouteIcon color="primary" />
-                <Typography variant="h6">Routes with Vehicle Assignments</Typography>
-                <Chip 
-                  label={`${routeData.length} routes`} 
-                  size="small" 
-                  color="primary" 
-                  variant="outlined" 
-                />
+                <DispatchIcon sx={{ color: 'white' }} />
+                <Box>
+                  <Typography variant="h5" fontWeight="bold" color="white">{routes.length}</Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>Routes</Typography>
+                </Box>
               </Stack>
-            }
-          />
-          <Divider />
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>#</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <RouteIcon fontSize="small" />
-                      <span>Route</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <BusinessIcon fontSize="small" />
-                      <span>Facilities</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <VehicleIcon fontSize="small" />
-                      <span>Vehicle</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <DriverIcon fontSize="small" />
-                      <span>Driver</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1}>
-                      <DelivererIcon fontSize="small" />
-                      <span>Deliverer</span>
-                    </Stack>
-                  </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                    <Stack direction="row" alignItems="center" spacing={1} justifyContent="center">
-                      <CompleteIcon fontSize="small" />
-                      <span>Status</span>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => {
-                  // Check if this route has passed dispatch stage (already completed)
-                  const isInactive = route.process_status === 'dispatch_completed';
-                  
-                  return (
-                  <TableRow 
-                    key={route.process_id} 
-                    hover 
-                    sx={{ 
-                      '&:hover': { bgcolor: 'grey.50' },
-                      bgcolor: isInactive ? 'grey.100' : 'inherit',
-                      opacity: isInactive ? 0.6 : 1
-                    }}
-                  >
+            </Card>
+          </Stack>
+        </Box>
+      </Card>
+
+      {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+      {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1 }} />}
+
+      <Card sx={{ borderRadius: 3, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+        <Box sx={{ background: 'linear-gradient(90deg, #e65100 0%, #ef6c00 100%)', px: 3, py: 2 }}>
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <DispatchIcon sx={{ color: 'white' }} />
+            <Typography variant="h6" fontWeight="bold" color="white">Routes Ready for Dispatch</Typography>
+            <Chip label={`${routes.length} routes`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
+          </Stack>
+        </Box>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#e65100', color: 'white', fontWeight: 700 } }}>
+                <TableCell>Route</TableCell>
+                <TableCell align="center">Facilities</TableCell>
+                <TableCell align="center">Ready</TableCell>
+                <TableCell>Vehicle</TableCell>
+                <TableCell>Driver</TableCell>
+                <TableCell>Deliverer</TableCell>
+                <TableCell align="center">Details</TableCell>
+                <TableCell align="center">Action</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {routes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route) => {
+                const ready = isRouteReady(route);
+                return (
+                  <TableRow key={route.route_name} hover>
                     <TableCell>
-                      <Chip   
-                        label={(page * rowsPerPage) + index + 1} 
-                        size="small" 
-                        color="primary" 
-                        variant="outlined" 
+                      <Chip label={route.route_name} size="small" variant="outlined" color="warning" />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2" fontWeight={600}>{route.total_facilities}</Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Chip
+                        label={`${route.ready_facilities || 0} / ${route.total_facilities}`}
+                        size="small"
+                        color={ready ? 'success' : 'warning'}
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
-                        {route.route_name}
-                      </Typography>
+                      <Typography variant="body2">{route.vehicle_name || '—'}</Typography>
                     </TableCell>
                     <TableCell>
-                      <Box>
-                        {route.facilities && route.facilities.length > 0 ? (
-                          <Box>
-                            <Typography variant="body2" fontWeight="bold" color="primary" sx={{ mb: 1 }}>
-                              {route.facilities.length} Facilities
-                            </Typography>
-                            {route.facilities.map((facility, idx) => (
-                              <Typography key={idx} variant="body2" sx={{ mb: 0.5 }}>
-                                • {facility.facility_name}
-                              </Typography>
-                            ))}
-                          </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No facilities data
-                          </Typography>
-                        )}
-                      </Box>
+                      <Typography variant="body2">{route.driver_name || '—'}</Typography>
                     </TableCell>
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {route.vehicle_name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {route.plate_number}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {route.driver_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {route.deliverer_name || 'Not assigned'}
-                      </Typography>
+                      <Typography variant="body2">{route.deliverer_name || '—'}</Typography>
                     </TableCell>
                     <TableCell align="center">
-                      {isInactive ? (
-                        <Chip 
-                          label="Passed to Documentation" 
-                          color="info" 
-                          size="small" 
-                          variant="outlined"
-                        />
-                      ) : (
-                        <Button 
-                          variant="outlined" 
-                          color="success" 
-                          size="small" 
-                          startIcon={<CompleteIcon />} 
-                          onClick={() => handleCompleteDispatch(route.process_id, route.route_name)}
-                          sx={{ borderRadius: 2 }}
-                        >
-                          Complete
-                        </Button>
-                      )}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<InfoIcon />}
+                        onClick={() => setDetailRoute(route)}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        Details
+                      </Button>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<CheckIcon />}
+                        disabled={!ready}
+                        onClick={() => handleCompleteDispatch(route)}
+                        sx={{ bgcolor: '#e65100', '&:hover': { filter: 'brightness(0.9)' }, borderRadius: 2 }}
+                      >
+                        Complete
+                      </Button>
                     </TableCell>
                   </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <TablePagination 
-              component="div" 
-              count={routeData.length} 
-              rowsPerPage={rowsPerPage} 
-              page={page}
-              onPageChange={(_, p) => setPage(p)}
-              onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              sx={{ borderTop: 1, borderColor: 'divider' }}
-            />
-          </TableContainer>
-        </Card>
-      </Container>
-    </>
+                );
+              })}
+              {routes.length === 0 && !loading && (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                    No routes ready for dispatch
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+          <TablePagination component="div" count={routes.length} rowsPerPage={rowsPerPage} page={page}
+            onPageChange={(_, p) => setPage(p)} rowsPerPageOptions={[5, 10, 25]} />
+        </TableContainer>
+      </Card>
+
+      {/* Details Dialog */}
+      <Dialog open={!!detailRoute} onClose={() => setDetailRoute(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          Route: {detailRoute?.route_name}
+          <Typography variant="body2" color="text.secondary">
+            {detailRoute?.ready_facilities || 0} / {detailRoute?.total_facilities} facilities ready
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1}>
+            {(detailRoute?.facilities || []).map((f, i) => {
+              const isReady = f.process_status === 'driver_assigned' || f.process_status === 'dispatch_completed';
+              return (
+                <Stack key={i} direction="row" alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Typography variant="body2">{f.facility_name}</Typography>
+                    {f.process_type && (
+                      <Chip
+                        label={f.process_type === 'vaccine' ? 'Vaccine' : 'HP'}
+                        size="small"
+                        color={f.process_type === 'vaccine' ? 'secondary' : 'primary'}
+                        variant="outlined"
+                        sx={{ height: 18, fontSize: '0.65rem' }}
+                      />
+                    )}
+                  </Stack>
+                  <Chip
+                    label={f.process_status === 'dispatch_completed' ? 'Completed' : isReady ? 'driver_assigned' : (f.process_status === 'no_process' ? 'Not Started' : 'Pending')}
+                    size="small"
+                    icon={isReady ? <CheckIcon style={{ fontSize: 14 }} /> : <PendingIcon style={{ fontSize: 14 }} />}
+                    color={f.process_status === 'dispatch_completed' ? 'info' : isReady ? 'success' : 'warning'}
+                    variant={isReady ? 'filled' : 'outlined'}
+                  />
+                </Stack>
+              );
+            })}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailRoute(null)} variant="outlined">Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Container>
   );
 };
 

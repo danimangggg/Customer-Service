@@ -1,4 +1,5 @@
 const db = require('../../models');
+const { Op } = require('sequelize');
 const Process = db.process;
 const Facility = db.facility;
 
@@ -12,7 +13,7 @@ exports.getGoodsIssueProcesses = async (req, res) => {
       ? { branch_code: branchCode }
       : {};
 
-    const whereClause = { status: 'tm_confirmed', process_type };
+    const whereClause = { status: 'freight_order_sent_to_ewm', process_type };
     if (process_type === 'regular') {
       whereClause.reporting_month = `${month} ${year}`;
     }

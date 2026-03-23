@@ -214,14 +214,39 @@ const getCustomerServiceDetails = async (req, res) => {
     
     console.log('All service records found:', allServiceDetails.length);
 
-    // Deduplicate: keep only the latest record for each service unit
+    // Deduplicate: keep only the latest record for each service unit,
+    // EXCEPT for O2C — if there are multiple O2C records (Cashier flow),
+    // merge them into one entry with combined duration.
     const serviceMap = new Map();
+    const o2cRecords = [];
+
     allServiceDetails.forEach(service => {
-      const existing = serviceMap.get(service.service_unit);
-      if (!existing || new Date(service.created_at) > new Date(existing.created_at)) {
-        serviceMap.set(service.service_unit, service);
+      if (service.service_unit === 'O2C Officer') {
+        o2cRecords.push(service);
+      } else {
+        const existing = serviceMap.get(service.service_unit);
+        if (!existing || new Date(service.created_at) > new Date(existing.created_at)) {
+          serviceMap.set(service.service_unit, service);
+        }
       }
     });
+
+    // Merge O2C records: use earliest created_at as anchor, latest end_time as end,
+    // and sum durations across all phases
+    if (o2cRecords.length > 0) {
+      o2cRecords.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const merged = {
+        ...o2cRecords[o2cRecords.length - 1], // take latest for officer_name/status
+        service_unit: 'O2C Officer',
+        created_at: o2cRecords[0].created_at,       // earliest start
+        end_time: o2cRecords[o2cRecords.length - 1].end_time, // latest end
+        notes: o2cRecords.length > 1
+          ? `${o2cRecords.length} phases (incl. Cashier return)`
+          : o2cRecords[0].notes,
+        _o2c_phases: o2cRecords, // keep raw phases for duration summing
+      };
+      serviceMap.set('O2C Officer', merged);
+    }
     
     console.log('After deduplication:', serviceMap.size, 'unique service units');
     
@@ -233,9 +258,31 @@ const getCustomerServiceDetails = async (req, res) => {
     const enrichedDetails = serviceDetails.map((service, index) => {
       let waitingMinutes = 0;
       let startTime = null;
-      
+
+      // For merged O2C with multiple phases, sum all phase durations
+      if (service._o2c_phases && service._o2c_phases.length > 1) {
+        const phases = service._o2c_phases;
+        let totalMinutes = 0;
+        // Phase 1: registration → first O2C end
+        const regTime = customer?.started_at;
+        if (regTime && phases[0].end_time) {
+          totalMinutes += Math.max(0, Math.round((new Date(phases[0].end_time) - new Date(regTime)) / 60000));
+        }
+        // Subsequent phases: previous O2C end → next O2C end (skip Cashier gap)
+        for (let i = 1; i < phases.length; i++) {
+          if (phases[i - 1].end_time && phases[i].end_time) {
+            // Find Cashier end_time between these two O2C records
+            const cashierRecord = serviceMap.get('Cashier');
+            const phaseStart = cashierRecord?.end_time || phases[i - 1].end_time;
+            totalMinutes += Math.max(0, Math.round((new Date(phases[i].end_time) - new Date(phaseStart)) / 60000));
+          }
+        }
+        startTime = regTime;
+        const { _o2c_phases, ...cleanService } = service;
+        return { ...cleanService, start_time: startTime, waiting_minutes: totalMinutes, duration_minutes: totalMinutes };
+      }
+
       if (index === 0) {
-        // First service: waiting time from registration
         const registrationTime = customer?.started_at;
         if (registrationTime && service.end_time) {
           const start = new Date(registrationTime);
@@ -244,7 +291,6 @@ const getCustomerServiceDetails = async (req, res) => {
           startTime = registrationTime;
         }
       } else {
-        // Subsequent services: waiting time from previous service end
         const previousService = serviceDetails[index - 1];
         if (previousService.end_time && service.end_time) {
           const start = new Date(previousService.end_time);
@@ -253,9 +299,10 @@ const getCustomerServiceDetails = async (req, res) => {
           startTime = previousService.end_time;
         }
       }
-      
+
+      const { _o2c_phases, ...cleanService } = service;
       return {
-        ...service,
+        ...cleanService,
         start_time: startTime,
         waiting_minutes: Math.max(0, waitingMinutes),
         duration_minutes: waitingMinutes

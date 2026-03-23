@@ -34,6 +34,15 @@ body {
   z-index: 1;
 }
 
+/* Mobile: no left margin, add top padding for AppBar */
+@media (max-width: 899px) {
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    padding: 76px 12px 20px 12px;
+  }
+}
+
 /* Public pages without sidebar */
 .public-content {
   margin-left: 0;
@@ -64,4 +73,29 @@ body {
 /* SweetAlert2 — always above the sidebar drawer (z-index 1200) */
 .swal-above-navbar {
   z-index: 9999 !important;
+}
+
+/* ── Mobile: scrollable tabs ── */
+@media (max-width: 899px) {
+  body:not(.tv-display) .MuiTabs-root {
+    max-width: 100%;
+  }
+  body:not(.tv-display) .MuiTabs-scroller {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  body:not(.tv-display) .MuiTabs-flexContainer {
+    flex-wrap: nowrap;
+  }
+}
+
+/* ── Mobile: horizontally scrollable tables ── */
+@media (max-width: 899px) {
+  body:not(.tv-display) .MuiTableContainer-root,
+  body:not(.tv-display) table {
+    display: block;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
 }

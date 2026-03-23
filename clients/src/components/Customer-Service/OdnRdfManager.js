@@ -224,7 +224,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={window.innerWidth < 600}>
       <DialogTitle>
         <Typography variant="h6" component="div">
           Manage ODNs - {facilityName}
@@ -240,13 +240,13 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
           <Typography variant="subtitle1" gutterBottom>
             Add New ODN
           </Typography>
-          <Stack direction="row" spacing={2} alignItems="center">
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
             <TextField
               label="ODN Number"
               value={newOdn}
               onChange={(e) => setNewOdn(e.target.value)}
               size="small"
-              sx={{ flex: 1 }}
+              fullWidth
             />
             <TextField
               select
@@ -254,7 +254,8 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
               value={selectedStore}
               onChange={(e) => setSelectedStore(e.target.value)}
               size="small"
-              sx={{ minWidth: 120 }}
+              fullWidth
+              sx={{ minWidth: { sm: 120 } }}
             >
               {stores.map((store) => (
                 <MenuItem key={store.value} value={store.value}>
@@ -267,6 +268,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
               startIcon={<AddIcon />}
               onClick={handleAddOdn}
               disabled={loading}
+              sx={{ whiteSpace: 'nowrap' }}
             >
               Add
             </Button>
@@ -305,19 +307,20 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
               >
                 {editingId === odn.id ? (
                   <Box sx={{ width: '100%' }}>
-                    <Stack direction="row" spacing={2} alignItems="center">
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
                       <TextField
                         value={editOdn}
                         onChange={(e) => setEditOdn(e.target.value)}
                         size="small"
-                        sx={{ flex: 1 }}
+                        fullWidth
                       />
                       <TextField
                         select
                         value={editStore}
                         onChange={(e) => setEditStore(e.target.value)}
                         size="small"
-                        sx={{ minWidth: 120 }}
+                        fullWidth
+                        sx={{ minWidth: { sm: 120 } }}
                       >
                         {stores.map((store) => (
                           <MenuItem key={store.value} value={store.value}>
@@ -325,20 +328,14 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
                           </MenuItem>
                         ))}
                       </TextField>
-                      <IconButton
-                        color="primary"
-                        onClick={handleSaveEdit}
-                        size="small"
-                      >
-                        <SaveIcon />
-                      </IconButton>
-                      <IconButton
-                        color="secondary"
-                        onClick={handleCancelEdit}
-                        size="small"
-                      >
-                        <CancelIcon />
-                      </IconButton>
+                      <Stack direction="row" spacing={1}>
+                        <IconButton color="primary" onClick={handleSaveEdit} size="small">
+                          <SaveIcon />
+                        </IconButton>
+                        <IconButton color="secondary" onClick={handleCancelEdit} size="small">
+                          <CancelIcon />
+                        </IconButton>
+                      </Stack>
                     </Stack>
                   </Box>
                 ) : (

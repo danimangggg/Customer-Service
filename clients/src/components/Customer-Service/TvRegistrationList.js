@@ -23,13 +23,6 @@ const TvRegistrationList = () => {
   const [displayMode, setDisplayMode] = useState('video'); // 'video' or 'qr'
   const [youtubeVideos, setYoutubeVideos] = useState([]);
 
-  console.log('TvRegistrationList render:', {
-    customersLength: customers.length,
-    youtubeVideosLength: youtubeVideos.length,
-    displayMode,
-    currentTime
-  });
-
   const lastCallTimes = useRef(new Map());
   const ANNOUNCEMENT_REPEAT_INTERVAL_MS = 3 * 1000;
   
@@ -48,23 +41,27 @@ const TvRegistrationList = () => {
     }
   }, []);
 
-  // Load YouTube videos from database
+  // Load YouTube videos from database — refresh every 60 seconds to pick up playlist changes
   useEffect(() => {
     const loadYoutubePlaylist = async () => {
       try {
-        const response = await api.get(`${api_url}/api/settings/youtube_playlist`, {
-          params: branchParam ? { branch_code: branchParam } : {}
-        });
+        const response = await api.get(`/api/settings/youtube_playlist`);
+        console.log('🎬 playlist fetch response:', response.data);
         if (response.data.success && response.data.value) {
+          console.log('🎬 setting videos:', response.data.value);
           setYoutubeVideos(response.data.value);
+        } else {
+          console.warn('🎬 no value in response:', response.data);
         }
       } catch (error) {
-        console.error('Error loading YouTube playlist:', error);
+        console.error('🎬 Error loading YouTube playlist:', error);
       }
     };
     
     loadYoutubePlaylist();
-  }, [api_url]);
+    const interval = setInterval(loadYoutubePlaylist, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const oneWeekAgo = dayjs().subtract(7, 'days').startOf('day');
   
@@ -491,7 +488,7 @@ const TvRegistrationList = () => {
 
     const handleSave = async () => {
       try {
-        await api.put(`${api_url}/api/settings/youtube_playlist`, {
+        await api.put(`/api/settings/youtube_playlist`, {
           value: tempVideos,
           description: 'YouTube videos playlist for customer slide'
         });

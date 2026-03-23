@@ -14,7 +14,12 @@ import {
   Avatar,
   Chip,
   Stack,
-  Collapse
+  Collapse,
+  IconButton,
+  AppBar,
+  Toolbar,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import {
   Assignment,
@@ -48,13 +53,17 @@ import {
   Receipt,
   Security,
   Print,
-  AccountTree
+  AccountTree,
+  Menu as MenuIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
 
 const Sidebar = () => {
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tmSettingsOpen, setTmSettingsOpen] = useState(false);
   const [tmReportsOpen, setTmReportsOpen] = useState(false);
@@ -120,15 +129,37 @@ const Sidebar = () => {
   });
 
   const MenuTooltip = ({ title, children }) => (
-    <Tooltip title={title} placement="right" enterDelay={300}>
+    <Tooltip title={isMobile ? '' : title} placement="right" enterDelay={300}>
       {children}
     </Tooltip>
   );
 
+  // Close mobile drawer when navigating to a page
+  const handleNavClick = () => {
+    if (isMobile) setMobileOpen(false);
+  };
+
   return (
     <Box sx={{ display: 'flex' }}>
+      {/* Mobile top AppBar with hamburger */}
+      {isMobile && (
+        <AppBar position="fixed" sx={{ bgcolor: '#1565c0', zIndex: theme.zIndex.drawer + 1 }}>
+          <Toolbar>
+            <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 2 }}>
+              <MenuIcon />
+            </IconButton>
+            <Box component="img" src="/pharmalog-logo.png" alt="EPSS-MT" sx={{ height: 40, mr: 1 }} />
+            <Typography variant="body1" fontWeight="bold" sx={{ color: 'white', fontSize: '0.95rem' }}>
+              EPSS Monitoring Tool
+            </Typography>
+          </Toolbar>
+        </AppBar>
+      )}
+
       <Drawer
-        variant="permanent"
+        variant={isMobile ? 'temporary' : 'permanent'}
+        open={isMobile ? mobileOpen : true}
+        onClose={() => setMobileOpen(false)}
         anchor="left"
         sx={{
           width: drawerWidth,
@@ -142,6 +173,7 @@ const Sidebar = () => {
             background: '#ffffff',
             color: '#1a1a1a',
             overflowX: 'hidden',
+            overflowY: 'auto',
             position: 'fixed',
             height: '100vh',
             boxShadow: '4px 0 20px rgba(21,101,192,0.12)',
@@ -211,7 +243,7 @@ const Sidebar = () => {
          {/* DASHBOARDS SECTION - AT THE TOP */}
          {(jobTitle === "Manager" || jobTitle === "Coordinator" || accountType === "Admin") && (
            <MenuTooltip title={"Dashboard"}>
-             <ListItem button component={Link} to="/manager-dashboard"
+             <ListItem button component={Link} onClick={handleNavClick} to="/manager-dashboard"
                sx={getActiveStyles('/manager-dashboard')}>
                <ListItemIcon><Dashboard sx={{ color: '#e91e63' }} /></ListItemIcon>
                <ListItemText primary={"Dashboard"}
@@ -227,7 +259,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Outstanding Process"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/hp-facilities"
                sx={getActiveStyles('/hp-facilities')}
              >
@@ -247,7 +279,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Outstanding"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/ewm-outstanding"
                sx={getActiveStyles('/ewm-outstanding')}
              >
@@ -267,7 +299,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Goods Issue"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/ewm-goods-issue"
                sx={getActiveStyles('/ewm-goods-issue')}
              >
@@ -287,7 +319,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Outstanding Process"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/outstandingProcess"
                sx={getActiveStyles('/outstandingProcess')}
              >
@@ -315,7 +347,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Invoice Records"}>
              <ListItem
                button
-               component={Link}
+               component={Link} onClick={handleNavClick}
                to="/finance-invoices"
                sx={getActiveStyles('/finance-invoices')}
              >
@@ -343,7 +375,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Outstanding Process"}>
              <ListItem
                button
-               component={Link}
+               component={Link} onClick={handleNavClick}
                to="/outstandingProcess"
                sx={getActiveStyles('/outstandingProcess')}
              >
@@ -371,7 +403,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Register Customer"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/register-customer"
                sx={getActiveStyles('/register-customer')}
              >
@@ -399,7 +431,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Customer Availability"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/queue-manager"
                sx={getActiveStyles('/queue-manager')}
              >
@@ -427,7 +459,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Outstanding Process"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/pi-vehicle-requests"
                sx={{
                  borderRadius: 2,
@@ -462,7 +494,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Dispatch Management"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/dispatch-management"
                sx={{
                  borderRadius: 2,
@@ -497,7 +529,7 @@ const Sidebar = () => {
            <MenuTooltip title={"HP Documentation"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/documentation-hp"
                sx={{
                  borderRadius: 2,
@@ -535,7 +567,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Quality Evaluation"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/quality-evaluation"
                sx={{
                  borderRadius: 2,
@@ -570,7 +602,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Outstanding Process"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/dispatch"
                sx={{
                  borderRadius: 2,
@@ -608,7 +640,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Exit Permit"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/exit-permit"
                sx={getActiveStyles('/exit-permit')}
              >
@@ -633,7 +665,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Security"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/gate-keeper"
                sx={getActiveStyles('/gate-keeper')}
              >
@@ -658,7 +690,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Picklists"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/all-picklists"
                sx={{
                  borderRadius: 2,
@@ -693,7 +725,7 @@ const Sidebar = () => {
            <MenuTooltip title={"EWM Documentation"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/ewm-documentation"
                sx={{
                  borderRadius: 2,
@@ -728,7 +760,7 @@ const Sidebar = () => {
            <MenuTooltip title={"TV"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/tv-main-menu"
                sx={{
                  borderRadius: 2,
@@ -801,7 +833,7 @@ const Sidebar = () => {
                  <MenuTooltip title={"Organization Profile"}>
                    <ListItem 
                      button 
-                     component={Link} 
+                     component={Link} onClick={handleNavClick} 
                      to="/settings/organization-profile"
                      sx={{
                        ...getActiveStyles('/settings/organization-profile'),
@@ -834,7 +866,7 @@ const Sidebar = () => {
                  <MenuTooltip title={"Store Management"}>
                    <ListItem 
                      button 
-                     component={Link} 
+                     component={Link} onClick={handleNavClick} 
                      to="/settings/store-management"
                      sx={{
                        ...getActiveStyles('/settings/store-management'),
@@ -867,7 +899,7 @@ const Sidebar = () => {
                  <MenuTooltip title={"EPSS Branches"}>
                    <ListItem
                      button
-                     component={Link}
+                     component={Link} onClick={handleNavClick}
                      to="/settings/branches"
                      sx={{
                        ...getActiveStyles('/settings/branches'),
@@ -899,7 +931,7 @@ const Sidebar = () => {
                  <MenuTooltip title={"User Management"}>
                    <ListItem 
                      button 
-                     component={Link}                      to="/settings/user-management"
+                     component={Link} onClick={handleNavClick}                      to="/settings/user-management"
                      sx={{
                        ...getActiveStyles('/settings/user-management'),
                        pl: 4,
@@ -929,7 +961,7 @@ const Sidebar = () => {
                  <MenuTooltip title={"Account Types & Roles"}>
                    <ListItem 
                      button 
-                     component={Link} 
+                     component={Link} onClick={handleNavClick} 
                      to="/settings/account-types"
                      sx={{
                        ...getActiveStyles('/settings/account-types'),
@@ -960,7 +992,7 @@ const Sidebar = () => {
                  <MenuTooltip title={"Reset Password"}>
                    <ListItem 
                      button 
-                     component={Link} 
+                     component={Link} onClick={handleNavClick} 
                      to="/reset-password"
                      sx={{
                        ...getActiveStyles('/reset-password'),
@@ -995,7 +1027,7 @@ const Sidebar = () => {
          {/* Vehicle Log Sheet - Driver, General Service only */}
          {(jobTitle === 'Driver' || jobTitle === 'General Service') && (
            <MenuTooltip title={"Vehicle Log Sheet"}>
-             <ListItem button component={Link} to="/transportation/vehicle-log-sheet"
+             <ListItem button component={Link} onClick={handleNavClick} to="/transportation/vehicle-log-sheet"
                sx={{ borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/vehicle-log-sheet') }}>
                <ListItemIcon><DirectionsCar sx={{ color: '#1565c0' }} /></ListItemIcon>
                <ListItemText primary={"Vehicle Log Sheet"}
@@ -1007,7 +1039,7 @@ const Sidebar = () => {
          {/* Fuel Log Book - Driver and General Service */}
          {(jobTitle === 'Driver' || jobTitle === 'General Service') && (
            <MenuTooltip title={"Fuel Log Book"}>
-             <ListItem button component={Link} to="/transportation/fuel-log-book"
+             <ListItem button component={Link} onClick={handleNavClick} to="/transportation/fuel-log-book"
                sx={{ borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/fuel-log-book') }}>
                <ListItemIcon><DirectionsCar sx={{ color: '#16a34a' }} /></ListItemIcon>
                <ListItemText primary={"Fuel Log Book"}
@@ -1021,7 +1053,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Outstanding"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/tm-manager"
                sx={getActiveStyles('/tm-manager')}
              >
@@ -1071,7 +1103,7 @@ const Sidebar = () => {
                <List component="div" disablePadding>
 
                  <MenuTooltip title={"Routes"}>
-                   <ListItem button component={Link} to="/transportation/routes"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/transportation/routes"
                      sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/routes') }}>
                      <ListItemIcon><Route sx={{ color: '#c62828' }} /></ListItemIcon>
                      <ListItemText primary={"Routes"}
@@ -1080,7 +1112,7 @@ const Sidebar = () => {
                  </MenuTooltip>
 
                  <MenuTooltip title={"Vehicles"}>
-                   <ListItem button component={Link} to="/transportation/vehicle-management"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/transportation/vehicle-management"
                      sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/vehicle-management') }}>
                      <ListItemIcon><DirectionsCar sx={{ color: '#e53935' }} /></ListItemIcon>
                      <ListItemText primary={"Vehicles"}
@@ -1089,7 +1121,7 @@ const Sidebar = () => {
                  </MenuTooltip>
 
                  <MenuTooltip title={"HP Facilities"}>
-                   <ListItem button component={Link} to="/transportation/hp-facilities"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/transportation/hp-facilities"
                      sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/hp-facilities') }}>
                      <ListItemIcon><LocalHospital sx={{ color: '#c62828' }} /></ListItemIcon>
                      <ListItemText primary={"HP Facilities"}
@@ -1112,28 +1144,28 @@ const Sidebar = () => {
              <Collapse in={tmReportsOpen} timeout="auto" unmountOnExit>
                <List component="div" disablePadding>
                  <MenuTooltip title={"HP Report"}>
-                   <ListItem button component={Link} to="/reports/hp-comprehensive"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/hp-comprehensive"
                      sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/reports/hp-comprehensive') }}>
                      <ListItemIcon><LocalHospital sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"HP Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.95rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"RDF Report"}>
-                   <ListItem button component={Link} to="/reports/rdf"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/rdf"
                      sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/reports/rdf') }}>
                      <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"RDF Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.95rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"Vehicle Log Sheet"}>
-                   <ListItem button component={Link} to="/transportation/vehicle-log-sheet"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/transportation/vehicle-log-sheet"
                      sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/vehicle-log-sheet') }}>
                      <ListItemIcon><DirectionsCar sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"Vehicle Log Sheet"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/vehicle-log-sheet') ? 600 : 500, fontSize: '0.95rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"Fuel Log Book"}>
-                   <ListItem button component={Link} to="/transportation/fuel-log-book"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/transportation/fuel-log-book"
                      sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/transportation/fuel-log-book') }}>
                      <ListItemIcon><DirectionsCar sx={{ color: '#16a34a', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"Fuel Log Book"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/fuel-log-book') ? 600 : 500, fontSize: '0.95rem' } }} />
@@ -1153,7 +1185,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Biller"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/biller"
                sx={getActiveStyles('/biller')}
              >
@@ -1209,7 +1241,7 @@ const Sidebar = () => {
                <List component="div" disablePadding>
                  {isSuperAdmin && (
                    <MenuTooltip title={"Manager Dashboard"}>
-                     <ListItem button component={Link} to="/manager-dashboard"
+                     <ListItem button component={Link} onClick={handleNavClick} to="/manager-dashboard"
                        sx={{ ...getActiveStyles('/manager-dashboard'), pl: 4, ml: 2, mr: 1 }}>
                        <ListItemIcon><Dashboard sx={{ color: '#c62828' }} /></ListItemIcon>
                        <ListItemText primary={"Manager Dashboard"}
@@ -1218,7 +1250,7 @@ const Sidebar = () => {
                    </MenuTooltip>
                  )}
                  <MenuTooltip title={"HP Report"}>
-                   <ListItem button component={Link} to="/reports/hp-comprehensive"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/hp-comprehensive"
                      sx={{ ...getActiveStyles('/reports/hp-comprehensive'), pl: 4, ml: 2, mr: 1 }}>
                      <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
                      <ListItemText primary={"HP Report"}
@@ -1226,7 +1258,7 @@ const Sidebar = () => {
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"RDF Report"}>
-                   <ListItem button component={Link} to="/reports/rdf"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/rdf"
                      sx={{ ...getActiveStyles('/reports/rdf'), pl: 4, ml: 2, mr: 1 }}>
                      <ListItemIcon><BarChart sx={{ color: '#c62828' }} /></ListItemIcon>
                      <ListItemText primary={"RDF Report"}
@@ -1252,28 +1284,28 @@ const Sidebar = () => {
              <Collapse in={mgmtReportsOpen} timeout="auto" unmountOnExit>
                <List component="div" disablePadding>
                  <MenuTooltip title={"HP Report"}>
-                   <ListItem button component={Link} to="/reports/hp-comprehensive"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/hp-comprehensive"
                      sx={{ pl: 4, ...getActiveStyles('/reports/hp-comprehensive') }}>
                      <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"HP Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.9rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"RDF Report"}>
-                   <ListItem button component={Link} to="/reports/rdf"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/rdf"
                      sx={{ pl: 4, ...getActiveStyles('/reports/rdf') }}>
                      <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"RDF Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.9rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"Vehicle Log Sheet"}>
-                   <ListItem button component={Link} to="/transportation/vehicle-log-sheet"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/transportation/vehicle-log-sheet"
                      sx={{ pl: 4, ...getActiveStyles('/transportation/vehicle-log-sheet') }}>
                      <ListItemIcon><DirectionsCar sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"Vehicle Log Sheet"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/vehicle-log-sheet') ? 600 : 500, fontSize: '0.9rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"Fuel Log Book"}>
-                   <ListItem button component={Link} to="/transportation/fuel-log-book"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/transportation/fuel-log-book"
                      sx={{ pl: 4, ...getActiveStyles('/transportation/fuel-log-book') }}>
                      <ListItemIcon><DirectionsCar sx={{ color: '#16a34a', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"Fuel Log Book"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/transportation/fuel-log-book') ? 600 : 500, fontSize: '0.9rem' } }} />
@@ -1298,14 +1330,14 @@ const Sidebar = () => {
              <Collapse in={mgmtProfileOpen} timeout="auto" unmountOnExit>
                <List component="div" disablePadding>
                  <MenuTooltip title={"Organization Profile"}>
-                   <ListItem button component={Link} to="/reports/organization-profile"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/organization-profile"
                      sx={{ pl: 4, ...getActiveStyles('/reports/organization-profile') }}>
                      <ListItemIcon><Business sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"Organization Profile"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/organization-profile') ? 600 : 500, fontSize: '0.9rem' } }} />
                    </ListItem>
                  </MenuTooltip>
                  <MenuTooltip title={"Users"}>
-                   <ListItem button component={Link} to="/settings/user-management"
+                   <ListItem button component={Link} onClick={handleNavClick} to="/settings/user-management"
                      sx={{ pl: 4, ...getActiveStyles('/settings/user-management') }}>
                      <ListItemIcon><Group sx={{ color: '#1565c0', fontSize: 20 }} /></ListItemIcon>
                      <ListItemText primary={"Users"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/settings/user-management') ? 600 : 500, fontSize: '0.9rem' } }} />
@@ -1321,7 +1353,7 @@ const Sidebar = () => {
            <MenuTooltip title={"HP Report"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/reports/hp-comprehensive"
                sx={getActiveStyles('/reports/hp-comprehensive')}
              >
@@ -1346,7 +1378,7 @@ const Sidebar = () => {
            <MenuTooltip title={"RDF Report"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/reports/rdf"
                sx={getActiveStyles('/reports/rdf')}
              >
@@ -1371,7 +1403,7 @@ const Sidebar = () => {
            <MenuTooltip title={"Organization Profile"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
                to="/settings/organization-profile"
                sx={getActiveStyles('/settings/organization-profile')}
              >
@@ -1396,7 +1428,32 @@ const Sidebar = () => {
            <MenuTooltip title={"TV"}>
              <ListItem 
                button 
-               component={Link} 
+               component={Link} onClick={handleNavClick} 
+               to="/tv-main-menu"
+               sx={getActiveStyles('/tv-main-menu')}
+             >
+               <ListItemIcon>
+                 <Tv sx={{ color: '#c62828' }} />
+               </ListItemIcon>
+               <ListItemText 
+                 primary={"TV"} 
+                 sx={{ 
+                   '& .MuiListItemText-primary': { 
+                     fontWeight: isActivePath('/tv-main-menu') ? 600 : 500,
+                     fontSize: '0.95rem'
+                   } 
+                 }} 
+               />
+             </ListItem>
+           </MenuTooltip>
+         )}
+
+         {/* TV Main Menu - for Customer Service Officer (O2C only) */}
+         {jobTitle === "Customer Service Officer" && (
+           <MenuTooltip title={"TV"}>
+             <ListItem 
+               button 
+               component={Link} onClick={handleNavClick} 
                to="/tv-main-menu"
                sx={getActiveStyles('/tv-main-menu')}
              >
@@ -1421,7 +1478,7 @@ const Sidebar = () => {
         <Divider sx={{ my: 2, bgcolor: 'rgba(198,40,40,0.15)' }} />
 
         {/* User Info Section - Bottom */}
-        <Box sx={{ mt: 'auto', px: 2, py: 2, bgcolor: 'rgba(198,40,40,0.06)', borderRadius: 2, mx: 1, mb: 1 }}>
+        <Box sx={{ px: 2, py: 2, bgcolor: 'rgba(198,40,40,0.06)', borderRadius: 2, mx: 1, mb: 1 }}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <Avatar sx={{ width: 40, height: 40, bgcolor: '#c62828' }}>
               <AccountCircle />
@@ -1452,7 +1509,7 @@ const Sidebar = () => {
             <MenuTooltip title={"Change Password"}>
               <ListItem 
                 button 
-                component={Link} 
+                component={Link} onClick={handleNavClick} 
                 to="/change-password"
                 sx={{
                   borderRadius: 2,

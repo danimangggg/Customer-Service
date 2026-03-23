@@ -101,6 +101,7 @@ const AppContent = () => {
         <Routes>
         <Route path = '/' element={<DefaultRedirect />} />
         <Route path = '/login' Component={SignIn} />
+        <Route path = '/tvcustomer' Component={TvCustomer} />
 
         <Route element = {<ProtectedRoutes/>}>
             <Route path = '/change-password' exact Component={ChangePassword}/>
@@ -123,7 +124,6 @@ const AppContent = () => {
             <Route path = '/queue-manager' Component={QueueManager} />
             <Route path = '/tv-dispatch' Component={TvDispatch} />
             <Route path = '/dispatch' Component={Dispatch} />
-            <Route path = '/tvcustomer' Component={TvCustomer} />
             <Route path = '/tv-main-menu' Component={TvMainMenu} />
             <Route path = '/tv-real-entertainment' Component={TvRealEntertainmentPage} />
             <Route path = '/exit-permit' Component={ExitPermit} />

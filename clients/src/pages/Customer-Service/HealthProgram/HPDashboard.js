@@ -387,11 +387,11 @@ const HPDashboard = ({ branchCode = '' }) => {
         <Grid item xs={12} sm={6} md={4}>
           <MetricCard
             title="Completed"
-            value={data.qualityEvaluated || 0}
+            value={expectedVsDone.done || 0}
             icon={<Star />}
             color="error"
-            subtitle="Quality assessments completed"
-            progress={data.expectedThisMonth > 0 ? (data.qualityEvaluated / data.expectedThisMonth) * 100 : 0}
+            subtitle="Facilities completed (incl. RRF/VRF not sent)"
+            progress={data.expectedThisMonth > 0 ? ((expectedVsDone.done || 0) / data.expectedThisMonth) * 100 : 0}
             isMonthDependent={true}
             selectedMonth={selectedMonth}
             selectedYear={selectedYear}

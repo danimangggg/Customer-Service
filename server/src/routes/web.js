@@ -225,6 +225,8 @@ let routes =  (app) => {
   // TM (Transportation Manager) routes
   const tmController = require('../controllers/HealthProgram/tmController');
   router.get('/api/tm-processes', tmController.getTMProcesses);
+  router.get('/api/tm-routes', tmController.getTMRoutes);
+  router.get('/api/tm-phase2-routes', tmController.getTMPhase2Routes);
   router.post('/api/tm-notify', tmController.notifyTM);
   router.post('/api/tm-create-freight-order', tmController.createFreightOrder);
   router.post('/api/tm-send-to-ewm', tmController.sendToEWM);
@@ -237,7 +239,7 @@ let routes =  (app) => {
 
   // Dispatch routes (HP)
   const dispatchController = require('../controllers/Transportation/dispatchController');
-  router.put('/api/processes/:id/complete-dispatch', dispatchController.completeDispatchHP);
+  router.post('/api/complete-dispatch-hp', dispatchController.completeDispatchHP);
 
   // EWM Goods Issue routes
   const ewmGoodsIssueController = require('../controllers/HealthProgram/ewmGoodsIssueController');
@@ -259,6 +261,7 @@ let routes =  (app) => {
   const documentationController = require('../controllers/Documentation/documentationController');
   const documentFollowupController = require('../controllers/Documentation/documentFollowupController');
   router.get('/api/dispatched-odns', documentationController.getDispatchedODNs);
+  router.get('/api/documentation/route-km', documentationController.getRouteKilometer);
   router.get('/api/documentation/stats', documentationController.getDocumentationStats);
   router.get('/api/documentation/available-months', documentationController.getAvailableMonths);
   router.put('/api/odns/:id/pod-confirmation', documentationController.updatePODConfirmation);

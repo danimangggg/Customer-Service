@@ -18,7 +18,6 @@ import {
   Person as DriverIcon,
   PersonOutline as DelivererIcon
 } from '@mui/icons-material';
-import axios from 'axios';
 import api from '../../../axiosInstance';
 import Swal from 'sweetalert2';
 import { successToast } from '../../../utils/toast';
@@ -29,8 +28,6 @@ const MySwal = withReactContent(Swal);
 
 const PIVehicleRequests = () => {
   const [routeData, setRouteData] = useState([]);
-  const [facilityData, setFacilityData] = useState([]); // for emergency/breakdown
-  const [filterType, setFilterType] = useState('Regular');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -51,7 +48,6 @@ const PIVehicleRequests = () => {
   const loggedInUserId = localStorage.getItem('UserId');
   const userJobTitle = localStorage.getItem('JobTitle') || '';
   const isPIOfficer = userJobTitle === 'PI Officer-HP';
-  const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Ethiopian calendar function
   const getCurrentEthiopianMonth = () => {
@@ -107,48 +103,36 @@ const PIVehicleRequests = () => {
   const currentEthiopianYear = currentEthiopian.year;
 
   useEffect(() => {
-    if (filterType === 'Regular') {
-      fetchRouteData();
-    } else {
-      fetchFacilityData();
-    }
+    fetchRouteData();
     fetchStats();
     fetchVehicles();
     fetchDrivers();
     fetchDeliverers();
-  }, [currentEthiopianMonth, currentEthiopianYear, filterType]);
+  }, [currentEthiopianMonth, currentEthiopianYear]);
 
   // Silent background polling every 5s
   useEffect(() => {
     const silentFetch = async () => {
       try {
-        if (filterType === 'Regular') {
-          const res = await api.get(`${api_url}/api/pi-vehicle-requests`, {
-            params: { month: currentEthiopianMonth, year: currentEthiopianYear, process_type: 'regular' }
-          });
-          setRouteData(res.data.routes || []);
-        } else {
-          const res = await api.get(`${api_url}/api/pi-vehicle-requests/by-facility`, {
-            params: { process_type: filterType.toLowerCase() }
-          });
-          setFacilityData(res.data.facilities || []);
-        }
+        const res = await api.get(`/api/pi-vehicle-requests`, {
+          params: { month: currentEthiopianMonth, year: currentEthiopianYear }
+        });
+        setRouteData(res.data.routes || []);
       } catch (_) {}
     };
     const interval = setInterval(silentFetch, 5000);
     return () => clearInterval(interval);
-  }, [filterType, currentEthiopianMonth, currentEthiopianYear]);
+  }, [currentEthiopianMonth, currentEthiopianYear]);
 
   const fetchRouteData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await api.get(`${api_url}/api/pi-vehicle-requests`, {
+      const response = await api.get(`/api/pi-vehicle-requests`, {
         params: {
           month: currentEthiopianMonth,
-          year: currentEthiopianYear,
-          process_type: 'regular'
+          year: currentEthiopianYear
         }
       });
       
@@ -161,29 +145,9 @@ const PIVehicleRequests = () => {
     }
   };
 
-  const fetchFacilityData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await api.get(`${api_url}/api/pi-vehicle-requests/by-facility`, {
-        params: {
-          process_type: filterType.toLowerCase()
-        }
-      });
-      
-      setFacilityData(response.data.facilities || []);
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setError("Failed to load facility data. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchStats = async () => {
     try {
-      const response = await api.get(`${api_url}/api/pi-vehicle-requests/stats`, {
+      const response = await api.get(`/api/pi-vehicle-requests/stats`, {
         params: {
           month: currentEthiopianMonth,
           year: currentEthiopianYear
@@ -197,7 +161,7 @@ const PIVehicleRequests = () => {
 
   const fetchVehicles = async () => {
     try {
-      const response = await api.get(`${api_url}/api/vehicles/available`);
+      const response = await api.get(`/api/vehicles/available`);
       setVehicles(response.data);
     } catch (err) {
       console.error("Vehicles fetch error:", err);
@@ -206,7 +170,7 @@ const PIVehicleRequests = () => {
 
   const fetchDrivers = async () => {
     try {
-      const response = await api.get(`${api_url}/api/drivers/available`);
+      const response = await api.get(`/api/drivers/available`);
       setDrivers(response.data);
     } catch (err) {
       console.error("Drivers fetch error:", err);
@@ -215,7 +179,7 @@ const PIVehicleRequests = () => {
 
   const fetchDeliverers = async () => {
     try {
-      const response = await api.get(`${api_url}/api/deliverers/available`);
+      const response = await api.get(`/api/deliverers/available`);
       setDeliverers(response.data);
     } catch (err) {
       console.error("Deliverers fetch error:", err);
@@ -235,7 +199,7 @@ const PIVehicleRequests = () => {
 
     if (result.isConfirmed) {
       try {
-        await api.post(`${api_url}/api/pi-vehicle-requests/request`, {
+        await api.post(`/api/pi-vehicle-requests/request`, {
           route_id: routeId,
           month: currentEthiopianMonth,
           year: currentEthiopianYear,
@@ -244,7 +208,7 @@ const PIVehicleRequests = () => {
 
         // Record service time for PI Officer
         try {
-          await api.post(`${api_url}/api/service-time-hp`, {
+          await api.post(`/api/service-time-hp`, {
             process_id: routeId,
             service_unit: 'PI Officer - HP',
             end_time: new Date().toISOString(),
@@ -281,14 +245,14 @@ const PIVehicleRequests = () => {
 
     if (result.isConfirmed) {
       try {
-        await api.post(`${api_url}/api/pi-vehicle-requests/request-by-process`, {
+        await api.post(`/api/pi-vehicle-requests/request-by-process`, {
           process_id: processId,
           requested_by: loggedInUserId
         });
 
         // Record service time for PI Officer
         try {
-          await api.post(`${api_url}/api/service-time-hp`, {
+          await api.post(`/api/service-time-hp`, {
             process_id: processId,
             service_unit: 'PI Officer - HP',
             end_time: new Date().toISOString(),
@@ -329,7 +293,7 @@ const PIVehicleRequests = () => {
     }
 
     try {
-      await api.post(`${api_url}/api/route-assignments`, {
+      await api.post(`/api/route-assignments`, {
         route_id: editingRoute.route_id,
         vehicle_id: assignmentData.vehicle_id,
         driver_id: assignmentData.driver_id,
@@ -362,7 +326,7 @@ const PIVehicleRequests = () => {
 
     if (result.isConfirmed) {
       try {
-        await api.delete(`${api_url}/api/pi-vehicle-requests/${routeId}`, {
+        await api.delete(`/api/pi-vehicle-requests/${routeId}`, {
           params: {
             month: currentEthiopianMonth,
             year: currentEthiopianYear
@@ -450,24 +414,9 @@ const PIVehicleRequests = () => {
         {/* Loading Progress */}
         {loading && <LinearProgress sx={{ mb: 2 }} />}
 
-        {/* Type Filter */}
-        <Card sx={{ mb: 2, p: 2 }}>
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <Typography variant="body2" fontWeight="bold" color="text.secondary">Process Type:</Typography>
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <Select
-                value={filterType}
-                onChange={(e) => { setFilterType(e.target.value); setPage(0); }}
-              >
-                <MenuItem value="Regular">HP Regular</MenuItem>
-                <MenuItem value="Vaccine">Vaccine</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </Card>
+        {/* Type Filter - removed, show all process types together */}
 
-        {/* Routes Table (Regular) */}
-        {filterType === 'Regular' && (
+        {/* Routes Table */}
         <Card className="pi-card">
           <CardHeader 
             title={
@@ -519,10 +468,11 @@ const PIVehicleRequests = () => {
                 {routeData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route, index) => {
                   // Use server-computed flag — it accounts for biller_completed, vehicle_requested, and RRF/VRF not sent
                   const allFacilitiesReady = route.all_facilities_ready === 1;
+                  const READY_STATUSES = ['biller_completed', 'vehicle_requested', 'ewm_completed', 'tm_notified', 'tm_confirmed', 'freight_order_sent_to_ewm', 'ewm_goods_issued', 'driver_assigned', 'dispatched'];
                   const readyCount = (route.facilities || []).filter(f =>
-                    f.process_status === 'biller_completed' ||
-                    f.process_status === 'vehicle_requested' ||
-                    f.rrf_not_sent === 1
+                    READY_STATUSES.includes(f.process_status) ||
+                    f.rrf_not_sent === 1 ||
+                    f.quality_confirmed === 1
                   ).length;
                   const remainingFacilities = route.total_facilities_in_route - readyCount;
                   
@@ -575,9 +525,10 @@ const PIVehicleRequests = () => {
                           </Box>
                         )}
                         {route.facilities.map((facility, idx) => {
-                          const isCompleted = facility.process_status === 'biller_completed' || facility.process_status === 'vehicle_requested';
+                          const isCompleted = READY_STATUSES.includes(facility.process_status);
                           const isRrfNotSent = facility.rrf_not_sent === 1;
-                          const isReady = isCompleted || isRrfNotSent;
+                          const isQualityConfirmed = facility.quality_confirmed === 1;
+                          const isReady = isCompleted || isRrfNotSent || isQualityConfirmed;
                           return (
                             <Box key={idx} sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                               <Typography variant="body2">
@@ -585,7 +536,7 @@ const PIVehicleRequests = () => {
                               </Typography>
                               {isReady ? (
                                 <Chip 
-                                  label={isRrfNotSent && !isCompleted ? 'RRF Not Sent ✓' : '✓'} 
+                                  label={isRrfNotSent && !isCompleted ? 'Not Sent ✓' : '✓'} 
                                   size="small" 
                                   color={isRrfNotSent && !isCompleted ? 'warning' : 'success'}
                                   sx={{ ml: 1, height: 18, fontSize: '0.7rem' }}
@@ -694,103 +645,6 @@ const PIVehicleRequests = () => {
             />
           </TableContainer>
         </Card>
-        )}
-
-        {/* Facility Table (Emergency / Breakdown / Vaccine) */}
-        {(filterType === 'Emergency' || filterType === 'Breakdown' || filterType === 'Vaccine') && (
-        <Card className="pi-card">
-          <CardHeader
-            title={
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <BusinessIcon color="warning" />
-                <Typography variant="h6">{filterType} Facilities</Typography>
-                <Chip
-                  label={`${facilityData.length} facilities`}
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                />
-              </Stack>
-            }
-          />
-          <Divider />
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell sx={{ fontWeight: 'bold' }}>#</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Facility</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>ODN Numbers</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Started At</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {facilityData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((item, index) => (
-                  <TableRow key={item.process_id} hover>
-                    <TableCell>
-                      <Chip label={(page * rowsPerPage) + index + 1} size="small" color="warning" variant="outlined" />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight="bold">{item.facility_name}</Typography>
-                      <Typography variant="caption" color="text.secondary">Process #{item.process_id}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        {item.odns && item.odns.length > 0 ? item.odns.map((odn, i) => (
-                          <Chip key={i} label={odn.odn_number} size="small" color="info" variant="outlined" sx={{ mr: 0.5, mb: 0.5 }} />
-                        )) : (
-                          <Typography variant="caption" color="text.secondary">No ODNs</Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="caption" color="text.secondary">
-                        {item.started_at ? new Date(item.started_at).toLocaleString() : '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">
-                      {item.vehicle_requested ? (
-                        <Chip label="Vehicle Requested" color="success" size="small" icon={<VehicleIcon />} />
-                      ) : (
-                        <Button
-                          variant="contained"
-                          color="warning"
-                          size="small"
-                          startIcon={<RequestIcon />}
-                          onClick={() => handleRequestVehicleForProcess(item.process_id, item.facility_name)}
-                          sx={{ borderRadius: 2 }}
-                        >
-                          Request Vehicle
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {facilityData.length === 0 && !loading && (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">
-                      <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                        No {filterType.toLowerCase()} processes at biller_completed stage
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            <TablePagination
-              component="div"
-              count={facilityData.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={(_, p) => setPage(p)}
-              onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
-              rowsPerPageOptions={[5, 10, 25, 50]}
-              sx={{ borderTop: 1, borderColor: 'divider' }}
-            />
-          </TableContainer>
-        </Card>
-        )}
         <Dialog open={openAssignDialog} onClose={() => setOpenAssignDialog(false)} maxWidth="md" fullWidth>
           <DialogTitle>
             <Stack direction="row" alignItems="center" spacing={2}>

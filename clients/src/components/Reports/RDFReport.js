@@ -127,7 +127,6 @@ const RDFReport = () => {
   
   // Best Of states
   const [bestOfData, setBestOfData] = useState(null);
-  const [bestOfLastWeekData, setBestOfLastWeekData] = useState(null);
   const [bestOfLoading, setBestOfLoading] = useState(false);
 
   const getThisWeekRange = () => {
@@ -338,20 +337,14 @@ const RDFReport = () => {
   };
 
   const fetchBestOfWeek = async (range) => {
-    const { from, to } = range || bestOfRange;
     try {
       setBestOfLoading(true);
       const branchParam = selectedBranch ? { branch_code: selectedBranch } : {};
-      const [thisRes, lastRes] = await Promise.all([
-        api.get(`${API_URL}/api/best-of-week`, { params: { startDate: from, endDate: to, ...branchParam } }),
-        api.get(`${API_URL}/api/best-of-week`, { params: { startDate: getLastWeekRange().from, endDate: getLastWeekRange().to, ...branchParam } }),
-      ]);
-      if (thisRes.data.success) setBestOfData(thisRes.data.data);
-      if (lastRes.data.success) setBestOfLastWeekData(lastRes.data.data);
+      const res = await api.get(`${API_URL}/api/best-of-week`, { params: { ...branchParam } });
+      if (res.data.success) setBestOfData(res.data.data);
     } catch (err) {
       console.error('Error fetching best of week:', err);
       setBestOfData(null);
-      setBestOfLastWeekData(null);
     } finally {
       setBestOfLoading(false);
     }
@@ -1378,45 +1371,8 @@ const RDFReport = () => {
                 </Box>
               )}
 
-              {/* Last Week */}
-              {bestOfLastWeekData && (
-                <Box sx={{ mt: 6 }}>
-                  <Card sx={{ mb: 4, background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
-                    <CardContent sx={{ textAlign: 'center', py: 3 }}>
-                      <Typography variant="h4" fontWeight="bold" gutterBottom>🥈 Last Week's Best 🥈</Typography>
-                      {bestOfLastWeekData.dateRange?.start && (
-                        <Typography variant="h6" sx={{ opacity: 0.9 }}>
-                          {new Date(bestOfLastWeekData.dateRange.start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                          {' — '}
-                          {new Date(bestOfLastWeekData.dateRange.end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        </Typography>
-                      )}
-                    </CardContent>
-                  </Card>
-                  <Grid container spacing={3}>
-                    {Object.entries(bestOfLastWeekData.employees).map(([role, emp]) => {
-                      if (!emp) return null;
-                      const roleLabels = { o2c: 'O2C Officer', ewm: 'EWM Officer', wim: 'WIM Operator', dispatch: 'Dispatcher', documentation: 'Documentation', security: 'Security Officer' };
-                      const countLabels = { o2c: 'Processes', ewm: 'Processes', wim: 'Picklists', dispatch: 'Dispatches', documentation: 'Documents', security: 'Vehicles' };
-                      return (
-                        <Grid item xs={12} sm={6} md={4} key={role}>
-                          <Card sx={{ p: 2, borderRadius: 3, border: '1px solid #e0e0e0', '&:hover': { boxShadow: 4 } }}>
-                            <Stack alignItems="center" spacing={1}>
-                              <Avatar sx={{ bgcolor: '#f5576c', width: 48, height: 48, fontSize: '1.5rem' }}>👤</Avatar>
-                              <Typography variant="caption" color="text.secondary" fontWeight={600}>{roleLabels[role] || role}</Typography>
-                              <Typography variant="h6" fontWeight="bold" textAlign="center">{emp.full_name}</Typography>
-                              <Chip label={`${emp.process_count} ${countLabels[role] || 'Tasks'}`} size="small" color="error" variant="outlined" />
-                            </Stack>
-                          </Card>
-                        </Grid>
-                      );
-                    })}
-                  </Grid>
-                </Box>
-              )}
-
-              {!bestOfData && !bestOfLastWeekData && (
-                <Alert severity="warning">Unable to load Best of Week data. Please try again later.</Alert>
+              {!bestOfData && (
+                <Alert severity="warning">Unable to load Best of All Time data. Please try again later.</Alert>
               )}
             </Box>
           )}
@@ -1537,8 +1493,8 @@ const RDFReport = () => {
                           <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
                             <TableCell>{service.service_unit}</TableCell>
                             <TableCell>{service.officer_name}</TableCell>
-                            <TableCell>{new Date(service.start_time).toLocaleString()}</TableCell>
-                            <TableCell>{new Date(service.end_time).toLocaleString()}</TableCell>
+                            <TableCell>{service.start_time ? new Date(service.start_time).toLocaleString() : '—'}</TableCell>
+                            <TableCell>{service.end_time ? new Date(service.end_time).toLocaleString() : '—'}</TableCell>
                             <TableCell>{formatDuration(service.waiting_minutes)}</TableCell>
                             <TableCell>
                               <Chip 

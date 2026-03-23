@@ -28,6 +28,10 @@ app.use(express.json());
 global.__basedir = __dirname;
 app.use(express.urlencoded({ extended: true }));
 
+// Branch middleware — attaches req.branchCode from X-Branch-Code header
+const branchMiddleware = require('./src/middleware/branchMiddleware');
+app.use(branchMiddleware);
+
 // UNIQUE TEST ROUTE - If you can access this, server-production.js is running
 app.get('/api/server-check', (req, res) => {
   res.json({ 

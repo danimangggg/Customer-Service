@@ -60,7 +60,7 @@ const retrievePicklists = async (req, res) => {
         COALESCE(f_hp.zone_name, f_aa.zone_name) as zone_name,
         COALESCE(f_hp.region_name, f_aa.region_name) as region_name
       FROM picklist p
-      LEFT JOIN Employees e ON p.operator_id = e.id
+      LEFT JOIN employees e ON p.operator_id = e.id
       LEFT JOIN processes pr ON CAST(p.process_id AS UNSIGNED) = pr.id AND p.store = 'HP'
       LEFT JOIN facilities f_hp ON pr.facility_id = f_hp.id
       LEFT JOIN customer_queue cq ON CAST(p.process_id AS UNSIGNED) = cq.id AND p.store != 'HP'

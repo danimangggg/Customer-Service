@@ -42,7 +42,12 @@ const getFacilityById = async (req, res) => {
 // Create new facility
 const createFacility = async (req, res) => {
   try {
-    const facility = await Facility.create(req.body);
+    const branchCode = req.headers['x-branch-code'] || null;
+    const data = { ...req.body };
+    if (branchCode && !data.branch_code) {
+      data.branch_code = branchCode;
+    }
+    const facility = await Facility.create(data);
     res.status(201).json(facility);
   } catch (error) {
     console.error('Error creating facility:', error);
@@ -126,35 +131,53 @@ const bulkImportFacilities = async (req, res) => {
       continue;
     }
     try {
-      // If customer_id provided, check if it already exists → skip
-      if (row.customer_id) {
-        const byCustomerId = await Facility.findOne({ where: { customer_id: String(row.customer_id) } });
-        if (byCustomerId) {
-          results.skipped.push({ customer_id: row.customer_id, facility_name: byCustomerId.facility_name });
+      // Match by id → update if exists, else create
+      if (row.id) {
+        const existing = await Facility.findByPk(row.id);
+        if (existing) {
+          await existing.update({
+            facility_name: row.facility_name || existing.facility_name,
+            facility_type: row.facility_type || existing.facility_type,
+            region_name: row.region_name || existing.region_name,
+            zone_name: row.zone_name || existing.zone_name,
+            woreda_name: row.woreda_name || existing.woreda_name,
+            route: row.route || existing.route,
+            route2: row.route2 || existing.route2,
+            period: row.period || existing.period,
+            is_hp_site: row.is_hp_site !== undefined ? row.is_hp_site : existing.is_hp_site,
+            is_vaccine_site: row.is_vaccine_site !== undefined ? row.is_vaccine_site : existing.is_vaccine_site,
+            branch_code: row.branch_code || branchCode || existing.branch_code,
+          });
+          results.updated++;
           continue;
         }
       }
 
-      // Fall back: match by facility_name → update
-      const byName = await Facility.findOne({ where: { facility_name: row.facility_name } });
-      if (byName) {
-        await byName.update({
-          customer_id: row.customer_id ? String(row.customer_id) : byName.customer_id,
-          facility_type: row.facility_type || byName.facility_type,
-          region_name: row.region_name || byName.region_name,
-          zone_name: row.zone_name || byName.zone_name,
-          woreda_name: row.woreda_name || byName.woreda_name,
-          route: row.route || byName.route,
-          route2: row.route2 || byName.route2,
-          period: row.period || byName.period,
-          is_hp_site: row.is_hp_site !== undefined ? row.is_hp_site : byName.is_hp_site,
-          is_vaccine_site: row.is_vaccine_site !== undefined ? row.is_vaccine_site : byName.is_vaccine_site,
-          branch_code: branchCode || byName.branch_code,
-        });
-        results.updated++;
+      // No match → create
+      if (row.id) {
+        // Insert with explicit id using raw query
+        await db.sequelize.query(
+          `INSERT INTO facilities (id, facility_name, facility_type, region_name, zone_name, woreda_name, route, route2, period, is_hp_site, is_vaccine_site, branch_code, createdAt, updatedAt)
+           VALUES (:id, :facility_name, :facility_type, :region_name, :zone_name, :woreda_name, :route, :route2, :period, :is_hp_site, :is_vaccine_site, :branch_code, NOW(), NOW())`,
+          {
+            replacements: {
+              id: row.id,
+              facility_name: row.facility_name,
+              facility_type: row.facility_type || null,
+              region_name: row.region_name || null,
+              zone_name: row.zone_name || null,
+              woreda_name: row.woreda_name || null,
+              route: row.route || null,
+              route2: row.route2 || null,
+              period: row.period || null,
+              is_hp_site: row.is_hp_site ? 1 : 0,
+              is_vaccine_site: row.is_vaccine_site ? 1 : 0,
+              branch_code: row.branch_code || branchCode,
+            }
+          }
+        );
       } else {
         await Facility.create({
-          customer_id: row.customer_id ? String(row.customer_id) : null,
           facility_name: row.facility_name,
           facility_type: row.facility_type || null,
           region_name: row.region_name || null,
@@ -165,10 +188,10 @@ const bulkImportFacilities = async (req, res) => {
           period: row.period || null,
           is_hp_site: row.is_hp_site ? 1 : 0,
           is_vaccine_site: row.is_vaccine_site ? 1 : 0,
-          branch_code: branchCode,
+          branch_code: row.branch_code || branchCode,
         });
-        results.created++;
       }
+      results.created++;
     } catch (err) {
       results.errors.push({ row: i + 1, facility_name: row.facility_name, message: err.message });
     }

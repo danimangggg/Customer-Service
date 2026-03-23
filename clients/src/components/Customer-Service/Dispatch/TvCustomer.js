@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import api from '../../../axiosInstance';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Typography, CircularProgress, Button } from '@mui/material';
@@ -13,6 +13,11 @@ import dayjs from 'dayjs';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const TvCustomer = () => {
+  // Apply tv-display class immediately before any paint
+  useLayoutEffect(() => {
+    document.body.classList.add('tv-display');
+    return () => document.body.classList.remove('tv-display');
+  }, []);
   const [searchParams] = useSearchParams();
   const branchParam = searchParams.get('branch_code') || '';
   const [customers, setCustomers] = useState([]);
@@ -72,13 +77,11 @@ const TvCustomer = () => {
     
     console.log('TvCustomer: Interval started with ID:', interval);
     
-    // Add TV display class to body
-    document.body.classList.add('tv-display');
+    // Add TV display class to body - already handled by useLayoutEffect
     
     return () => {
       console.log('TvCustomer: Component unmounting, clearing interval');
       clearInterval(interval);
-      document.body.classList.remove('tv-display');
     };
   }, [fetchData]);
 
@@ -345,73 +348,59 @@ const TvCustomer = () => {
     return (
       <Box sx={{ 
         display: 'grid', 
-        gridTemplateColumns: '140px 2.5fr 1.2fr 180px', 
-        gap: 2, 
+        gridTemplateColumns: { xs: '70px 1fr 0.8fr 80px', sm: '140px 2.5fr 1.2fr 180px' }, 
+        gap: { xs: 0.5, sm: 2 }, 
         mb: 2,
         animation: isSpecial ? 'vibrantGlow 1.5s infinite alternate' : 'none',
         opacity: isSpecial ? 1 : 0.95,
-        minHeight: '110px'
+        minHeight: { xs: '70px', sm: '110px' }
       }}>
         {/* Ticket Badge */}
         <Box sx={{ 
-          height: '90px', bgcolor: '#011122', borderRadius: '15px 0 0 15px', 
+          height: { xs: '60px', sm: '90px' }, bgcolor: '#011122', borderRadius: '15px 0 0 15px', 
           border: `2px solid ${cust.themeColor}`, display: 'flex', 
           justifyContent: 'center', alignItems: 'center', position: 'relative'
         }}>
           <Box sx={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', bgcolor: cust.themeColor }} />
-          <Typography variant="h2" sx={{ fontWeight: 900, color: '#fff', fontSize: '3.5rem' }}>{cust.displayTicket}</Typography>
+          <Typography variant="h2" sx={{ fontWeight: 900, color: '#fff', fontSize: { xs: '2rem', sm: '3.5rem' } }}>{cust.displayTicket}</Typography>
         </Box>
 
         {/* Facility Box */}
         <Box sx={{ 
           bgcolor: 'rgba(255,255,255,0.03)', borderY: '2px solid rgba(255,255,255,0.1)', 
-          px: 3, py: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', 
-          border: `1px solid ${cust.themeColor}33`, minHeight: '90px'
+          px: { xs: 1, sm: 3 }, py: { xs: 1, sm: 2 }, display: 'flex', flexDirection: 'column', justifyContent: 'center', 
+          border: `1px solid ${cust.themeColor}33`, minHeight: { xs: '60px', sm: '90px' }
         }}>
-          {/* Store Badge and Facility Name */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1.5 }, mb: 0.5, flexWrap: 'wrap' }}>
             <Typography variant="h5" sx={{ 
-              color: cust.themeColor, 
-              fontWeight: 'bold',
+              color: cust.themeColor, fontWeight: 'bold',
               backgroundColor: `${cust.themeColor}22`,
-              px: 2,
-              py: 0.8,
-              borderRadius: 2,
-              border: `2px solid ${cust.themeColor}`,
-              fontSize: '1.4rem'
+              px: { xs: 0.8, sm: 2 }, py: { xs: 0.3, sm: 0.8 },
+              borderRadius: 2, border: `2px solid ${cust.themeColor}`,
+              fontSize: { xs: '0.7rem', sm: '1.4rem' }
             }}>
               {facilityInfo.storeKey}
             </Typography>
             <Typography variant="h4" sx={{ 
-              fontWeight: 'bold', 
-              color: '#fff', 
-              textTransform: 'uppercase', 
-              whiteSpace: 'normal',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-              lineHeight: 1.3,
-              overflow: 'visible',
-              flex: 1,
-              fontSize: '1.8rem'
+              fontWeight: 'bold', color: '#fff', textTransform: 'uppercase', 
+              whiteSpace: 'normal', wordWrap: 'break-word', overflowWrap: 'break-word',
+              lineHeight: 1.3, overflow: 'visible', flex: 1,
+              fontSize: { xs: '0.75rem', sm: '1.8rem' }
             }}>
               {facilityInfo.facilityName}
             </Typography>
           </Box>
-          
-          {/* Progress Steps */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 1 }}>
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.5 }}>
             {cust.processFlow?.map((step, index) => (
-              <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
                 <Box sx={{
-                  width: 10,
-                  height: 10,
+                  width: { xs: 6, sm: 10 }, height: { xs: 6, sm: 10 },
                   borderRadius: '50%',
-                  bgcolor: step.status === 'completed' ? '#00b894' : 
-                           step.status === 'in_progress' ? step.color : '#444',
+                  bgcolor: step.status === 'completed' ? '#00b894' : step.status === 'in_progress' ? step.color : '#444',
                   border: index === cust.currentStep ? `2px solid ${cust.themeColor}` : 'none'
                 }} />
                 {index < cust.processFlow.length - 1 && (
-                  <Box sx={{ width: 14, height: 2, bgcolor: '#444' }} />
+                  <Box sx={{ width: { xs: 8, sm: 14 }, height: 2, bgcolor: '#444' }} />
                 )}
               </Box>
             ))}
@@ -420,28 +409,21 @@ const TvCustomer = () => {
 
         {/* Status Label Box */}
         <Box sx={{ 
-          bgcolor: `${cust.themeColor}22`, display: 'flex', gap: 2, 
+          bgcolor: `${cust.themeColor}22`, display: 'flex', gap: { xs: 0.5, sm: 2 }, 
           justifyContent: 'center', alignItems: 'center', border: `1px solid ${cust.themeColor}66`,
-          flexDirection: 'column', py: 2, px: 1
+          flexDirection: 'column', py: { xs: 1, sm: 2 }, px: { xs: 0.5, sm: 1 }
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexDirection: 'column' }}>
-            <cust.Icon sx={{ color: cust.themeColor, fontSize: '3rem' }} />
-            <Typography variant="h6" sx={{ 
-              fontWeight: 'bold', 
-              color: '#fff', 
-              letterSpacing: 1,
-              textAlign: 'center',
-              whiteSpace: 'normal',
-              wordWrap: 'break-word',
-              overflowWrap: 'break-word',
-              lineHeight: 1.2,
-              fontSize: '1.1rem'
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexDirection: 'column' }}>
+            <cust.Icon sx={{ color: cust.themeColor, fontSize: { xs: '1.5rem', sm: '3rem' } }} />
+            <Typography sx={{ 
+              fontWeight: 'bold', color: '#fff', letterSpacing: 0.5,
+              textAlign: 'center', whiteSpace: 'normal', wordWrap: 'break-word',
+              lineHeight: 1.2, fontSize: { xs: '0.6rem', sm: '1.1rem' }
             }}>
               {cust.statusLabel}
             </Typography>
           </Box>
-          {/* Current Step Indicator */}
-          <Typography variant="body2" sx={{ color: cust.themeColor, fontWeight: 'bold', fontSize: '0.95rem' }}>
+          <Typography sx={{ color: cust.themeColor, fontWeight: 'bold', fontSize: { xs: '0.55rem', sm: '0.95rem' } }}>
             Step {cust.currentStep + 1} of {cust.processFlow?.length || 5}
           </Typography>
         </Box>
@@ -450,12 +432,12 @@ const TvCustomer = () => {
         <Box sx={{ 
           bgcolor: '#011122', border: `2px solid ${cust.themeColor}`, 
           borderRadius: '0 15px 15px 0', display: 'flex', 
-          justifyContent: 'center', alignItems: 'center', gap: 1 
+          justifyContent: 'center', alignItems: 'center', gap: 0.5
         }}>
-          <Typography variant="h2" sx={{ fontWeight: 900, color: '#fff', fontSize: '3.5rem' }}>
+          <Typography sx={{ fontWeight: 900, color: '#fff', fontSize: { xs: '1.8rem', sm: '3.5rem' } }}>
             {dayjs().diff(dayjs(cust.started_at), 'm')}
           </Typography>
-          <Typography variant="body1" sx={{ color: cust.themeColor, fontWeight: 'bold', fontSize: '1rem' }}>MIN</Typography>
+          <Typography sx={{ color: cust.themeColor, fontWeight: 'bold', fontSize: { xs: '0.6rem', sm: '1rem' } }}>MIN</Typography>
         </Box>
       </Box>
     );
@@ -467,7 +449,7 @@ const TvCustomer = () => {
       width: '100vw',
       background: 'linear-gradient(135deg, #010a14 0%, #021a33 100%)', 
       color: '#fff', 
-      p: 4, 
+      p: { xs: 1.5, sm: 4 }, 
       display: 'flex', 
       flexDirection: 'column', 
       overflow: 'hidden',
@@ -480,12 +462,12 @@ const TvCustomer = () => {
     }}>
       
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 1, sm: 3 } }}>
         <Box>
-          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff', fontSize: '2.5rem' }}>EPSS-MT MONITOR</Typography>
-          <Typography variant="caption" sx={{ color: '#00d2ff', letterSpacing: 4, fontWeight: 'bold', fontSize: '0.75rem' }}>REAL-TIME DISPATCH FLOW</Typography>
+          <Typography variant="h3" sx={{ fontWeight: 900, color: '#fff', fontSize: { xs: '1.2rem', sm: '2.5rem' } }}>EPSS-MT MONITOR</Typography>
+          <Typography variant="caption" sx={{ color: '#00d2ff', letterSpacing: { xs: 1, sm: 4 }, fontWeight: 'bold', fontSize: { xs: '0.6rem', sm: '0.75rem' } }}>REAL-TIME DISPATCH FLOW</Typography>
         </Box>
-        <img src="/pharmalog-logo.png" alt="EPSS-MT Logo" style={{ height: '55px' }} />
+        <img src="/pharmalog-logo.png" alt="EPSS-MT Logo" style={{ height: '40px' }} />
       </Box>
 
       {/* FIXED READY ITEMS */}

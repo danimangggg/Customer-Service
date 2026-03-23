@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
   Typography, Chip, IconButton, Box, TextField, InputAdornment, Card,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, MenuItem, 
   Container, TablePagination, FormControl, InputLabel, Select, Stack,
-  Avatar, FormControlLabel, Checkbox, CircularProgress
+  Avatar, FormControlLabel, Checkbox
 } from '@mui/material';
 import VaccinesIcon from '@mui/icons-material/Vaccines';
 import SearchIcon from '@mui/icons-material/Search';
@@ -12,9 +12,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import RouteIcon from '@mui/icons-material/Route';
-import DownloadIcon from '@mui/icons-material/Download';
-import UploadIcon from '@mui/icons-material/Upload';
-import * as XLSX from 'xlsx';
 import axios from 'axios';
 import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
@@ -33,8 +30,6 @@ const HPFacilities = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [openEdit, setOpenEdit] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const importRef = useRef();
   
   // Value Taker State
   const [selectedFacility, setSelectedFacility] = useState({ 
@@ -190,69 +185,6 @@ const HPFacilities = () => {
     }
   };
 
-  // --- EXCEL TEMPLATE DOWNLOAD ---
-  const handleDownloadTemplate = () => {
-    const templateData = [
-      {
-        customer_id: 'HC001',
-        facility_name: 'Example Health Center',
-        facility_type: 'Health Center',
-        region_name: 'Addis Ababa',
-        zone_name: 'Zone 1',
-        woreda_name: 'Woreda 1',
-        route: 'Route A',
-        period: 'Odd',
-        is_hp_site: 1,
-        is_vaccine_site: 0
-      }
-    ];
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Facilities');
-    XLSX.writeFile(wb, 'facilities_template.xlsx');
-  };
-
-  // --- EXCEL IMPORT ---
-  const handleImportExcel = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    e.target.value = '';
-    setImporting(true);
-    try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws);
-      if (rows.length === 0) {
-        MySwal.fire('Empty File', 'No rows found in the Excel file.', 'warning');
-        return;
-      }
-      const res = await api.post(`${api_url}/api/facilities/bulk-import`, rows);
-      const { created, updated, skipped = [], errors } = res.data;
-      await MySwal.fire({
-        title: 'Import Complete',
-        html: `
-          <div style="text-align:center;padding:10px">
-            <p>✅ Created: <strong>${created}</strong></p>
-            <p>🔄 Updated: <strong>${updated}</strong></p>
-            ${skipped.length > 0 ? `<p>⏭️ Skipped (already exist): <strong>${skipped.length}</strong></p>
-              <div style="max-height:120px;overflow-y:auto;text-align:left;font-size:11px;background:#f9f9f9;padding:6px;border-radius:4px">
-                ${skipped.map(s => `<div>${s.customer_id} — ${s.facility_name}</div>`).join('')}
-              </div>` : ''}
-            ${errors.length > 0 ? `<p>❌ Errors: <strong>${errors.length}</strong></p><p style="font-size:12px;color:red">${errors[0]?.message || ''}</p>` : ''}
-          </div>
-        `,
-        icon: errors.length > 0 ? 'warning' : 'success',
-        confirmButtonColor: '#4caf50',
-      });
-      fetchFacilities();
-    } catch (err) {
-      MySwal.fire('Error', err.response?.data?.message || 'Import failed', 'error');
-    } finally {
-      setImporting(false);
-    }
-  };
-
   // --- SEARCH AND FILTER ---
   const filtered = facilities.filter(f => {
     const matchesSearch = f.facility_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -353,29 +285,7 @@ const HPFacilities = () => {
                   </Typography>
                 </Box>
               </Stack>
-              <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  startIcon={<DownloadIcon />}
-                  onClick={handleDownloadTemplate}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Template
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  color="success"
-                  startIcon={importing ? <CircularProgress size={16} /> : <UploadIcon />}
-                  onClick={() => importRef.current.click()}
-                  disabled={importing}
-                  sx={{ borderRadius: 2 }}
-                >
-                  Import Excel
-                </Button>
-                <input ref={importRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportExcel} />
-              </Stack>
+
             </Box>
           </Box>
 

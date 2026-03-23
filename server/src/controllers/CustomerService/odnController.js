@@ -129,6 +129,24 @@ const getODNsByProcess = async (req, res) => {
       order: [['created_at', 'ASC']]
     });
 
+    // Auto-fix: if all ODNs are ewm_completed but process is stuck at o2c_completed or ewm_completed,
+    // it means there's an inconsistent state — reset ODNs to pending so EWM can re-process
+    const proc = await Process.findByPk(process_id);
+    if (
+      proc &&
+      ['o2c_completed', 'ewm_completed'].includes(proc.status) &&
+      odns.length > 0 &&
+      odns.every(o => o.status === 'ewm_completed')
+    ) {
+      // Also ensure process is ewm_completed (not stuck at o2c_completed)
+      if (proc.status !== 'ewm_completed') {
+        await Process.update({ status: 'ewm_completed' }, { where: { id: process_id } });
+      }
+      await ODN.update({ status: 'pending' }, { where: { process_id } });
+      odns.forEach(o => { o.status = 'pending'; });
+      console.log(`[ODN Auto-fix] Reset ODNs to pending for process ${process_id}`);
+    }
+
     return res.status(200).send({ 
       data: odns 
     });
@@ -244,18 +262,15 @@ const completeProcess = async (req, res) => {
       return res.status(404).send({ message: 'Process not found' });
     }
 
-    // RRF/VRF not sent → skip all intermediate steps, go straight to biller_completed
-    const newStatus = rrf_not_sent ? 'biller_completed' : 'o2c_completed';
-    await process.update({ status: newStatus });
-
-    // Create the marker ODN so reports can detect and count it
+    // RRF/VRF not sent → mark ODN as quality_confirmed and set process to ewm_goods_issued (fully done)
     if (rrf_not_sent) {
-      const label = process.process_type === 'vaccine' ? 'VRF not sent' : 'RRF not sent';
-      await ODN.create({
-        process_id: process_id,
-        odn_number: label,
-        status: 'rrf_not_sent',
-      });
+      await ODN.update(
+        { quality_confirmed: true, pod_confirmed: true },
+        { where: { process_id: process_id } }
+      );
+      await process.update({ status: 'ewm_goods_issued' });
+    } else {
+      await process.update({ status: 'o2c_completed' });
     }
 
     return res.status(200).send({ 

@@ -231,8 +231,8 @@ export default function SignIn() {
       <Grid container component="main" sx={{ height: '100vh', overflow: 'hidden' }}>
         <CssBaseline />
 
-        {/* Left Side */}
-        <Grid item xs={false} sm={4} md={7} sx={{ overflow: 'hidden' }}>
+        {/* Left Side — hidden on mobile */}
+        <Grid item xs={false} sm={4} md={7} sx={{ overflow: 'hidden', display: { xs: 'none', sm: 'block' } }}>
           <StyledPaper elevation={0} square sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Box sx={{ position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: 550, px: 3 }}>
               <Box sx={{ position: 'absolute', top: -32, left: -24, right: -24, height: 6, background: 'linear-gradient(90deg, #c62828, #ef5350)' }} />
@@ -292,8 +292,13 @@ export default function SignIn() {
 
         {/* Right Side — Login Form */}
         <Grid item xs={12} sm={8} md={5} component={Paper} elevation={6} square
-          sx={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2, bgcolor: '#f7f8fa' }}>
-          <LoginBox sx={{ width: '100%', maxWidth: 420, px: 4 }}>
+          sx={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 2, bgcolor: '#f7f8fa', minHeight: '100vh' }}>
+          <LoginBox sx={{ width: '100%', maxWidth: 420, px: { xs: 3, sm: 4 } }}>
+            {/* Show logo on mobile since left panel is hidden */}
+            <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexDirection: 'column', alignItems: 'center', mb: 2 }}>
+              <img src="/pharmalog-logo.png" alt="EPSS-MT Logo" style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid rgba(198,40,40,0.2)' }} />
+              <Typography variant="h6" sx={{ fontWeight: 900, color: '#c62828', mt: 1 }}>EPSS-MT</Typography>
+            </Box>
             <StyledAvatar><LockOutlinedIcon sx={{ fontSize: 28 }} /></StyledAvatar>
 
             <Typography component="h1" variant="h4" sx={{ mt: 1, mb: 0.5, fontWeight: 800, color: '#333', letterSpacing: '-0.5px' }}>

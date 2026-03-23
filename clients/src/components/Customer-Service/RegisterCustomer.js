@@ -330,8 +330,8 @@ const RegisterCustomer = () => {
       setStartedAt(dayjs().tz(dayjs.tz.guess()).format('YYYY-MM-DDTHH:mm'));
       setShowCreditO2cSelect(false);
     }).catch(err => {
-      console.error('Registration failed:', err);
-      setSnackbarMessage('Registration failed. Please try again.');
+      console.error('Registration failed:', err.response?.data || err.message);
+      setSnackbarMessage(`Registration failed: ${err.response?.data?.message || err.message}`);
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     });

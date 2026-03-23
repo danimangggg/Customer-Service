@@ -128,8 +128,8 @@ const TvRealEntertainment = () => {
     if (isInitial) setLoading(true);
     try {
       const [custRes, facRes] = await Promise.all([
-        api.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} }),
-        api.get(`${API_URL}/api/facilities`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} })
+        api.get(`/api/tv-display-customers`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} }),
+        api.get(`/api/facilities`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} })
       ]);
       
       // Only update state if data actually changed to prevent unnecessary re-renders
@@ -377,7 +377,7 @@ const TvRealEntertainment = () => {
   useEffect(() => {
     const loadYoutubePlaylist = async () => {
       try {
-        const response = await api.get(`${API_URL}/api/settings/youtube_playlist`, {
+        const response = await api.get(`/api/settings/youtube_playlist_realtv`, {
           params: branchParam ? { branch_code: branchParam } : {}
         });
         if (response.data.success && response.data.value) {
@@ -392,9 +392,9 @@ const TvRealEntertainment = () => {
             const videos = JSON.parse(savedVideos);
             setYoutubeVideos(videos);
             // Migrate to database
-            await api.put(`${API_URL}/api/settings/youtube_playlist`, {
+            await api.put(`/api/settings/youtube_playlist_realtv`, {
               value: videos,
-              description: 'YouTube videos playlist for TV entertainment'
+              description: 'YouTube videos playlist for Real TV entertainment'
             });
             // Clear localStorage after successful migration
             localStorage.removeItem('tv_youtube_videos');
@@ -406,6 +406,8 @@ const TvRealEntertainment = () => {
     };
     
     loadYoutubePlaylist();
+    const interval = setInterval(loadYoutubePlaylist, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // Extract YouTube video ID from URL
@@ -457,9 +459,9 @@ const TvRealEntertainment = () => {
     const handleSave = async () => {
       try {
         // Save to database
-        await api.put(`${API_URL}/api/settings/youtube_playlist`, {
+        await api.put(`/api/settings/youtube_playlist_realtv`, {
           value: tempVideos,
-          description: 'YouTube videos playlist for TV entertainment'
+          description: 'YouTube videos playlist for Real TV entertainment'
         });
         
         setYoutubeVideos(tempVideos);

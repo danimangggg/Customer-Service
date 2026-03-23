@@ -1,14 +1,17 @@
 const db = require('../../models');
 const Process = db.process;
+const ODN = db.odn;
 
 // Valid revert transitions: current status → previous status
 const REVERT_MAP = {
-  ewm_completed:    'o2c_completed',
-  tm_confirmed:     'ewm_completed',
-  ewm_goods_issued: 'tm_confirmed',
-  biller_completed: 'ewm_goods_issued',
-  driver_assigned:  'biller_completed',
-  dispatch_completed: 'driver_assigned',
+  ewm_completed:              'o2c_completed',
+  tm_notified:                'ewm_completed',
+  tm_confirmed:               'ewm_completed',
+  freight_order_sent_to_ewm:  'biller_completed',
+  ewm_goods_issued:           'freight_order_sent_to_ewm',
+  biller_completed:           'ewm_goods_issued',
+  driver_assigned:            'biller_completed',
+  dispatch_completed:         'driver_assigned',
 };
 
 // Vaccine skips ewm_goods_issued, so biller_completed reverts to tm_confirmed
@@ -41,6 +44,16 @@ exports.revertProcess = async (req, res) => {
     }
 
     await process.update({ status: targetStatus });
+
+    // When reverting back to ewm_completed from any TM stage,
+    // reset all ODNs to 'pending' so EWM can process them again
+    if (targetStatus === 'ewm_completed') {
+      await ODN.update(
+        { status: 'pending' },
+        { where: { process_id: process_id } }
+      );
+      console.log(`[HP Revert] Reset ODNs to pending for process ${process_id}`);
+    }
 
     console.log(`[HP Revert] Process ${process_id}: ${process.status} → ${targetStatus}`);
 

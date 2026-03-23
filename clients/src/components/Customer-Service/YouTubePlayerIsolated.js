@@ -112,7 +112,7 @@ const YouTubePlayerIsolated = ({ videos, initialIndex = 0 }) => {
         bottom: 20,
         left: '50%',
         transform: 'translateX(-50%)',
-        bgcolor: 'rgba(0,0,0,0.9)',
+        bgcolor: 'transparent',
         p: 2,
         borderRadius: 3,
         display: 'flex',
@@ -137,18 +137,8 @@ const YouTubePlayerIsolated = ({ videos, initialIndex = 0 }) => {
   );
 };
 
-// Only re-render if videos array length changes (new videos added/removed)
+// Re-render when any video in the playlist changes
 export default React.memo(YouTubePlayerIsolated, (prevProps, nextProps) => {
-  const shouldNotRerender = prevProps.videos.length === nextProps.videos.length &&
-         prevProps.videos[0]?.id === nextProps.videos[0]?.id;
-  
-  console.log('YouTubePlayerIsolated memo check:', {
-    prevLength: prevProps.videos.length,
-    nextLength: nextProps.videos.length,
-    prevFirstId: prevProps.videos[0]?.id,
-    nextFirstId: nextProps.videos[0]?.id,
-    shouldNotRerender: shouldNotRerender
-  });
-  
-  return shouldNotRerender;
+  if (prevProps.videos.length !== nextProps.videos.length) return false;
+  return prevProps.videos.every((v, i) => v.id === nextProps.videos[i]?.id);
 });

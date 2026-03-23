@@ -16,6 +16,7 @@ const TvMainMenu = () => {
   const jobTitle = localStorage.getItem('JobTitle') || '';
   const isSuperAdmin = accountType === 'Super Admin';
   const isReportsRole = jobTitle === 'Reports';
+  const isCSO = jobTitle === 'Customer Service Officer';
   const canSelectBranch = isSuperAdmin || isReportsRole;
   const [branches, setBranches] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState('');
@@ -90,6 +91,10 @@ const TvMainMenu = () => {
       navigate(route);
     }
   };
+
+  const visibleMenuItems = isCSO
+    ? menuItems.filter(item => item.id === 'o2c')
+    : menuItems;
 
   return (
     <>
@@ -336,7 +341,7 @@ const TvMainMenu = () => {
           {/* Menu Cards Section */}
           <Box sx={{ flex: 1, p: 4, minHeight: 0 }}>
             <Grid container spacing={3} justifyContent="center">
-              {menuItems.map((item, index) => (
+              {visibleMenuItems.map((item, index) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
                   <Fade in={true} timeout={800 + (index * 200)}>
                     <Card 

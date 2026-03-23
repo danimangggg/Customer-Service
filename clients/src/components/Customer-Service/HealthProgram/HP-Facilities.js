@@ -513,7 +513,7 @@ const HpFacilities = () => {
         setProcessODNCounts(prev => ({ ...prev, [processId]: 1 }));
         await axios.post(`${api_url}/api/complete-process`, { process_id: processId, rrf_not_sent: true });
         setActiveProcesses(prev =>
-          prev.map(p => p.id === processId ? { ...p, status: 'biller_completed' } : p)
+          prev.map(p => p.id === processId ? { ...p, status: 'ewm_goods_issued' } : p)
         );
         successToast(`Process completed with "${isVaccine ? 'VRF' : 'RRF'} not sent" status.`);
       } catch (err) {
@@ -758,7 +758,7 @@ const HpFacilities = () => {
   const handleReturnToO2C = async (processId) => {
     const result = await Swal.fire({
       title: 'Return to O2C Officer?',
-      text: 'This will return the process to O2C Officer for corrections. The process status will change from "O2C Completed" back to "Completed" so the O2C Officer can update any mistaken information.',
+      text: 'This will return the process to O2C Officer for corrections. The process status will change from "O2C Completed" back to "O2C Pending" so the O2C Officer can update any mistaken information.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, Return for Corrections',
@@ -825,30 +825,25 @@ const HpFacilities = () => {
 
   // Helper function to check if facility should be visible based on period and type
   const shouldShowFacility = (facility) => {
-    console.log('Checking facility:', facility.facility_name, {
-      route: facility.route,
-      period: facility.period,
-      isHP: isHPFacility(facility),
-      filterType: filterType
-    });
-
     if (filterType === "Emergency" || filterType === "Breakdown") {
-      // Emergency/Breakdown: show all HP facilities regardless of route/period
       return isHPFacility(facility);
     }
     
-    // Vaccine: show only facilities marked as vaccine sites
     if (filterType === "Vaccine") {
       return !!facility.is_vaccine_site;
     }
     
-    // Regular: show only facilities marked as HP sites, filtered by current period automatically
+    // For EWM officers: show any HP facility — period filter is irrelevant,
+    // the proc lookup below will determine if there's an active process
+    if (isEWMOfficer) {
+      return !!facility.is_hp_site;
+    }
+    
+    // O2C Officers: filter by current period
     if (!facility.is_hp_site) return false;
-    // Auto-filter by current period: always show Monthly, show Odd/Even based on current month
     if (facility.period === 'Monthly') return true;
     if (currentPeriod === 'odd' && facility.period === 'Odd') return true;
     if (currentPeriod === 'even' && facility.period === 'Even') return true;
-    // Facilities with no period set — show them
     if (!facility.period) return true;
     return false;
   };
@@ -874,7 +869,7 @@ const HpFacilities = () => {
       const shouldShow = shouldShowFacility(f);
       
       if (matchesSearch && matchesRoute && shouldShow) {
-        const validStatuses = ['o2c_completed', 'ewm_completed', 'vehicle_requested', 'vehicle_assigned', 'dispatched'];
+        const validStatuses = ['o2c_completed', 'ewm_completed', 'tm_notified', 'tm_confirmed', 'freight_order_sent_to_ewm', 'vehicle_requested', 'vehicle_assigned', 'dispatched'];
         let proc;
         if (isSpecialType) {
           // Emergency/Breakdown: match by process_type, no reporting_month filter
@@ -912,13 +907,7 @@ const HpFacilities = () => {
     });
     
     // Debug info for EWM officers (after processing)
-    console.log('EWM Debug Info');
-    console.log('Total Facilities:', facilities.length);
-    console.log('Total Processes:', activeProcesses.length);
-    console.log('O2C Completed Processes:', activeProcesses.filter(p => p.status === 'o2c_completed').length);
-    console.log('Filtered Facilities:', filteredData.length);
-    console.log('Current Period:', currentPeriod);
-    console.log('Filter Type:', filterType);
+    console.log('EWM Filtered Facilities:', filteredData.length);
   } else {
     // O2C Officers: Original facility-based filtering
     const isSpecialType = filterType === "Emergency" || filterType === "Breakdown";
@@ -942,7 +931,12 @@ const HpFacilities = () => {
           a.process_type === 'vaccine' &&
           a.reporting_month === selReporting
         );
-        const vaccineDone = vaccineProc && vaccineProc.status !== 'o2c_started' && vaccineProc.status !== 'completed';
+        const vaccineProcODNs = vaccineProc ? (processODNData[vaccineProc.id] || []) : [];
+        const vaccineODNQualityDone = vaccineProcODNs.some(o => o.quality_confirmed);
+        const vaccineDone = vaccineProc && (
+          (vaccineProc.status !== 'o2c_started' && vaccineProc.status !== 'completed') ||
+          (vaccineProc.status === 'completed' && vaccineODNQualityDone)
+        );
         return matchesSearch && matchesRoute && shouldShow && !vaccineDone;
       }
 
@@ -950,7 +944,10 @@ const HpFacilities = () => {
         a.facility_id === f.id && a.reporting_month === selReporting && a.process_type !== 'vaccine'
       );
       // Hide if process is already past O2C stage
-      const alreadyDone = proc && proc.status !== 'o2c_started';
+      // 'completed' means returned to O2C for corrections — show it, UNLESS ODN is already quality_confirmed
+      const procODNs = proc ? (processODNData[proc.id] || []) : [];
+      const odnQualityDone = procODNs.some(o => o.quality_confirmed);
+      const alreadyDone = proc && (proc.status !== 'o2c_started' && proc.status !== 'completed') || (proc && proc.status === 'completed' && odnQualityDone);
       
       return matchesSearch && matchesRoute && shouldShow && !alreadyDone;
     });

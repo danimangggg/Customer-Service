@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import axios from 'axios';
 import api from '../../axiosInstance';
 import {
@@ -55,6 +56,8 @@ import {
   Map,
   Public,
   Domain,
+  Download as DownloadIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -64,6 +67,8 @@ const MySwal = withReactContent(Swal);
 const OrganizationProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef();
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogType, setDialogType] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
@@ -124,11 +129,11 @@ const OrganizationProfile = () => {
     setLoading(true);
     try {
       // Fetch facilities from the actual facilities table
-      const facilitiesRes = await api.get(`${api_url}/api/facilities`);
+      const facilitiesRes = await api.get(`/api/facilities`);
       setFacilities(facilitiesRes.data);
 
       // Fetch employees data
-      const employeesRes = await api.get(`${api_url}/api/get-employee`);
+      const employeesRes = await api.get(`/api/get-employee`);
       setEmployees(employeesRes.data);
 
       // For now, we'll extract unique regions, zones, and woredas from facilities
@@ -284,20 +289,16 @@ const OrganizationProfile = () => {
           region_name: regions.find(r => r.id === zones.find(z => z.id === woredas.find(w => w.id === newItem.parentId)?.zoneId)?.regionId)?.name || ''
         };
 
-        // Only include custom ID when creating new facility
         if (!selectedItem && newItem.facilityId) {
           facilityData.id = newItem.facilityId;
         }
 
         if (selectedItem) {
-          // Update existing facility
-          await api.put(`${api_url}/api/facilities/${selectedItem.id}`, facilityData);
+          await api.put(`/api/facilities/${selectedItem.id}`, facilityData);
         } else {
-          // Add new facility
-          await api.post(`${api_url}/api/facilities`, facilityData);
+          await api.post(`/api/facilities`, facilityData);
         }
         
-        // Refresh facilities data
         await fetchAllData();
         emoji = '🏥';
       }
@@ -326,30 +327,32 @@ const OrganizationProfile = () => {
         emoji = '🏘️';
       }
       
+      // Close dialog first, then show success after a brief delay
       handleCloseDialog();
       
-      // Success message
-      await MySwal.fire({
-        title: `${dialogType.charAt(0).toUpperCase() + dialogType.slice(1)} ${action.charAt(0).toUpperCase() + action.slice(1)}!`,
-        html: `
-          <div style="text-align: center; padding: 20px;">
-            <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
-              ${emoji}
+      setTimeout(async () => {
+        await MySwal.fire({
+          title: `${dialogType.charAt(0).toUpperCase() + dialogType.slice(1)} ${action.charAt(0).toUpperCase() + action.slice(1)}!`,
+          html: `
+            <div style="text-align: center; padding: 20px;">
+              <div style="font-size: 60px; color: #4caf50; margin-bottom: 20px;">
+                ${emoji}
+              </div>
+              <p style="font-size: 18px; color: #333;">
+                ${dialogType.charAt(0).toUpperCase() + dialogType.slice(1)} <strong>"${itemName}"</strong> has been successfully ${action}.
+              </p>
             </div>
-            <p style="font-size: 18px; color: #333;">
-              ${dialogType.charAt(0).toUpperCase() + dialogType.slice(1)} <strong>"${itemName}"</strong> has been successfully ${action}.
-            </p>
-          </div>
-        `,
-        icon: 'success',
-        confirmButtonColor: '#4caf50',
-        confirmButtonText: 'Great!',
-        timer: 3000,
-        timerProgressBar: true
-      });
+          `,
+          icon: 'success',
+          confirmButtonColor: '#4caf50',
+          confirmButtonText: 'Great!',
+          timer: 3000,
+          timerProgressBar: true
+        });
+      }, 300);
       
     } catch (err) {
-      console.error('Error saving item:', err);
+      console.error('Error saving item:', err.response?.data || err.message);
       
       // Error message
       await MySwal.fire({
@@ -442,7 +445,7 @@ const OrganizationProfile = () => {
     if (result.isConfirmed) {
       try {
         if (type === 'facility') {
-          await api.delete(`${api_url}/api/facilities/${id}`);
+          await api.delete(`/api/facilities/${id}`);
           await fetchAllData(); // Refresh data
         } else {
           // Handle local deletion for regions, zones, woredas
@@ -528,7 +531,8 @@ const OrganizationProfile = () => {
     facility.facility_type?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
     facility.woreda_name?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
     facility.zone_name?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
-    facility.region_name?.toLowerCase().includes(facilitiesSearch.toLowerCase())
+    facility.region_name?.toLowerCase().includes(facilitiesSearch.toLowerCase()) ||
+    facility.branch_code?.toLowerCase().includes(facilitiesSearch.toLowerCase())
   );
 
   const paginatedFacilities = filteredFacilities.slice(
@@ -568,6 +572,70 @@ const OrganizationProfile = () => {
   };
 
   const jobTitleStats = getJobTitleStats();
+
+  // --- EXCEL TEMPLATE DOWNLOAD ---
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        id: '',
+        facility_name: 'Example Health Center',
+        facility_type: 'Health Center',
+        region_name: 'Addis Ababa',
+        zone_name: 'Zone 1',
+        woreda_name: 'Woreda 1',
+        branch_code: 'AA01',
+        route: 'Route A',
+        period: 'Odd',
+        is_hp_site: 1,
+        is_vaccine_site: 0
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Facilities');
+    XLSX.writeFile(wb, 'facilities_template.xlsx');
+  };
+
+  // --- EXCEL IMPORT ---
+  const handleImportExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws);
+      if (rows.length === 0) {
+        MySwal.fire('Empty File', 'No rows found in the Excel file.', 'warning');
+        return;
+      }
+      const res = await api.post('/api/facilities/bulk-import', rows);
+      const { created, updated, skipped = [], errors } = res.data;
+      await MySwal.fire({
+        title: 'Import Complete',
+        html: `
+          <div style="text-align:center;padding:10px">
+            <p>✅ Created: <strong>${created}</strong></p>
+            <p>🔄 Updated: <strong>${updated}</strong></p>
+            ${skipped.length > 0 ? `<p>⏭️ Skipped (already exist): <strong>${skipped.length}</strong></p>
+              <div style="max-height:120px;overflow-y:auto;text-align:left;font-size:11px;background:#f9f9f9;padding:6px;border-radius:4px">
+                ${skipped.map(s => `<div>${s.customer_id} — ${s.facility_name}</div>`).join('')}
+              </div>` : ''}
+            ${errors.length > 0 ? `<p>❌ Errors: <strong>${errors.length}</strong></p><p style="font-size:12px;color:red">${errors[0]?.message || ''}</p>` : ''}
+          </div>
+        `,
+        icon: errors.length > 0 ? 'warning' : 'success',
+        confirmButtonColor: '#4caf50',
+      });
+      fetchAllData();
+    } catch (err) {
+      MySwal.fire('Error', err.response?.data?.message || 'Import failed', 'error');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1135,14 +1203,35 @@ const OrganizationProfile = () => {
                   <Typography variant="h5" fontWeight="bold">
                     Facilities Management
                   </Typography>
-                  <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => handleOpenDialog('facility')}
-                    className="action-button"
-                  >
-                    Add Facility
-                  </Button>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<DownloadIcon />}
+                      onClick={handleDownloadTemplate}
+                    >
+                      Template
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="success"
+                      startIcon={importing ? <CircularProgress size={16} /> : <UploadIcon />}
+                      onClick={() => importRef.current.click()}
+                      disabled={importing}
+                    >
+                      Import Excel
+                    </Button>
+                    <input ref={importRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImportExcel} />
+                    <Button
+                      variant="contained"
+                      startIcon={<Add />}
+                      onClick={() => handleOpenDialog('facility')}
+                      className="action-button"
+                    >
+                      Add Facility
+                    </Button>
+                  </Stack>
                 </Stack>
                 
                 {/* Search Field for Facilities */}
@@ -1150,7 +1239,7 @@ const OrganizationProfile = () => {
                   <TextField
                     fullWidth
                     variant="outlined"
-                    placeholder="Search facilities by name, type, woreda, zone, or region..."
+                    placeholder="Search facilities by name, type, woreda, zone, region, or branch..."
                     value={facilitiesSearch}
                     onChange={(e) => setFacilitiesSearch(e.target.value)}
                     sx={{ maxWidth: 500 }}
@@ -1167,6 +1256,7 @@ const OrganizationProfile = () => {
                         <TableCell><strong>Woreda</strong></TableCell>
                         <TableCell><strong>Zone</strong></TableCell>
                         <TableCell><strong>Region</strong></TableCell>
+                        <TableCell><strong>Branch</strong></TableCell>
                         <TableCell align="center"><strong>Actions</strong></TableCell>
                       </TableRow>
                     </TableHead>
@@ -1189,6 +1279,11 @@ const OrganizationProfile = () => {
                           <TableCell>{facility.woreda_name || 'N/A'}</TableCell>
                           <TableCell>{facility.zone_name || 'N/A'}</TableCell>
                           <TableCell>{facility.region_name || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontFamily="monospace" color="text.secondary">
+                              {facility.branch_code || '—'}
+                            </Typography>
+                          </TableCell>
                           <TableCell align="center">
                             <IconButton onClick={() => handleOpenDialog('facility', facility)} color="primary">
                               <Edit />
@@ -1311,6 +1406,10 @@ const OrganizationProfile = () => {
                       <MenuItem value="Health Center">Health Center</MenuItem>
                       <MenuItem value="Clinic">Clinic</MenuItem>
                       <MenuItem value="Pharmacy">Pharmacy</MenuItem>
+                      <MenuItem value="Woreda HO">Woreda HO</MenuItem>
+                      <MenuItem value="Zonal HO">Zonal HO</MenuItem>
+                      <MenuItem value="Regional HO">Regional HO</MenuItem>
+                      <MenuItem value="Others">Others</MenuItem>
                     </Select>
                   </FormControl>
                   <FormControl fullWidth>
