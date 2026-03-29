@@ -5,7 +5,7 @@ import {
   TablePagination, Stack, Box, Chip, Avatar, Divider, Grid, LinearProgress, Alert,
   Checkbox, TextField, FormControl, InputLabel, Select, MenuItem, InputAdornment,
   Dialog, DialogTitle, DialogContent, DialogActions, FormControlLabel,
-  useMediaQuery, useTheme
+  useMediaQuery, useTheme, Tabs, Tab, CircularProgress, Tooltip
 } from '@mui/material';
 import {
   Description as DocumentIcon,
@@ -14,15 +14,29 @@ import {
   Search as SearchIcon,
   Save as SaveIcon,
   Route as RouteIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Undo as UndoIcon
 } from '@mui/icons-material';
-import axios from 'axios';
-import api from '../../axiosInstance';
+import { DataGrid, GridToolbar, GridToolbarContainer, GridToolbarColumnsButton, GridToolbarFilterButton, GridToolbarDensitySelector, GridToolbarQuickFilter } from '@mui/x-data-grid';
+import * as XLSX from 'xlsx';
+import axios from 'axios';import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { formatTimestamp } from '../../utils/serviceTimeHelper';
 
 const MySwal = withReactContent(Swal);
+
+const HPExcelToolbar = ({ onExport }) => (
+  <GridToolbarContainer sx={{ p: 1, gap: 1, flexWrap: 'wrap' }}>
+    <GridToolbarColumnsButton />
+    <GridToolbarFilterButton />
+    <GridToolbarDensitySelector />
+    <Button size="small" variant="outlined" onClick={onExport} sx={{ ml: 0.5, textTransform: 'none', fontSize: '0.8rem' }}>
+      Export Excel
+    </Button>
+    <Box sx={{ ml: 'auto' }}><GridToolbarQuickFilter debounceMs={300} /></Box>
+  </GridToolbarContainer>
+);
 
 const DocumentationHP = () => {
   const theme = useTheme();
@@ -39,6 +53,13 @@ const DocumentationHP = () => {
   const [autoSaving, setAutoSaving] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState(null);
+  const [docTab, setDocTab] = useState(0);
+  const [historyData, setHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyReceivedBy, setHistoryReceivedBy] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [hpEditDialog, setHpEditDialog] = useState({ open: false, row: null, pod_number: '' });
   const [editFormData, setEditFormData] = useState({
     pod_numbers: '',
     arrival_kilometer: '',
@@ -151,6 +172,53 @@ const DocumentationHP = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const params = {};
+      if (historyReceivedBy) params.received = historyReceivedBy === 'received' ? 'yes' : 'no';
+      if (historyDateFrom) params.startDate = historyDateFrom;
+      if (historyDateTo) params.endDate = historyDateTo;
+      const res = await api.get(`${api_url}/api/hp-finance`, { params });
+      if (res.data.success) setHistoryData(res.data.data || []);
+    } catch { setHistoryData([]); }
+    finally { setHistoryLoading(false); }
+  };
+
+  useEffect(() => { if (docTab === 1) fetchHistory(); }, [docTab, historyReceivedBy, historyDateFrom, historyDateTo]);
+
+  const exportHistoryToExcel = () => {
+    const rows = historyData.map((r, i) => ({
+      '#': i + 1,
+      'Facility': r.facility_name || '',
+      'Woreda': r.woreda_name || '',
+      'Route': r.route_name || '',
+      'ODN': r.odn_number || '',
+      'POD #': r.pod_number || '',
+      'Month': r.reporting_month || '',
+      'Submitted Date': r.pod_confirmed_at ? new Date(r.pod_confirmed_at).toLocaleDateString() : '',
+      'Received': r.received ? 'Yes' : 'No',
+      'Received By': r.received_by || '',
+      'Received At': r.received_at ? new Date(r.received_at).toLocaleDateString() : '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'HP History');
+    XLSX.writeFile(wb, `HP_Documentation_History_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleHpEditSave = async () => {
+    const { row, pod_number } = hpEditDialog;
+    try {
+      if (pod_number !== (row.pod_number || '')) {
+        await api.put(`${api_url}/api/hp-finance/odn/${row.odn_id}/pod`, { pod_number });
+      }
+      MySwal.fire({ icon: 'success', title: 'Updated', timer: 1200, showConfirmButton: false });
+      setHpEditDialog({ open: false, row: null, pod_number: '' });
+      fetchHistory();
+    } catch { MySwal.fire({ icon: 'error', title: 'Failed to update' }); }
   };
 
   const handleEditClick = async (facility) => {
@@ -295,7 +363,7 @@ const DocumentationHP = () => {
     console.log('✅ Validation passed, showing confirmation dialog');
     
     const result = await MySwal.fire({
-      title: 'Complete and Pass to Quality Evaluator?',
+      title: 'Complete and Pass to Finance?',
       html: `
         <div style="text-align: left; margin: 20px 0;">
           <div style="background: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
@@ -363,7 +431,7 @@ const DocumentationHP = () => {
         html: `
           <div style="text-align: center;">
             <p>POD confirmed for <strong>${selectedFacility.facility_name}</strong></p>
-            <p><strong>${selectedFacility.total_odns}</strong> ODNs passed to Quality Evaluator</p>
+            <p><strong>${selectedFacility.total_odns}</strong> ODNs passed to Finance</p>
           </div>
         `,
         timer: 3000,
@@ -376,7 +444,7 @@ const DocumentationHP = () => {
     } catch (err) {
       console.error('❌ Complete error:', err);
       console.error('Error details:', err.response?.data);
-      MySwal.fire('Error', err.response?.data?.error || 'Failed to complete and pass to Quality Evaluator', 'error');
+      MySwal.fire('Error', err.response?.data?.error || 'Failed to complete and pass to Finance', 'error');
     } finally {
       setAutoSaving(false);
     }
@@ -472,35 +540,38 @@ const DocumentationHP = () => {
           </Stack>
         } />
         <Divider />
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.50' }}>
-                <TableCell sx={{ fontWeight: 'bold' }}>Facility</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Route</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>ODNs</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>POD Status</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {facilityData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">No facilities found for the selected period.</Typography>
-                  </TableCell>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={docTab} onChange={(_, v) => { setDocTab(v); setPage(0); }}>
+            <Tab label={`In Progress (${facilityData.length})`} />
+            <Tab label="History" />
+          </Tabs>
+        </Box>
+
+        {docTab === 0 && (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ bgcolor: 'grey.50' }}>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Facility</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Route</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>ODNs</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>POD Status</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
-              ) : (
-                facilityData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((facility) => {
-                  const isFullyConfirmed = facility.confirmed_pods === facility.total_odns;
-                  
-                  return (
-                    <TableRow key={facility.facility_id} className={`facility-row ${isFullyConfirmed ? 'confirmed-row' : ''}`} hover>
+              </TableHead>
+              <TableBody>
+                {facilityData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">No facilities in progress.</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  facilityData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((facility) => (
+                    <TableRow key={facility.facility_id} className="facility-row" hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight="bold">{facility.facility_name}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {facility.region_name} • {facility.zone_name}
-                        </Typography>
+                        <Typography variant="caption" color="text.secondary">{facility.region_name} • {facility.zone_name}</Typography>
                       </TableCell>
                       <TableCell>
                         <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -515,35 +586,145 @@ const DocumentationHP = () => {
                         {facility.pod_numbers ? (
                           <Stack spacing={0.5}>
                             <Chip label={`POD: ${facility.pod_numbers}`} size="small" color="info" />
-                            <Typography variant="caption" color="text.secondary">
-                              KM: {facility.arrival_kilometer || 'N/A'}
-                            </Typography>
+                            <Typography variant="caption" color="text.secondary">KM: {facility.arrival_kilometer || 'N/A'}</Typography>
                           </Stack>
                         ) : (
                           <Chip label="Pending" size="small" color="warning" variant="outlined" />
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        {isFullyConfirmed ? (
-                          <Chip icon={<ConfirmedIcon />} label="Confirmed" color="success" size="small" />
-                        ) : (
-                          <Button variant="contained" size="small" startIcon={<EditIcon />}
-                            onClick={() => handleEditClick(facility)}>
-                            Edit
-                          </Button>
-                        )}
+                        <Button variant="contained" size="small" startIcon={<EditIcon />} onClick={() => handleEditClick(facility)}>Edit</Button>
                       </TableCell>
                     </TableRow>
-                  );
-                })
+                  ))
+                )}
+              </TableBody>
+            </Table>
+            <TablePagination component="div" count={facilityData.length} rowsPerPage={rowsPerPage} page={page}
+              onPageChange={(_, p) => setPage(p)}
+              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+              rowsPerPageOptions={[5, 10, 25, 50]} sx={{ borderTop: 1, borderColor: 'divider' }} />
+          </TableContainer>
+        )}
+
+        {docTab === 1 && (
+          <Box>
+            {/* History Filters */}
+            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+              <Stack direction="row" flexWrap="wrap" gap={2} alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Received</InputLabel>
+                  <Select value={historyReceivedBy} label="Received" onChange={e => setHistoryReceivedBy(e.target.value)}>
+                    <MenuItem value="">All</MenuItem>
+                    <MenuItem value="received">Received</MenuItem>
+                    <MenuItem value="not_received">Not Received</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField size="small" label="From" type="date" value={historyDateFrom}
+                  onChange={e => setHistoryDateFrom(e.target.value)}
+                  InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+                <TextField size="small" label="To" type="date" value={historyDateTo}
+                  onChange={e => setHistoryDateTo(e.target.value)}
+                  InputLabelProps={{ shrink: true }} sx={{ width: 150 }} />
+              </Stack>
+            </Box>
+            <Box sx={{ height: 580 }}>
+              {historyLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
+              ) : (
+                <DataGrid
+                  rows={historyData.map((r, i) => ({ ...r, id: r.invoice_id || `${r.process_id}_${r.odn_id || i}` }))}
+                  columns={[
+                    {
+                      field: 'seq', headerName: '#', width: 55, sortable: false,
+                      renderCell: (params) => params.api.getRowIndex(params.id) + 1,
+                    },
+                    {
+                      field: 'facility_name', headerName: 'Facility', flex: 1.5, minWidth: 180,
+                      renderCell: ({ row }) => (
+                        <Box sx={{ py: 0.5 }}>
+                          <Typography variant="body2" fontWeight={600} sx={{ whiteSpace: 'normal', lineHeight: 1.3 }}>{row.facility_name || '—'}</Typography>
+                          {row.woreda_name && <Typography variant="caption" color="text.secondary">{row.woreda_name}</Typography>}
+                        </Box>
+                      ),
+                    },
+                    {
+                      field: 'route_name', headerName: 'Route', width: 140,
+                      renderCell: ({ value }) => value ? <Chip label={value} size="small" color="primary" variant="outlined" /> : '—',
+                    },
+                    {
+                      field: 'odn_number', headerName: 'ODN', width: 140,
+                      renderCell: ({ value }) => <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{value || '—'}</Typography>,
+                    },
+                    {
+                      field: 'pod_number', headerName: 'POD #', width: 180,
+                      renderCell: ({ value }) => <Typography variant="body2" fontWeight={700} color="success.main" sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{value || '—'}</Typography>,
+                    },
+                    { field: 'reporting_month', headerName: 'Month', width: 130 },
+                    {
+                      field: 'pod_confirmed_at', headerName: 'Submitted Date', width: 160,
+                      renderCell: ({ value }) => value ? new Date(value).toLocaleDateString() : '—',
+                    },
+                    {
+                      field: 'received', headerName: 'Received', width: 110,
+                      renderCell: ({ value }) => value
+                        ? <Chip icon={<ConfirmedIcon />} label="Yes" size="small" color="success" />
+                        : <Chip label="No" size="small" color="warning" variant="outlined" />,
+                    },
+                    {
+                      field: 'received_by', headerName: 'Received By', width: 170,
+                      renderCell: ({ row }) => !row.received ? '—' : (
+                        <Box>
+                          <Typography variant="body2" fontWeight={600}>{row.received_by || '—'}</Typography>
+                          {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
+                        </Box>
+                      ),
+                    },
+                    {
+                      field: 'actions', headerName: 'Actions', width: 130, sortable: false,
+                      renderCell: ({ row }) => !!row.received ? (
+                        <Tooltip title="Undo received — return to Documentation">
+                          <Button variant="outlined" size="small" color="warning" startIcon={<UndoIcon />}
+                            onClick={async () => {
+                              const res = await MySwal.fire({
+                                title: 'Return this record?', icon: 'warning',
+                                showCancelButton: true, confirmButtonText: 'Yes, Return', confirmButtonColor: '#e65100'
+                              });
+                              if (!res.isConfirmed) return;
+                              try {
+                                await api.put(`${api_url}/api/invoices/${row.invoice_id}/return`, { returned_by: loggedInUserId });
+                                MySwal.fire({ icon: 'success', title: 'Returned', timer: 1200, showConfirmButton: false });
+                                fetchHistory();
+                              } catch { MySwal.fire({ icon: 'error', title: 'Failed' }); }
+                            }}
+                            sx={{ textTransform: 'none' }}>Return</Button>
+                        </Tooltip>
+                      ) : (
+                        <Button variant="contained" size="small" color="primary"
+                          startIcon={<EditIcon />}
+                          onClick={() => setHpEditDialog({ open: true, row, pod_number: row.pod_number || '' })}
+                          sx={{ textTransform: 'none', fontWeight: 'bold' }}>Edit</Button>
+                      ),
+                    },
+                  ]}
+                  getRowHeight={() => 'auto'}
+                  disableSelectionOnClick
+                  components={{ Toolbar: HPExcelToolbar }}
+                  componentsProps={{ toolbar: { onExport: exportHistoryToExcel } }}
+                  pageSize={10}
+                  rowsPerPageOptions={[10, 25, 50]}
+                  sx={{
+                    border: 0,
+                    '& .MuiDataGrid-columnHeaders': { backgroundColor: '#7b1fa2', color: '#fff', fontWeight: 700 },
+                    '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 700 },
+                    '& .MuiDataGrid-row:hover': { backgroundColor: '#f3e5f5' },
+                    '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1 },
+                  }}
+                />
               )}
-            </TableBody>
-          </Table>
-          <TablePagination component="div" count={facilityData.length} rowsPerPage={rowsPerPage} page={page}
-            onPageChange={(_, p) => setPage(p)}
-            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
-            rowsPerPageOptions={[5, 10, 25, 50]} sx={{ borderTop: 1, borderColor: 'divider' }} />
-        </TableContainer>
+            </Box>
+          </Box>
+        )}
       </Card>
 
       {/* Edit Dialog */}
@@ -620,7 +801,7 @@ const DocumentationHP = () => {
               
               {!editFormData.all_pod_received && (
                 <Alert severity="info" sx={{ mt: 2 }}>
-                  Check "All POD Received" to enable completion and pass to Quality Evaluator
+                  Check "All POD Received" to enable completion and pass to Finance
                 </Alert>
               )}
             </Box>
@@ -634,9 +815,24 @@ const DocumentationHP = () => {
           {editFormData.all_pod_received && (
             <Button variant="contained" color="success" startIcon={<ConfirmedIcon />}
               onClick={handleCompleteAndPassToQE} disabled={autoSaving}>
-              Complete & Pass to QE
+              Complete & Pass to Finance
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* HP History Edit Dialog */}
+      <Dialog open={hpEditDialog.open} onClose={() => setHpEditDialog({ open: false, row: null, pod_number: '' })} maxWidth="xs" fullWidth>
+        <DialogTitle>Edit POD Number</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField fullWidth size="small" label="POD Number" value={hpEditDialog.pod_number}
+              onChange={e => setHpEditDialog(prev => ({ ...prev, pod_number: e.target.value }))} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setHpEditDialog({ open: false, row: null, pod_number: '' })}>Cancel</Button>
+          <Button variant="contained" startIcon={<SaveIcon />} onClick={handleHpEditSave}>Save</Button>
         </DialogActions>
       </Dialog>
     </Container>

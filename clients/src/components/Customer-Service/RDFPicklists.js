@@ -13,6 +13,7 @@ import {
   Chip,
   Grid,
   Button,
+  TablePagination,
 } from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -26,6 +27,8 @@ const api_url = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 const RDFPicklists = () => {
   const [picklists, setPicklists] = useState([]);
   const [combinedPicklists, setCombinedPicklists] = useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -228,7 +231,7 @@ const RDFPicklists = () => {
               </Fade>
             ) : (
               <Grid container spacing={3}>
-                {combinedPicklists.map((p) => (
+                {combinedPicklists.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((p) => (
                   <Grid item xs={12} key={p.id}>
                     <Card className="picklist-item" elevation={0}>
                       <Box sx={{ p: 3 }}>
@@ -308,6 +311,15 @@ const RDFPicklists = () => {
                 ))}
               </Grid>
             )}
+            <TablePagination
+              component="div"
+              count={combinedPicklists.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+              rowsPerPageOptions={[10, 25, 50, 100]}
+            />
           </Box>
         </Card>
       </Container>

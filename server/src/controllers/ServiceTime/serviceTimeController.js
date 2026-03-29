@@ -6,7 +6,6 @@ const insertServiceTime = async (req, res) => {
     const { 
       process_id, 
       service_unit, 
-      end_time, 
       officer_id, 
       officer_name, 
       status, 
@@ -16,14 +15,13 @@ const insertServiceTime = async (req, res) => {
     const query = `
       INSERT INTO service_time 
       (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, NOW(), ?, ?, ?, ?)
     `;
 
     await db.sequelize.query(query, {
       replacements: [
         process_id, 
         service_unit, 
-        end_time, 
         officer_id, 
         officer_name, 
         status || 'completed', 
@@ -49,7 +47,6 @@ const insertServiceTimeHP = async (req, res) => {
     const { 
       process_id, 
       service_unit, 
-      end_time, 
       officer_id, 
       officer_name, 
       status, 
@@ -97,7 +94,7 @@ const insertServiceTimeHP = async (req, res) => {
     const query = `
       INSERT INTO service_time_hp 
       (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, NOW(), ?, ?, ?, ?)
     `;
 
     console.log(`💾 Storing officer_name: '${finalOfficerName}'`);
@@ -106,7 +103,6 @@ const insertServiceTimeHP = async (req, res) => {
       replacements: [
         process_id, 
         service_unit, 
-        end_time, 
         officer_id, 
         finalOfficerName, 
         status || 'completed', 
@@ -341,16 +337,16 @@ const createServiceTime = async (req, res) => {
 const updateServiceTime = async (req, res) => {
   try {
     const { id } = req.params;
-    const { end_time, status, notes } = req.body;
+    const { status, notes } = req.body;
     
     const query = `
       UPDATE service_time 
-      SET end_time = ?, status = ?, notes = ?, updated_at = NOW()
+      SET end_time = NOW(), status = ?, notes = ?, updated_at = NOW()
       WHERE id = ?
     `;
     
     await db.sequelize.query(query, {
-      replacements: [end_time, status, notes, id],
+      replacements: [status, notes, id],
       type: db.sequelize.QueryTypes.UPDATE
     });
     

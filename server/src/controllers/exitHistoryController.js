@@ -88,7 +88,7 @@ async function getHistoryByStore(req, res) {
       INNER JOIN customer_queue cq ON eh.process_id = cq.id
       LEFT JOIN facilities f ON cq.facility_id = f.id
       WHERE eh.store_id = ?
-        AND LOWER(COALESCE(cq.status, '')) != 'completed'
+        AND eh.gate_status NOT IN ('allowed', 'denied')
       ORDER BY eh.created_at DESC
     `, { replacements: [store], type: db.sequelize.QueryTypes.SELECT });
 
@@ -134,7 +134,7 @@ async function getPendingByStore(req, res) {
       FROM exit_history eh
       INNER JOIN customer_queue cq ON eh.process_id = cq.id
       LEFT JOIN facilities f ON cq.facility_id = f.id
-      WHERE eh.store_id = ? AND eh.gate_status = 'pending'
+      WHERE eh.store_id = ? AND (eh.gate_status = 'pending' OR eh.gate_status = 'partial_done')
       ORDER BY eh.created_at ASC
     `, { replacements: [store], type: db.sequelize.QueryTypes.SELECT });
 

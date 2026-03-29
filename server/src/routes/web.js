@@ -115,6 +115,13 @@ let routes =  (app) => {
   router.get('/api/ewm-completed-customers', invoiceController.getEwmCompletedCustomers);
   router.post('/api/invoices', invoiceController.saveInvoice);
   router.get('/api/invoices', invoiceController.getInvoices);
+  router.put('/api/invoices/:id/received', invoiceController.markReceived);
+  router.put('/api/invoices/:id/return', invoiceController.returnReceived);
+  router.put('/api/invoices/:id/folder', invoiceController.saveFolderNumber);
+  router.get('/api/hp-finance', invoiceController.getHPDocumentationCompleted);
+  router.post('/api/hp-finance/received', invoiceController.markHPReceived);
+  router.post('/api/hp-finance/folder', invoiceController.saveHPFolderNumber);
+  router.put('/api/hp-finance/odn/:odn_id/pod', invoiceController.updateOdnPodNumber);
 
   // Customer Availability routes
   const customerAvailabilityController = require('../controllers/CustomerService/customerAvailabilityController');
@@ -342,6 +349,12 @@ let routes =  (app) => {
   router.post('/api/branches', branchController.createBranch);
   router.put('/api/branches/:id', branchController.updateBranch);
   router.delete('/api/branches/:id', branchController.deleteBranch);
+
+  // Backup routes
+  const backupController = require('../controllers/Settings/backupController');
+  router.get('/api/backup/summary', backupController.getBackupSummary);
+  router.get('/api/backup/download', backupController.downloadBackup);
+  router.post('/api/backup/restore', backupController.restoreBackup);
 
   // App Settings routes (YouTube playlist, etc.)
   const appSettingsController = require('../controllers/Settings/appSettingsController');

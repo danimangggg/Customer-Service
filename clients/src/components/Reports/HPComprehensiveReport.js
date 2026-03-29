@@ -146,7 +146,7 @@ const HPComprehensiveReport = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    if (newValue === 8) fetchBestOfHP(bestOfRange);
+    if (newValue === 7) fetchBestOfHP(bestOfRange);
   };
 
   const handleExportReport = () => {

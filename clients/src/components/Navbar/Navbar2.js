@@ -26,6 +26,7 @@ import {
   AccountCircle,
   AddCircleOutline,
   VpnKey,
+  Backup,
   ExitToApp,
   Group,
   Task,
@@ -564,11 +565,11 @@ const Sidebar = () => {
 
          {/* Quality Evaluation - for Quality Evaluator */}
          {jobTitle === "Quality Evaluator" && (
-           <MenuTooltip title={"Quality Evaluation"}>
+           <MenuTooltip title={"Finance Invoices"}>
              <ListItem 
                button 
                component={Link} onClick={handleNavClick} 
-               to="/quality-evaluation"
+               to="/finance-invoices"
                sx={{
                  borderRadius: 2,
                  mx: 1,
@@ -585,7 +586,7 @@ const Sidebar = () => {
                  <Assignment sx={{ color: '#c62828' }} />
                </ListItemIcon>
                <ListItemText 
-                 primary={"Quality Evaluation"} 
+                 primary={"Finance Invoices"} 
                  sx={{ 
                    '& .MuiListItemText-primary': { 
                      fontWeight: 500,
@@ -988,6 +989,26 @@ const Sidebar = () => {
                    </ListItem>
                  </MenuTooltip>
 
+                 {/* Backup - Super Admin only */}
+                 {isSuperAdmin && (
+                 <MenuTooltip title={"Data Backup"}>
+                   <ListItem
+                     button
+                     component={Link} onClick={handleNavClick}
+                     to="/settings/backup"
+                     sx={{ ...getActiveStyles('/settings/backup'), pl: 4, ml: 2, mr: 1 }}
+                   >
+                     <ListItemIcon>
+                       <Backup sx={{ color: '#c62828' }} />
+                     </ListItemIcon>
+                     <ListItemText
+                       primary={"Data Backup"}
+                       sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/settings/backup') ? 600 : 500, fontSize: '0.95rem' } }}
+                     />
+                   </ListItem>
+                 </MenuTooltip>
+                 )}
+
                  {/* Reset Password */}
                  <MenuTooltip title={"Reset Password"}>
                    <ListItem 
@@ -1349,7 +1370,7 @@ const Sidebar = () => {
          )}
 
          {/* HP Report - for HP users only */}
-         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "Reports" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "TM Manager" || jobTitle === "Biller") && (
+         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "Reports" && jobTitle !== "TM Manager" && (jobTitle === "O2C Officer - HP" || jobTitle === "EWM Officer - HP" || jobTitle === "PI Officer-HP" || jobTitle === "Documentation Officer - HP" || jobTitle === "Quality Evaluator" || jobTitle === "Dispatcher - HP" || jobTitle === "Biller") && (
            <MenuTooltip title={"HP Report"}>
              <ListItem 
                button 

@@ -33,6 +33,7 @@ import HPFacilitiesCS from './components/Customer-Service/HealthProgram/HP-Facil
 import PIVehicleRequests from './components/Customer-Service/HealthProgram/PIVehicleRequests';
 import TMManager from './components/Customer-Service/HealthProgram/TMManager';
 import HPDriverAssignment from './components/Transportation/HPDriverAssignment';
+import HPFacilitiesTransport from './components/Transportation/HPFacilities';
 import EWMGoodsIssue from './components/Customer-Service/HealthProgram/EWMGoodsIssue';
 import EWMOutstanding from './components/Customer-Service/HealthProgram/EWMOutstanding';
 import Biller from './components/Customer-Service/HealthProgram/Biller';
@@ -40,7 +41,6 @@ import HPDashboard from './pages/Customer-Service/HealthProgram/HPDashboard';
 import DispatchManagement from './components/Transportation/DispatchManagement';
 import DocumentationHP from './components/Documentation/DocumentationHP';
 import QualityEvaluationHP from './components/Quality/QualityEvaluationHP';
-import HPFacilitiesTransport from './components/Transportation/HPFacilities';
 import HPPicklist from './pages/Customer-Service/HealthProgram/HP-PicklistPage';
 import TransportationReports from './pages/Reports/TransportationReports';
 import AllPicklists from './components/Customer-Service/AllPicklists';
@@ -58,6 +58,7 @@ import VehicleLogSheet from './components/Transportation/VehicleLogSheet';
 import FuelLogBook from './components/Transportation/FuelLogBook';
 import StoreManagementPage from './pages/Settings/StoreManagementPage';
 import BranchManagement from './components/Settings/BranchManagement';
+import BackupManager from './components/Settings/BackupManager';
 import HPComprehensiveReport from './components/Reports/HPComprehensiveReport';
 import RDFReport from './components/Reports/RDFReport';
 import ManagerDashboard from './components/Reports/ManagerDashboard';
@@ -161,6 +162,7 @@ const AppContent = () => {
             <Route path='/transportation/fuel-log-book' element={<FuelLogBookRoute />} />
             <Route path = '/settings/store-management' Component={StoreManagementPage} />
             <Route path = '/settings/branches' Component={BranchManagement} />
+            <Route path = '/settings/backup' Component={BackupManager} />
         </Route>
         
       </Routes>

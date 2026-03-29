@@ -9,7 +9,7 @@ module.exports = {
       : 3306),
   USER: process.env.DB_USER || 'root',
   PASSWORD: process.env.DB_PASSWORD || 'areacode',
-  DB: process.env.DB_NAME || 'customer-service',
+  DB: process.env.DB_NAME || 'Customer',
   dialect: 'mysql',
   timezone: '+03:00', // East Africa Time (GMT+3)
   dialectOptions: {

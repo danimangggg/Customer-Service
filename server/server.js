@@ -64,6 +64,6 @@ console.log('Starting server on port:', port);
 console.log('Environment:', process.env.NODE_ENV || 'development');
 console.log('Database host:', process.env.DB_HOST || 'localhost');
 
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, 'localhost', () => {
   console.log(`Server is running on port ${port}`);
 });

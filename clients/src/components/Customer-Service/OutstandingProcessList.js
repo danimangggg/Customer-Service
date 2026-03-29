@@ -6,7 +6,7 @@ import {
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
     Button, Typography, CircularProgress, Box, Chip, Checkbox, IconButton,
     Container, Card, CardHeader, Avatar, Stack, Divider, Fade, Tooltip,
-    LinearProgress, Grid
+    LinearProgress, Grid, TablePagination
 } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -23,7 +23,9 @@ const OutstandingCustomers = () => {
     const [employees, setEmployees] = useState([]);
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [customerOdns, setCustomerOdns] = useState({}); // Store ODNs by customer ID
+    const [customerOdns, setCustomerOdns] = useState({});
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     
     // ODN Manager state
     const [odnManagerOpen, setOdnManagerOpen] = useState(false);
@@ -1070,6 +1072,7 @@ const OutstandingCustomers = () => {
                                 </Box>
                             </Fade>
                         ) : (
+                            <>
                             <TableContainer component={Paper} className="enhanced-table">
                                 <Table>
                                     <TableHead className="table-header">
@@ -1128,7 +1131,7 @@ const OutstandingCustomers = () => {
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            filterAndSortCustomers.map((customer) => {
+                                            filterAndSortCustomers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((customer) => {
                                 const { name, woreda } = getFacilityDetails(customer.facility_id);
                                 const normalizedStatus = customer.status ? String(customer.status).trim().toLowerCase() : null;
                                 const isO2CCompleted = customer.next_service_point?.toLowerCase() === 'ewm';
@@ -1141,6 +1144,9 @@ const OutstandingCustomers = () => {
                                 const showStartAndStopButtons = normalizedStatus === 'notifying';
                                 const showCompleteButton = normalizedStatus === 'o2c_started';
                                 const hasOdns = (customerOdns[customer.id] || []).length > 0;
+                                // Complete button only requires ODNs for Credit customers (always go to EWM)
+                                // Cash customers can go to Cashier without ODNs
+                                const completeButtonDisabled = customer.customer_type === 'Credit' && !hasOdns;
 
                                 const myStoreStatus = getStoreODN(customer);
                                 
@@ -1285,8 +1291,8 @@ const OutstandingCustomers = () => {
                                                                     color="success"
                                                                     onClick={() => handleComplete(customer)}
                                                                     size="small"
-                                                                    disabled={!hasOdns}
-                                                                    title={!hasOdns ? 'Add at least one ODN before completing' : ''}
+                                                                    disabled={completeButtonDisabled}
+                                                                    title={completeButtonDisabled ? 'Add at least one ODN before completing' : ''}
                                                                 >
                                                                     Complete
                                                                 </Button>
@@ -1411,6 +1417,16 @@ const OutstandingCustomers = () => {
                                     </TableBody>
                 </Table>
                             </TableContainer>
+                            <TablePagination
+                                component="div"
+                                count={filterAndSortCustomers.length}
+                                page={page}
+                                onPageChange={(_, p) => setPage(p)}
+                                rowsPerPage={rowsPerPage}
+                                onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                                rowsPerPageOptions={[10, 25, 50, 100]}
+                            />
+                            </>
                         )}
                     </Box>
                 </Card>

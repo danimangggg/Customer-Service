@@ -24,7 +24,6 @@ const ExitPermit = () => {
   const [records, setRecords] = useState([]);
   const [historyRecords, setHistoryRecords] = useState([]);
   const [facilities, setFacilities] = useState([]);
-  const [gateKeepers, setGateKeepers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [formValues, setFormValues] = useState({});
@@ -98,10 +97,9 @@ const ExitPermit = () => {
       console.log('Store ID:', storeKeys.storeId);
       
       // Fetch from TV display endpoint which has ODN-based data
-      const [serviceRes, facilityRes, usersRes] = await Promise.all([
+      const [serviceRes, facilityRes] = await Promise.all([
         axios.get(`${API_URL}/api/tv-display-customers`),
-        api.get(`${API_URL}/api/facilities`),
-        axios.get(`${API_URL}/api/users`)
+        api.get(`${API_URL}/api/facilities`)
       ]);
       
       console.log('Service Response:', serviceRes.data);
@@ -119,33 +117,15 @@ const ExitPermit = () => {
         
         // Show records where:
         // 1. Dispatch is completed for this store
-        // 2. Exit permit is NOT yet completed for this store
-        // 3. Global status is not completed (final gate keeper approval)
+        // 2. Exit permit is NOT yet completed for this store (pending or partial_done = needs another round)
+        // 3. Global status is not completed OR exit permit is partial_done (partial completion)
         return dispatchStatus === 'completed' && 
                exitPermitStatus !== 'completed' && 
-               globalStatus !== 'completed';
+               (globalStatus !== 'completed' || exitPermitStatus === 'partial_done' || exitPermitStatus === 'partial');
       });
       
       console.log('Total records:', serviceRes.data.length);
       console.log('Filtered records for exit permit:', activeRows.length);
-      
-      // Get Gate Keepers (Security Officers) for THIS store only from active sessions
-      console.log('Current store:', userStore);
-      
-      try {
-        const gateKeepersResponse = await axios.get(`${API_URL}/api/gate-keepers-by-store/${userStore}`);
-        const gateKeeperUsers = gateKeepersResponse.data.gateKeepers || [];
-        
-        console.log(`Available Security Officers (Gate Keepers) for ${userStore}:`, gateKeeperUsers.length);
-        if (gateKeeperUsers.length === 0) {
-          console.log(`ℹ️ No Security Officers currently assigned to ${userStore} (Gate Keepers must log in and select this store)`);
-        }
-        
-        setGateKeepers(gateKeeperUsers);
-      } catch (error) {
-        console.error('Error fetching Gate Keepers:', error);
-        setGateKeepers([]);
-      }
       
       // Handle facilities data
       const facilityData = Array.isArray(facilityRes.data) ? facilityRes.data : [];
@@ -190,14 +170,12 @@ const ExitPermit = () => {
       const interval = setInterval(() => fetchData(true), 10000);
       return () => clearInterval(interval);
     }
-  }, [fetchData, currentTab]);
-
-  // Fetch history when history tab is selected OR on mount to get count
-  useEffect(() => {
     if (currentTab === 1) {
       fetchHistoryData(historyPage);
+      const interval = setInterval(() => fetchHistoryData(historyPage), 5000);
+      return () => clearInterval(interval);
     }
-  }, [currentTab, historyPage, fetchHistoryData]);
+  }, [fetchData, fetchHistoryData, currentTab, historyPage]);
 
   // Fetch history count on mount for tab label
   useEffect(() => {
@@ -457,22 +435,18 @@ const ExitPermit = () => {
         setSnackbar({ open: true, message: "Receipt number required for Cash customers.", severity: "error" });
         return;
     }
-    if (isCash && !data.receiptCount) {
-      setSnackbar({ open: true, message: "Receipt count required for Cash customers.", severity: "warning" });
+    if (!data.receiptCount) {
+      setSnackbar({ open: true, message: "Receipt count is required.", severity: "warning" });
       return;
     }
     if (!data.plateNumber || !data.amount || !data.measurement) {
       setSnackbar({ open: true, message: "Please fill all required fields.", severity: "warning" });
       return;
     }
-    if (!data.selectedGateKeeper) {
-      setSnackbar({ open: true, message: "Please select a Security officer to send the exit permit request.", severity: "warning" });
-      return;
-    }
 
     try {
       const exitPermitData = {
-        receipt_count: isCash ? data.receiptCount : null,
+        receipt_count: data.receiptCount || null,
         vehicle_plate: data.plateNumber,
         receipt_number: data.receiptNumber || null,
         total_amount: data.amount,
@@ -546,9 +520,9 @@ const ExitPermit = () => {
         allExitPermitCompleted = allOdns.every(odn => odn.exit_permit_status === 'completed');
         
         // Only set to archived if it's full completion AND all stores completed
-        if (!isPartial && allExitPermitCompleted) {
+        // AND process is not already 'completed' (from a previous partial exit)
+        if (!isPartial && allExitPermitCompleted && record.status !== 'completed') {
           exitPermitData.status = 'archived';
-          // DON'T set completed_at here - only Gate Keeper sets it when allowing exit
           console.log('✅ All stores completed exit permit, setting status to archived');
         } else {
           console.log(isPartial ? '⏳ Partial completion - keeping in list' : '⏳ Some stores still need to complete exit permit');
@@ -570,12 +544,12 @@ const ExitPermit = () => {
           vehicle_plate: data.plateNumber,
           total_amount: data.amount,
           measurement_unit: data.measurement,
-          receipt_count: isCash ? data.receiptCount : null,
+          receipt_count: data.receiptCount || null,
           receipt_number: data.receiptNumber || null,
           exit_type: isPartial ? 'partial' : 'full',
           gate_status: 'pending',
-          assigned_gate_keeper_id: data.selectedGateKeeper.id,
-          assigned_gate_keeper_name: data.selectedGateKeeper.name,
+          assigned_gate_keeper_id: null,
+          assigned_gate_keeper_name: storeKeys.storeId,
           exited_at: new Date().toISOString()
         });
         console.log(`✅ Exit history record created (Exit #${exitNumber})`);
@@ -583,11 +557,11 @@ const ExitPermit = () => {
         console.error('❌ Failed to create exit history record:', err);
       }
 
-      // Update customer_queue with latest exit permit data and gate keeper assignment
-      exitPermitData.assigned_gate_keeper_id = data.selectedGateKeeper.id;
-      exitPermitData.assigned_gate_keeper_name = data.selectedGateKeeper.name;
-      // Update next_service_point so the status column reflects current stage
-      if (!exitPermitData.status) {
+      // Update customer_queue with latest exit permit data
+      exitPermitData.assigned_gate_keeper_id = null;
+      exitPermitData.assigned_gate_keeper_name = storeKeys.storeId;
+      // Only update next_service_point to gate-keeper if ALL stores have submitted exit permit
+      if (!exitPermitData.status && allExitPermitCompleted) {
         exitPermitData.next_service_point = 'gate-keeper';
       }
       
@@ -603,8 +577,8 @@ const ExitPermit = () => {
       setSnackbar({ 
         open: true, 
         message: isPartial 
-          ? `Partial exit permit sent to ${data.selectedGateKeeper.name}. Customer can return for more.`
-          : `Exit Permit sent to ${data.selectedGateKeeper.name}!`, 
+          ? `Partial exit permit sent to Gate ${storeKeys.storeId}.`
+          : `Exit Permit sent to Gate ${storeKeys.storeId}!`, 
         severity: "success" 
       });
       
@@ -657,7 +631,7 @@ const ExitPermit = () => {
           </Typography>
           {/* Debug Info */}
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            Status Key: {statusKey} | Security Officers: {gateKeepers.length} | Records: {records.length}
+            Status Key: {statusKey} | Records: {records.length}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             User: {userJobTitle} | Store: {storeId} | Access: {hasAccess ? 'Yes' : 'No'}
@@ -807,22 +781,16 @@ const ExitPermit = () => {
                                 <LocalShipping sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
                                 {row.vehicle_plate}
                               </Typography>
-                              {isCash && (
-                                <Typography variant="body2">
-                                  <Receipt sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                                  {row.receipt_count} Receipts
-                                </Typography>
-                              )}
+                              <Typography variant="body2">
+                                <Receipt sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
+                                {row.receipt_count} Receipts
+                              </Typography>
                               {isCash && row.receipt_number && (
                                 <Typography variant="body2" sx={{ color: '#f57c00' }}>
                                   <ConfirmationNumber sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
                                   {row.receipt_number}
                                 </Typography>
                               )}
-                              <Typography variant="body2" sx={{ fontWeight: 600, mt: 1 }}>
-                                <Person sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
-                                {row.assigned_gate_keeper_name || 'Security'}
-                              </Typography>
                               <Chip 
                                 label="Assigned" 
                                 color="info" 
@@ -838,14 +806,12 @@ const ExitPermit = () => {
                                 value={val.plateNumber || ''}
                                 onChange={(e) => handleInputChange(row.id, 'plateNumber', e.target.value)}
                               />
-                              {isCash && (
-                                <TextField 
-                                  label="Receipts Count" size="small" type="number"
-                                  InputProps={{ startAdornment: <InputAdornment position="start"><Receipt fontSize="small"/></InputAdornment> }}
-                                  value={val.receiptCount || ''}
-                                  onChange={(e) => handleInputChange(row.id, 'receiptCount', e.target.value)}
-                                />
-                              )}
+                              <TextField 
+                                label="Receipts Count" size="small" type="number"
+                                InputProps={{ startAdornment: <InputAdornment position="start"><Receipt fontSize="small"/></InputAdornment> }}
+                                value={val.receiptCount || ''}
+                                onChange={(e) => handleInputChange(row.id, 'receiptCount', e.target.value)}
+                              />
                               {isCash && (
                                 <TextField 
                                   label="Cash Receipt Number" size="small" color="warning" focused
@@ -854,32 +820,6 @@ const ExitPermit = () => {
                                   onChange={(e) => handleInputChange(row.id, 'receiptNumber', e.target.value)}
                                 />
                               )}
-                              <Autocomplete
-                                size="small"
-                                options={gateKeepers}
-                                getOptionLabel={(option) => option.label}
-                                value={val.selectedGateKeeper || null}
-                                onChange={(event, newValue) => {
-                                  handleInputChange(row.id, 'selectedGateKeeper', newValue);
-                                }}
-                                renderInput={(params) => (
-                                  <TextField
-                                    {...params}
-                                    label="Select Security Officer"
-                                    variant="filled"
-                                    required
-                                    InputProps={{
-                                      ...params.InputProps,
-                                      startAdornment: (
-                                        <InputAdornment position="start">
-                                          <Person fontSize="small" />
-                                        </InputAdornment>
-                                      )
-                                    }}
-                                  />
-                                )}
-                                sx={{ minWidth: 200 }}
-                              />
                             </Box>
                           )}
                         </TableCell>
@@ -935,7 +875,7 @@ const ExitPermit = () => {
           <DataGrid
             rows={historyRecords}
             columns={historyColumns}
-            pageSize={10}
+            pageSize={25}
             rowsPerPageOptions={[10, 25, 50, 100]}
             checkboxSelection={false}
             disableSelectionOnClick
@@ -1065,33 +1005,6 @@ const ExitPermit = () => {
                 ))}
               </Select>
             </FormControl>
-            <Autocomplete
-              fullWidth
-              options={gateKeepers}
-              getOptionLabel={(option) => option.label || option.name}
-              value={gateKeepers.find(gk => gk.id == editFormData.assigned_gate_keeper_id) || null}
-              onChange={(event, newValue) => {
-                setEditFormData({ 
-                  ...editFormData, 
-                  assigned_gate_keeper_id: newValue?.id || '',
-                  assigned_gate_keeper_name: newValue?.name || ''
-                });
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Security Officer"
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Person />
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              )}
-            />
             <Alert severity="info">
               Note: You can edit all fields. Changes will be saved immediately.
             </Alert>

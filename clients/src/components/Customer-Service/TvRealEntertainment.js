@@ -302,37 +302,34 @@ const TvRealEntertainment = () => {
     });
   }, [callingAudioMuted]);
 
+  const activeOrdersRef = useRef([]);
+  activeOrdersRef.current = activeOrders;
+
   const processQueue = useCallback(async () => {
     try {
       if (isPlayingAudio.current || audioQueueRef.current.length === 0) return;
       isPlayingAudio.current = true;
       const nextId = audioQueueRef.current.shift();
-      const order = activeOrders.find(c => c && c.id === nextId);
+      const order = activeOrdersRef.current.find(c => c && c.id === nextId);
       if (order && order.displayTicket) {
         await playNumber(order.displayTicket);
       }
-      // Wait 3 seconds after audio finishes before allowing next audio
-      setTimeout(() => {
-        isPlayingAudio.current = false;
-      }, 3000);
+      setTimeout(() => { isPlayingAudio.current = false; }, 3000);
     } catch (error) {
       console.error('Error in processQueue:', error);
       isPlayingAudio.current = false;
     }
-  }, [activeOrders, playNumber]);
+  }, [playNumber]);
 
   useEffect(() => {
     if (!audioStarted) return;
-    
-    // Set up interval to check for calling customers every 2 seconds
     const checkInterval = setInterval(() => {
       try {
         const now = Date.now();
-        activeOrders.forEach(cust => {
+        activeOrdersRef.current.forEach(cust => {
           try {
             if (cust && cust.isCalling && cust.id) {
               const lastTime = lastCallTimes.current.get(cust.id) || 0;
-              // Call every 10 seconds (10000ms)
               if (now - lastTime >= 10000) {
                 if (!audioQueueRef.current.includes(cust.id)) {
                   audioQueueRef.current.push(cust.id);
@@ -340,7 +337,6 @@ const TvRealEntertainment = () => {
                 }
               }
             } else if (cust && !cust.isCalling && cust.id) {
-              // Clear the last call time when customer is no longer in calling state
               lastCallTimes.current.delete(cust.id);
             }
           } catch (error) {
@@ -351,10 +347,9 @@ const TvRealEntertainment = () => {
       } catch (error) {
         console.error('Error in audio check interval:', error);
       }
-    }, 2000); // Check every 2 seconds
-    
+    }, 2000);
     return () => clearInterval(checkInterval);
-  }, [activeOrders, audioStarted, processQueue]);
+  }, [audioStarted, processQueue]);
 
   const getFacilityWithStore = (facilityId, storeKey) => {
     try {
@@ -738,7 +733,16 @@ const TvRealEntertainment = () => {
               fontWeight: 'bold',
               '&:hover': { bgcolor: '#0099cc' }
             }} 
-            onClick={() => setAudioStarted(true)}
+            onClick={async () => {
+              try {
+                const unlock = new Audio('/audio/amharic/1.mp3');
+                unlock.volume = 0.01;
+                await unlock.play();
+                unlock.pause();
+                unlock.currentTime = 0;
+              } catch (_) {}
+              setAudioStarted(true);
+            }}
           >
             START TV SYSTEM
           </Button>

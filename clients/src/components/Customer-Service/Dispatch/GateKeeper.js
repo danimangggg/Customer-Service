@@ -310,23 +310,30 @@ const GateKeeper = () => {
       }
 
       // 3. If partial and allowed: reset ODN statuses to pending for next round
+      // Also mark process as completed for reporting purposes (avg waiting time)
       if (action === 'allow' && isPartial) {
         try {
           await axios.put(`${API_URL}/api/odns-rdf/update-exit-permit-status`, {
             process_id: record.process_id,
             store: record.store_id,
-            exit_permit_status: 'pending',
+            exit_permit_status: 'partial_done',
             officer_id: gateKeeperId,
             officer_name: gateKeeperName
           });
           await axios.put(`${API_URL}/api/odns-rdf/update-gate-status`, {
             process_id: record.process_id,
             store: record.store_id,
-            gate_status: 'pending',
+            gate_status: 'partial_done',
             officer_id: gateKeeperId,
             officer_name: gateKeeperName
           });
-          console.log(`✅ Partial exit: reset ${record.store_id} statuses to pending for next visit`);
+          // Mark completed for reporting — process stays in active query because
+          // ODNs still have pending gate_status (tvDisplayController EXISTS check)
+          await axios.put(`${API_URL}/api/update-service-status/${record.process_id}`, {
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          });
+          console.log(`✅ Partial exit: reset ${record.store_id} statuses to pending, marked completed for reporting`);
         } catch (err) {
           console.error('❌ Failed to reset partial exit statuses:', err);
         }
@@ -347,21 +354,23 @@ const GateKeeper = () => {
         }
       }
 
-      // 4. If full exit and allowed: check if ALL full exit_history rows are allowed → mark process completed
+      // 4. If full exit and allowed: check if ALL stores have gate_status = 'allowed' → mark process completed
       if (action === 'allow' && !isPartial) {
         try {
-          const allExitsRes = await axios.get(`${API_URL}/api/exit-history/${record.process_id}`);
-          const allExits = allExitsRes.data.exits || [];
-          const fullExits = allExits.filter(e => e.exit_type === 'full');
-          const allAllowed = fullExits.length > 0 && fullExits.every(e =>
-            e.id === record.id ? true : e.gate_status === 'allowed'
+          const allOdnsRes = await axios.get(`${API_URL}/api/rdf-odns/${record.process_id}`);
+          const allOdns = allOdnsRes.data.odns || [];
+          // Every ODN across every store must have gate_status = 'allowed'
+          const allAllowed = allOdns.length > 0 && allOdns.every(odn =>
+            odn.gate_status === 'allowed'
           );
           if (allAllowed) {
             await axios.put(`${API_URL}/api/update-service-status/${record.process_id}`, {
               status: 'completed',
               completed_at: new Date().toISOString()
             });
-            console.log('✅ All full exits allowed — process marked completed');
+            console.log('✅ All stores gate-allowed — process marked completed');
+          } else {
+            console.log('⏳ Some stores still pending gate approval — process stays active');
           }
         } catch (err) {
           console.error('❌ Failed to check completion:', err);
@@ -492,6 +501,46 @@ const GateKeeper = () => {
   console.log('Store dialog open:', storeSelectionDialog);
   console.log('Assigned stores:', assignedStores);
   console.log('Records:', records.length);
+
+  // Block main content until store is selected
+  if (!assignedStores || assignedStores.length === 0) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh', gap: 2 }}>
+        <Storefront sx={{ fontSize: 64, color: '#2196f3' }} />
+        <Typography variant="h5" fontWeight="bold">Select Your Gate Store</Typography>
+        <Typography variant="body1" color="text.secondary">You must select a store before proceeding.</Typography>
+        <Button variant="contained" onClick={() => setStoreSelectionDialog(true)}>Select Store</Button>
+
+        {/* Store Selection Dialog rendered here too so it shows */}
+        <Dialog open={storeSelectionDialog} disableEscapeKeyDown PaperProps={{ sx: { borderRadius: 2, minWidth: { xs: '280px', sm: '400px' }, p: 2 } }}>
+          <Box sx={{ textAlign: 'center', pb: 1, pt: 2 }}>
+            <Storefront sx={{ fontSize: 48, color: '#2196f3', mb: 1 }} />
+            <Typography variant="h5" fontWeight="bold">Select Your Gate(s)</Typography>
+          </Box>
+          <DialogContent>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3, textAlign: 'center' }}>
+              Select one or more store gates you are assigned to.
+            </Typography>
+            <Autocomplete
+              multiple options={availableStores} value={selectedStores}
+              onChange={(event, newValue) => setSelectedStores(newValue)}
+              renderInput={(params) => <TextField {...params} label="Store Gates" placeholder="Select stores..." />}
+              renderTags={(value, getTagProps) => value.map((option, index) => (
+                <Chip label={option} {...getTagProps({ index })} color="primary" sx={{ m: 0.5 }} />
+              ))}
+              sx={{ width: '100%' }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>{selectedStores.length} store(s) selected</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Button onClick={handleStoreSelection} variant="contained" color="primary" disabled={selectedStores.length === 0} sx={{ px: 4, py: 1 }}>
+                Confirm Selection
+              </Button>
+            </Box>
+          </DialogContent>
+        </Dialog>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ 
@@ -933,14 +982,6 @@ const GateKeeper = () => {
               sx={{ px: 4, py: 1 }}
             >
               Confirm Selection
-            </Button>
-            <Button
-              onClick={() => setStoreSelectionDialog(false)}
-              variant="outlined"
-              color="secondary"
-              sx={{ px: 4, py: 1 }}
-            >
-              Close
             </Button>
           </Box>
         </DialogContent>

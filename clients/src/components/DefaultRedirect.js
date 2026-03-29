@@ -26,8 +26,6 @@ const DefaultRedirect = () => {
         navigate('/dispatch-management');
       } else if (jobTitle === "Documentation Officer - HP") {
         navigate('/documentation-hp');
-      } else if (jobTitle === "Quality Evaluator") {
-        navigate('/quality-evaluation');
       } else if (jobTitle === "Reports") {
         navigate('/reports/hp-comprehensive');
       }

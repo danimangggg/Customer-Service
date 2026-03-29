@@ -26,7 +26,14 @@ const getEwmCompletedCustomers = async (req, res) => {
         f.woreda_name,
         inv.id as invoice_id,
         inv.invoice_number,
-        inv.invoice_date
+        inv.invoice_date,
+        inv.folder_number,
+        inv.received,
+        inv.received_by,
+        inv.received_at,
+        inv.returned,
+        inv.returned_by,
+        inv.returned_at
       FROM odns_rdf odn
       INNER JOIN customer_queue cq ON odn.process_id = cq.id
       INNER JOIN facilities f ON cq.facility_id = f.id
@@ -167,8 +174,190 @@ const getInvoices = async (req, res) => {
   }
 };
 
+// Finance: mark invoice as received
+const markReceived = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { received_by } = req.body;
+    await db.sequelize.query(
+      `UPDATE invoices SET received = 1, received_by = ?, received_at = NOW(), returned = 0, updated_at = NOW() WHERE id = ?`,
+      { replacements: [received_by, id], type: db.sequelize.QueryTypes.UPDATE }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// EWM Documentation: return (undo) received
+const returnReceived = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { returned_by } = req.body;
+    await db.sequelize.query(
+      `UPDATE invoices SET received = 0, returned = 1, returned_by = ?, returned_at = NOW(), updated_at = NOW() WHERE id = ?`,
+      { replacements: [returned_by, id], type: db.sequelize.QueryTypes.UPDATE }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Save folder number
+const saveFolderNumber = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { folder_number } = req.body;
+    await db.sequelize.query(
+      `UPDATE invoices SET folder_number = ?, updated_at = NOW() WHERE id = ?`,
+      { replacements: [folder_number, id], type: db.sequelize.QueryTypes.UPDATE }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get HP processes completed by documentation (for Finance HP tab)
+const getHPDocumentationCompleted = async (req, res) => {
+  try {
+    const { search, month, year, received } = req.query;
+    const branchCode = req.headers['x-account-type'] !== 'Super Admin' ? (req.headers['x-branch-code'] || null) : null;
+
+    let conditions = [`p.status = 'documentation_completed'`];
+    if (branchCode) conditions.push(`f.branch_code = '${branchCode}'`);
+    const replacements = [];
+
+    if (month && year) {
+      conditions.push(`p.reporting_month = ?`);
+      replacements.push(`${month} ${year}`);
+    }
+    if (search) {
+      conditions.push(`(f.facility_name LIKE ? OR o.odn_number LIKE ? OR o.pod_number LIKE ?)`);
+      replacements.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (received === 'yes') conditions.push(`inv.received = 1`);
+    if (received === 'no') conditions.push(`(inv.received IS NULL OR inv.received = 0)`);
+
+    const where = conditions.filter(Boolean).join(' AND ');
+
+    const query = `
+      SELECT
+        p.id as process_id,
+        p.reporting_month,
+        p.process_type,
+        f.facility_name,
+        f.region_name, f.zone_name, f.woreda_name,
+        r.route_name,
+        o.id as odn_id,
+        o.odn_number,
+        o.pod_number,
+        o.pod_confirmed_at,
+        e.full_name as submitted_by,
+        inv.id as invoice_id,
+        inv.folder_number,
+        inv.received,
+        inv.received_by,
+        inv.received_at,
+        inv.returned,
+        inv.returned_by,
+        inv.returned_at
+      FROM processes p
+      INNER JOIN odns o ON o.process_id = p.id
+      LEFT JOIN facilities f ON p.facility_id = f.id
+      LEFT JOIN routes r ON f.route = r.route_name
+      LEFT JOIN employees e ON o.pod_confirmed_by = e.id
+      LEFT JOIN invoices inv ON inv.process_id = p.id AND inv.odn_number = o.odn_number
+      WHERE ${where}
+      ORDER BY o.pod_confirmed_at DESC
+    `;
+
+    const results = await db.sequelize.query(query, { replacements, type: db.sequelize.QueryTypes.SELECT });
+    res.json({ success: true, data: results });
+  } catch (error) {
+    console.error('Error fetching HP documentation completed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Mark HP invoice as received (reuse same invoices table, just with pod_number as identifier)
+const markHPReceived = async (req, res) => {
+  try {
+    const { process_id, odn_number, received_by } = req.body;
+    // Upsert into invoices table
+    const [existing] = await db.sequelize.query(
+      'SELECT id FROM invoices WHERE process_id = ? AND odn_number = ?',
+      { replacements: [process_id, odn_number], type: db.sequelize.QueryTypes.SELECT }
+    );
+    if (existing) {
+      await db.sequelize.query(
+        `UPDATE invoices SET received = 1, received_by = ?, received_at = NOW(), returned = 0, updated_at = NOW() WHERE id = ?`,
+        { replacements: [received_by, existing.id], type: db.sequelize.QueryTypes.UPDATE }
+      );
+    } else {
+      await db.sequelize.query(
+        `INSERT INTO invoices (process_id, odn_number, invoice_number, invoice_date, received, received_by, received_at, created_at, updated_at)
+         VALUES (?, ?, '', NOW(), 1, ?, NOW(), NOW(), NOW())`,
+        { replacements: [process_id, odn_number, received_by], type: db.sequelize.QueryTypes.INSERT }
+      );
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Save folder number for HP
+const saveHPFolderNumber = async (req, res) => {
+  try {
+    const { process_id, odn_number, folder_number } = req.body;
+    const [existing] = await db.sequelize.query(
+      'SELECT id FROM invoices WHERE process_id = ? AND odn_number = ?',
+      { replacements: [process_id, odn_number], type: db.sequelize.QueryTypes.SELECT }
+    );
+    if (existing) {
+      await db.sequelize.query(
+        `UPDATE invoices SET folder_number = ?, updated_at = NOW() WHERE id = ?`,
+        { replacements: [folder_number, existing.id], type: db.sequelize.QueryTypes.UPDATE }
+      );
+    } else {
+      await db.sequelize.query(
+        `INSERT INTO invoices (process_id, odn_number, invoice_number, invoice_date, folder_number, created_at, updated_at)
+         VALUES (?, ?, '', NOW(), ?, NOW(), NOW())`,
+        { replacements: [process_id, odn_number, folder_number], type: db.sequelize.QueryTypes.INSERT }
+      );
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Update pod_number on an ODN (for HP history edit)
+const updateOdnPodNumber = async (req, res) => {
+  try {
+    const { odn_id } = req.params;
+    const { pod_number } = req.body;
+    await db.sequelize.query(
+      `UPDATE odns SET pod_number = ? WHERE id = ?`,
+      { replacements: [pod_number, odn_id], type: db.sequelize.QueryTypes.UPDATE }
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports = {
   getEwmCompletedCustomers,
   saveInvoice,
-  getInvoices
+  getInvoices,
+  markReceived,
+  returnReceived,
+  saveFolderNumber,
+  getHPDocumentationCompleted,
+  markHPReceived,
+  saveHPFolderNumber,
+  updateOdnPodNumber
 };

@@ -5,7 +5,7 @@ import Swal from 'sweetalert2';
 import { 
     Box, Typography, CircularProgress, Paper, Table, TableBody, 
     TableCell, TableContainer, TableHead, TableRow, Button, Chip, Snackbar, Alert,
-    Container, Card, Avatar, Stack, Fade
+    Container, Card, Avatar, Stack, Fade, TablePagination
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -22,7 +22,9 @@ const DispatcherAccount = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-    const [customerOdns, setCustomerOdns] = useState({}); // Store ODNs by customer ID
+    const [customerOdns, setCustomerOdns] = useState({});
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
     const [notifyingTimers, setNotifyingTimers] = useState({}); // Track notification timers
     
     // --- STATE for Store Info ---
@@ -572,7 +574,7 @@ const DispatcherAccount = () => {
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        dispatchList.map((item, index) => {
+                                        dispatchList.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((item, index) => {
                                             // Get dispatch status from store_details
                                             const storeInfo = item.store_details?.[store] || {};
                                             const dispatchStatus = (storeInfo.dispatch_status || 'pending').toLowerCase().trim();
@@ -672,6 +674,15 @@ const DispatcherAccount = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        <TablePagination
+                            component="div"
+                            count={dispatchList.length}
+                            page={page}
+                            onPageChange={(_, p) => setPage(p)}
+                            rowsPerPage={rowsPerPage}
+                            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                            rowsPerPageOptions={[10, 25, 50, 100]}
+                        />
                     </Box>
                 </Card>
 

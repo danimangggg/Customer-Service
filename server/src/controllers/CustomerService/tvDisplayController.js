@@ -147,7 +147,9 @@ const getTvDisplayCustomers = async (req, res) => {
     // For active customers (TV display), group by customer
     const query = `
       SELECT 
-        cq.*,
+        cq.id, cq.facility_id, cq.customer_type, cq.status,
+        cq.started_at, cq.completed_at, cq.next_service_point,
+        cq.assigned_gate_keeper_id, cq.assigned_gate_keeper_name,
         GROUP_CONCAT(DISTINCT s.store_name ORDER BY s.store_name) as assigned_stores,
         GROUP_CONCAT(
           CONCAT(
@@ -161,15 +163,17 @@ const getTvDisplayCustomers = async (req, res) => {
           )
           ORDER BY s.store_name
           SEPARATOR '|'
-        ) as store_details
+        ) as store_details,
+        SUM(CASE WHEN odn.gate_status != 'allowed' OR odn.gate_status IS NULL THEN 1 ELSE 0 END) as pending_gate_count
       FROM customer_queue cq
-      LEFT JOIN odns_rdf odn ON cq.id = odn.process_id
-      LEFT JOIN stores s ON odn.store_id = s.id
-      WHERE cq.status != 'completed' 
-         AND cq.status != 'canceled'
-         AND cq.status != 'rejected'
+      INNER JOIN odns_rdf odn ON cq.id = odn.process_id
+      INNER JOIN stores s ON odn.store_id = s.id
+      WHERE cq.status NOT IN ('canceled', 'rejected')
          ${branchFilterActive}
-      GROUP BY cq.id
+      GROUP BY cq.id, cq.facility_id, cq.customer_type, cq.status,
+               cq.started_at, cq.completed_at, cq.next_service_point,
+               cq.assigned_gate_keeper_id, cq.assigned_gate_keeper_name
+      HAVING cq.status != 'completed' OR pending_gate_count > 0
       ORDER BY cq.started_at ASC
     `;
 

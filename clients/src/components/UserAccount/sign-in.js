@@ -212,7 +212,6 @@ export default function SignIn() {
         } else if (jobTitle === 'Documentation Officer')    { navigate('/customer-dashboard');
         } else if (jobTitle === 'Documentation Officer - HP') { navigate('/documentation-hp');
         } else if (jobTitle === 'Documentation Follower')   { navigate('/customer-dashboard');
-        } else if (jobTitle === 'Quality Evaluator')        { navigate('/quality-evaluation');
         } else if (accountType === 'Self Assesment') {
           if (jobTitle === 'WIM Operator') navigate('/all-picklists');
           else navigate('/customer-dashboard');

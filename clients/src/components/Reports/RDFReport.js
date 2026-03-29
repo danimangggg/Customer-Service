@@ -989,14 +989,9 @@ const RDFReport = () => {
                     const st = (params.row.status || '').toLowerCase();
 
                     let label, color;
-                    if (st === 'completed') { label = 'Completed'; color = '#2e7d32'; }
-                    else if (st === 'canceled') { label = 'Cancelled'; color = '#c62828'; }
-                    else if (st === 'archived') { label = 'At Security'; color = '#e65100'; }
-                    else if (nsp === 'gate-keeper') { label = 'At Security'; color = '#e65100'; }
-                    else if (nsp === 'dispatch' || nsp === 'exit-permit') { label = 'At Dispatch'; color = '#1565c0'; }
-                    else if (nsp === 'ewm') { label = 'At EWM'; color = '#6a1b9a'; }
-                    else if (nsp === 'o2c') { label = 'At O2C'; color = '#0277bd'; }
-                    else { label = params.row.next_service_point || 'Registered'; color = '#1565c0'; }
+                    if (st === 'completed' || st === 'archived') { label = 'Completed'; color = '#2e7d32'; }
+                    else if (st === 'canceled' || st === 'auto-canceled') { label = 'Cancelled'; color = '#c62828'; }
+                    else { label = 'In Progress'; color = '#1565c0'; }
 
                     return (
                       <Typography variant="body2" sx={{ color, fontWeight: 700 }}>
@@ -1554,6 +1549,7 @@ const RDFReport = () => {
                             if (v === 'allowed') return { label: 'Allowed', color: 'success' };
                             if (v === 'denied') return { label: 'Denied', color: 'error' };
                             if (v === 'partial') return { label: 'Partial', color: 'warning' };
+                            if (v === 'partial_done') return { label: 'Completed', color: 'success' };
                             if (v === 'almost_there' || v === 'continuing') return { label: 'Almost There', color: 'warning' };
                             if (v === 'notifying') return { label: 'Notifying', color: 'info' };
                             if (v === 'started') return { label: 'In Progress', color: 'info' };
