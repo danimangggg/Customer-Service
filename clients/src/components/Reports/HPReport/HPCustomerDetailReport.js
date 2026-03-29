@@ -17,10 +17,12 @@ import * as XLSX from 'xlsx';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
 const formatDuration = (mins) => {
-  if (mins == null || mins === 0) return '—';
-  if (mins < 60) return `${mins}m`;
-  if (mins < 1440) { const h = Math.floor(mins/60), m = mins%60; return m > 0 ? `${h}h ${m}m` : `${h}h`; }
-  const d = Math.floor(mins/1440), rem = mins%1440, h = Math.floor(rem/60);
+  if (mins == null || mins === '') return '—';
+  const m = Number(mins);
+  if (isNaN(m) || m <= 0) return '0m';
+  if (m < 60) return `${m}m`;
+  if (m < 1440) { const h = Math.floor(m/60), r = m%60; return r > 0 ? `${h}h ${r}m` : `${h}h`; }
+  const d = Math.floor(m/1440), rem = m%1440, h = Math.floor(rem/60);
   return h > 0 ? `${d}d ${h}h` : `${d}d`;
 };
 
@@ -599,6 +601,7 @@ const HPCustomerDetailReport = ({ branchCode = '' }) => {
                               label={selectedCustomer.process_status || selectedCustomer.status || 'Unknown'} 
                               color={
                                 selectedCustomer.process_status === 'Completed' ? 'success' :
+                                selectedCustomer.process_status === 'Partial Completed' ? 'warning' :
                                 selectedCustomer.process_status === 'In Progress' ? 'warning' :
                                 'default'
                               }
@@ -620,6 +623,8 @@ const HPCustomerDetailReport = ({ branchCode = '' }) => {
                                selectedCustomer.status === 'vehicle_assigned' ? 'Dispatch' :
                                selectedCustomer.status === 'dispatched' ? 'Documentation' :
                                selectedCustomer.status === 'completed' ? 'Completed' :
+                               selectedCustomer.status === 'partial_completed' ? 'Partial Completed (Gate)' :
+                               selectedCustomer.status === 'finance_received' ? 'Completed (Finance)' :
                                selectedCustomer.service_point?.toUpperCase() || 'N/A'}
                             </Typography>
                           </Box>
@@ -745,7 +750,7 @@ const HPCustomerDetailReport = ({ branchCode = '' }) => {
                             </TableCell>
                             <TableCell>
                               <Chip 
-                                label={formatDuration(service.waiting_minutes)}
+                                label={formatDuration(service.waiting_minutes ?? 0)}
                                 size="small"
                                 color="info"
                                 variant="outlined"

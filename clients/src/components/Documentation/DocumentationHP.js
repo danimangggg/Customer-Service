@@ -195,8 +195,11 @@ const DocumentationHP = () => {
       'Facility': r.facility_name || '',
       'Woreda': r.woreda_name || '',
       'Route': r.route_name || '',
-      'ODN': r.odn_number || '',
-      'POD #': r.pod_number || '',
+      'Vehicle': r.vehicle_name || '',
+      'Driver': r.driver_name || '',
+      'Deliverer': r.deliverer_name || '',
+      'ODN': r.odn_numbers || '',
+      'POD #': r.pod_numbers || '',
       'Month': r.reporting_month || '',
       'Submitted Date': r.pod_confirmed_at ? new Date(r.pod_confirmed_at).toLocaleDateString() : '',
       'Received': r.received ? 'Yes' : 'No',
@@ -554,6 +557,7 @@ const DocumentationHP = () => {
                 <TableRow sx={{ bgcolor: 'grey.50' }}>
                   <TableCell sx={{ fontWeight: 'bold' }}>Facility</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Route</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Vehicle / Driver</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>ODNs</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>POD Status</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
@@ -562,7 +566,7 @@ const DocumentationHP = () => {
               <TableBody>
                 {facilityData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                       <Typography color="text.secondary">No facilities in progress.</Typography>
                     </TableCell>
                   </TableRow>
@@ -578,6 +582,23 @@ const DocumentationHP = () => {
                           <RouteIcon fontSize="small" color="action" />
                           <Typography variant="body2">{facility.route_name}</Typography>
                         </Stack>
+                      </TableCell>
+                      <TableCell>
+                        {facility.vehicle_name || facility.driver_name ? (
+                          <Stack spacing={0.3}>
+                            {facility.vehicle_name && (
+                              <Typography variant="body2" fontWeight={600}>{facility.vehicle_name}</Typography>
+                            )}
+                            {facility.driver_name && (
+                              <Typography variant="caption" color="text.secondary">Driver: {facility.driver_name}</Typography>
+                            )}
+                            {facility.deliverer_name && (
+                              <Typography variant="caption" color="text.secondary">Deliverer: {facility.deliverer_name}</Typography>
+                            )}
+                          </Stack>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">—</Typography>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Chip label={`${facility.total_odns} ODNs`} size="small" color="primary" variant="outlined" />
@@ -653,11 +674,21 @@ const DocumentationHP = () => {
                       renderCell: ({ value }) => value ? <Chip label={value} size="small" color="primary" variant="outlined" /> : '—',
                     },
                     {
-                      field: 'odn_number', headerName: 'ODN', width: 140,
+                      field: 'driver_name', headerName: 'Driver / Deliverer', width: 180,
+                      renderCell: ({ row }) => (row.driver_name || row.deliverer_name) ? (
+                        <Box sx={{ py: 0.5 }}>
+                          {row.vehicle_name && <Typography variant="caption" color="primary.main" fontWeight={700} display="block">{row.vehicle_name}</Typography>}
+                          {row.driver_name && <Typography variant="body2" fontWeight={600}>{row.driver_name}</Typography>}
+                          {row.deliverer_name && <Typography variant="caption" color="text.secondary">{row.deliverer_name}</Typography>}
+                        </Box>
+                      ) : <Typography variant="caption" color="text.secondary">—</Typography>,
+                    },
+                    {
+                      field: 'odn_numbers', headerName: 'ODN', width: 140,
                       renderCell: ({ value }) => <Typography variant="body2" fontWeight={700} sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{value || '—'}</Typography>,
                     },
                     {
-                      field: 'pod_number', headerName: 'POD #', width: 180,
+                      field: 'pod_numbers', headerName: 'POD #', width: 180,
                       renderCell: ({ value }) => <Typography variant="body2" fontWeight={700} color="success.main" sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{value || '—'}</Typography>,
                     },
                     { field: 'reporting_month', headerName: 'Month', width: 130 },

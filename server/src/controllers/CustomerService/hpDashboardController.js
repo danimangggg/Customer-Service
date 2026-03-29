@@ -155,11 +155,9 @@ const getHPDashboardData = async (req, res) => {
       INNER JOIN facilities f ON p.facility_id = f.id
       WHERE ${facilityTypeFilter}
         AND (
-          EXISTS (
-            SELECT 1 FROM odns o WHERE o.process_id = p.id AND o.quality_confirmed = 1
-          )
+          p.status = 'finance_received'
           OR EXISTS (
-            SELECT 1 FROM odns o WHERE o.process_id = p.id AND (o.odn_number LIKE 'RRF not sent%' OR o.odn_number LIKE 'VRF not sent%')
+            SELECT 1 FROM invoices inv WHERE inv.process_id = p.id AND inv.received = 1
           )
         )
         ${branchFilter}

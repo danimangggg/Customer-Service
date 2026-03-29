@@ -92,14 +92,11 @@ const ChangePassword = () => {
 
       setMessage(response.data.message);
       
-      // Clear form after success
+      // Logout after password change
       setTimeout(() => {
-        setUsername('');
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setMessage('');
-      }, 3000);
+        localStorage.clear();
+        window.location.href = '/';
+      }, 2000);
     } catch (error) {
       setError(error.response?.data?.error || 'Something went wrong');
     } finally {

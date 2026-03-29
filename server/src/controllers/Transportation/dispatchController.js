@@ -22,10 +22,7 @@ const getDispatchRoutes = async (req, res) => {
         r.route_name,
         COUNT(DISTINCT f.id) as total_facilities,
         COUNT(DISTINCT CASE WHEN p.status = 'driver_assigned' THEN f.id END) as ready_facilities,
-        COUNT(DISTINCT CASE WHEN p.status = 'dispatch_completed' THEN f.id END) as completed_facilities,
-        MAX(p.vehicle_name) as vehicle_name,
-        MAX(p.driver_name) as driver_name,
-        MAX(p.deliverer_name) as deliverer_name
+        COUNT(DISTINCT CASE WHEN p.status = 'dispatch_completed' THEN f.id END) as completed_facilities
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
         AND (f.period = 'Monthly' OR f.period = ?)
@@ -50,7 +47,11 @@ const getDispatchRoutes = async (req, res) => {
           COALESCE(p_reg.status, p_vac.status, 'no_process') as process_status,
           CASE WHEN p_vac.id IS NOT NULL AND p_reg.id IS NULL THEN 'vaccine'
                WHEN p_reg.id IS NOT NULL THEN 'regular'
-               ELSE NULL END as process_type
+               ELSE NULL END as process_type,
+          COALESCE(p_reg.vehicle_id, p_vac.vehicle_id) as vehicle_id,
+          COALESCE(p_reg.vehicle_name, p_vac.vehicle_name) as vehicle_name,
+          COALESCE(p_reg.driver_name, p_vac.driver_name) as driver_name,
+          COALESCE(p_reg.deliverer_name, p_vac.deliverer_name) as deliverer_name
         FROM facilities f
         LEFT JOIN processes p_reg ON p_reg.facility_id = f.id AND p_reg.reporting_month = ? AND p_reg.process_type = 'regular'
         LEFT JOIN processes p_vac ON p_vac.facility_id = f.id AND p_vac.reporting_month = ? AND p_vac.process_type = 'vaccine'
@@ -62,7 +63,17 @@ const getDispatchRoutes = async (req, res) => {
         replacements: [reportingMonth, reportingMonth, route.route_name, currentPeriod],
         type: db.sequelize.QueryTypes.SELECT
       });
-      return { ...route, facilities };
+
+      // Derive distinct vehicles from facilities
+      const vehicleMap = {};
+      facilities.forEach(f => {
+        if (f.vehicle_id && !vehicleMap[f.vehicle_id]) {
+          vehicleMap[f.vehicle_id] = { vehicle_id: f.vehicle_id, vehicle_name: f.vehicle_name, driver_name: f.driver_name, deliverer_name: f.deliverer_name };
+        }
+      });
+      const vehicles = Object.values(vehicleMap);
+
+      return { ...route, facilities, vehicles };
     }));
 
     res.json({ routes: routesWithFacilities });
@@ -268,7 +279,7 @@ const completeDispatch = async (req, res) => {
           await db.sequelize.query(insertQuery, {
             replacements: [
               process.id,
-              'Dispatch - Route Completed',
+              'Dispatcher - HP',
               completed_by,
               officerName,
               'completed',

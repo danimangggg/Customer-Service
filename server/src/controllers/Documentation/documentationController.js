@@ -37,6 +37,9 @@ const getDispatchedODNs = async (req, res) => {
         p.reporting_month,
         ra.id as route_assignment_id,
         ra.arrival_kilometer,
+        p.vehicle_name,
+        p.driver_name,
+        p.deliverer_name,
         COUNT(DISTINCT o.id) as total_odns,
         SUM(CASE WHEN o.pod_confirmed = 1 THEN 1 ELSE 0 END) as confirmed_pods,
         SUM(CASE WHEN o.pod_confirmed = 1 AND o.documents_signed = 1 AND o.documents_handover = 1 THEN 1 ELSE 0 END) as fully_completed_odns,
@@ -60,7 +63,8 @@ const getDispatchedODNs = async (req, res) => {
         ${branchFilter}
         ${search ? 'AND (COALESCE(f.facility_name, \'\') LIKE ? OR COALESCE(r.route_name, \'\') LIKE ?)' : ''}
       GROUP BY p.facility_id, f.facility_name, f.region_name, f.zone_name, f.woreda_name, 
-               r.route_name, r.id, p.reporting_month, ra.id, ra.arrival_kilometer
+               r.route_name, r.id, p.reporting_month, ra.id, ra.arrival_kilometer,
+               p.vehicle_name, p.driver_name, p.deliverer_name
       HAVING fully_completed_odns < total_odns
       ORDER BY dispatch_completed_at DESC, facility_name
       LIMIT ? OFFSET ?

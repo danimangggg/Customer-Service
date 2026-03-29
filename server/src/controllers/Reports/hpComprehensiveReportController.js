@@ -367,36 +367,36 @@ const getComprehensiveHPReport = async (req, res) => {
       SELECT 
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') THEN p.facility_id END) as o2c_stage,
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') AND (
-          p.status IN ('ewm_completed','ewm_goods_issued','tm_notified','tm_confirmed','biller_received','biller_completed','freight_order_sent_to_ewm','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('ewm_completed','ewm_goods_issued','tm_notified','tm_confirmed','biller_received','biller_completed','freight_order_sent_to_ewm','vehicle_requested','driver_assigned','dispatch_completed','completed','partial_completed','finance_received') OR
           o.pod_confirmed = 1
         ) THEN p.facility_id END) as ewm_phase1_facilities,
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') AND (
           p.tm_confirmed_at IS NOT NULL OR
-          p.status IN ('tm_confirmed','ewm_goods_issued','biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('tm_confirmed','ewm_goods_issued','biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed','partial_completed','finance_received') OR
           o.pod_confirmed = 1
         ) THEN p.facility_id END) as tm_phase1_facilities,
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') AND (
           p.ewm_goods_issued_at IS NOT NULL OR
-          p.status IN ('ewm_goods_issued','biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('ewm_goods_issued','biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed','partial_completed','finance_received') OR
           o.pod_confirmed = 1
         ) THEN p.facility_id END) as ewm_phase2_facilities,
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') AND (
           p.biller_received_at IS NOT NULL OR
-          p.status IN ('biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('biller_received','biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed','partial_completed','finance_received') OR
           o.pod_confirmed = 1
         ) THEN p.facility_id END) as biller_facilities,
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') AND (
-          p.status IN ('biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('biller_completed','vehicle_requested','driver_assigned','dispatch_completed','completed','partial_completed','finance_received') OR
           o.pod_confirmed = 1
         ) THEN p.facility_id END) as pi_facilities,
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') AND (
           p.driver_assigned_at IS NOT NULL OR
-          p.status IN ('driver_assigned','dispatch_completed','completed') OR
+          p.status IN ('driver_assigned','dispatch_completed','completed','partial_completed','finance_received') OR
           o.pod_confirmed = 1
         ) THEN p.facility_id END) as tm_phase2_facilities,
         COUNT(DISTINCT CASE WHEN (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%') AND (
           p.dispatch_completed_at IS NOT NULL OR
-          p.status IN ('dispatch_completed','completed') OR
+          p.status IN ('dispatch_completed','completed','partial_completed','finance_received') OR
           o.pod_confirmed = 1 OR
           (p.status = 'driver_assigned' AND EXISTS (
             SELECT 1 FROM route_assignments ra2

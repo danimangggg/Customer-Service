@@ -18,6 +18,7 @@ import MUIDataTable from 'mui-datatables';
 import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import BranchSelect from '../Settings/BranchSelect';
+import FinanceInvoiceView from '../Finance/FinanceInvoiceView';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -163,9 +164,9 @@ const RDFReport = () => {
       fetchCustomers();
     } else if (activeTab === 2) {
       fetchDocumentation();
-    } else if (activeTab === 3) {
-      fetchCompletedPicklists();
     } else if (activeTab === 4) {
+      fetchCompletedPicklists();
+    } else if (activeTab === 5) {
       fetchBestOfWeek();
     }
   }, [activeTab, page, rowsPerPage, searchTerm, sortBy, sortOrder, statusFilter, dateFrom, dateTo, picklistPage, picklistRowsPerPage, selectedBranch]);
@@ -532,6 +533,23 @@ const RDFReport = () => {
           <Typography variant="body2">{params.value}</Typography>
         </Box>
       )
+    },
+    {
+      field: 'gate_processed_at',
+      headerName: 'Exit Date',
+      width: 170,
+      filterable: true,
+      valueGetter: (params) => params.row.gate_processed_at || params.row.completed_at || null,
+      renderCell: (params) => {
+        const val = params.value;
+        if (!val) return <Typography variant="body2" color="text.secondary">—</Typography>;
+        const d = new Date(val);
+        return (
+          <Typography variant="body2">
+            {d.toLocaleDateString()} {d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Typography>
+        );
+      }
     }
   ];
 
@@ -682,6 +700,11 @@ const RDFReport = () => {
           <Tab 
             label="Picklists" 
             icon={<Assignment />} 
+            iconPosition="start"
+          />
+          <Tab 
+            label="Finance" 
+            icon={<Receipt />} 
             iconPosition="start"
           />
           <Tab 
@@ -1242,8 +1265,13 @@ const RDFReport = () => {
         </Box>
       )}
 
-      {/* Best Of Tab */}
+      {/* Finance Tab */}
       {activeTab === 4 && (
+        <FinanceInvoiceView mode="rdf" />
+      )}
+
+      {/* Best Of Tab */}
+      {activeTab === 5 && (
         <Container maxWidth="xl">
           {/* Date Range Controls */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
@@ -1320,6 +1348,20 @@ const RDFReport = () => {
                     </CardContent>
                   </Card>
                   <Grid container spacing={4}>
+                    {bestOfData.employees.cs && (
+                      <Grid item xs={12} md={6}>
+                        <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', color: 'white', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-8px)' } }}>
+                          <CardContent sx={{ p: 4 }}><Stack spacing={3} alignItems="center"><Avatar sx={{ width: 100, height: 100, bgcolor: 'rgba(255,255,255,0.3)', fontSize: '3rem' }}>👤</Avatar><Box sx={{ textAlign: 'center' }}><Typography variant="overline" sx={{ opacity: 0.9 }}>CS Officer</Typography><Typography variant="h4" fontWeight="bold" gutterBottom>{bestOfData.employees.cs.full_name}</Typography><Chip label={`${bestOfData.employees.cs.process_count} Registrations`} sx={{ bgcolor: 'rgba(255,255,255,0.3)', color: 'white', fontWeight: 'bold', fontSize: '1rem', px: 2, py: 3 }} /></Box></Stack></CardContent>
+                        </Card>
+                      </Grid>
+                    )}
+                    {bestOfData.employees.cashier && (
+                      <Grid item xs={12} md={6}>
+                        <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', color: 'white', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-8px)' } }}>
+                          <CardContent sx={{ p: 4 }}><Stack spacing={3} alignItems="center"><Avatar sx={{ width: 100, height: 100, bgcolor: 'rgba(255,255,255,0.3)', fontSize: '3rem' }}>👤</Avatar><Box sx={{ textAlign: 'center' }}><Typography variant="overline" sx={{ opacity: 0.9 }}>Cashier</Typography><Typography variant="h4" fontWeight="bold" gutterBottom>{bestOfData.employees.cashier.full_name}</Typography><Chip label={`${bestOfData.employees.cashier.process_count} Invoices`} sx={{ bgcolor: 'rgba(255,255,255,0.3)', color: 'white', fontWeight: 'bold', fontSize: '1rem', px: 2, py: 3 }} /></Box></Stack></CardContent>
+                        </Card>
+                      </Grid>
+                    )}
                     {bestOfData.employees.o2c && (
                       <Grid item xs={12} md={6}>
                         <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', transition: 'transform 0.3s', '&:hover': { transform: 'translateY(-8px)' } }}>

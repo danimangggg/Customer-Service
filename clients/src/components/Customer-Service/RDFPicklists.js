@@ -279,7 +279,7 @@ const RDFPicklists = () => {
                               <Stack direction="row" alignItems="center" spacing={1}>
                                 <PersonIcon fontSize="small" color="info" />
                                 <Typography variant="body2" color="text.secondary">
-                                  Process ID: {p.process_id}
+                                  {p.operator_name || p.operator?.full_name || 'Unassigned'}
                                 </Typography>
                               </Stack>
                             </Stack>

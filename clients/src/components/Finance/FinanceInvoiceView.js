@@ -5,10 +5,10 @@ import * as XLSX from 'xlsx';
 import {
   Box, Typography, TextField, Button, Chip, CircularProgress,
   Alert, InputAdornment, MenuItem, Select, FormControl, InputLabel,
-  Paper, Checkbox, Tooltip, Stack, Tabs, Tab
+  Paper, Stack, Tabs, Tab
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
-import { Search, FileDownload, Receipt, CheckCircle } from '@mui/icons-material';
+import { Search, FileDownload, Receipt } from '@mui/icons-material';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -17,13 +17,14 @@ const ethiopianMonths = [
 ];
 
 // ─── RDF TAB ────────────────────────────────────────────────────────────────
+
 const RDFTab = () => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
-  const [receivedFilter, setReceivedFilter] = useState('');
+  const [receivedFilter, setReceivedFilter] = useState('received');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [officerFilter, setOfficerFilter] = useState('');
@@ -52,16 +53,11 @@ const RDFTab = () => {
 
   useEffect(() => { const t = setTimeout(fetchInvoices, 300); return () => clearTimeout(t); }, [fetchInvoices]);
 
-  const handleMarkReceived = async (inv) => {
+  const handleMarkReceived = useCallback(async (inv) => {
     if (inv.received) return;
     await axios.put(`${API_URL}/api/invoices/${inv.id}/received`, { received_by: fullName });
     fetchInvoices();
-  };
-
-  const handleFolderSave = async (inv, val) => {
-    await axios.put(`${API_URL}/api/invoices/${inv.id}/folder`, { folder_number: val });
-    fetchInvoices();
-  };
+  }, [fetchInvoices, fullName]);
 
   const filtered = invoices.filter(inv => {
     if (receivedFilter === 'received' && !inv.received) return false;
@@ -86,7 +82,7 @@ const RDFTab = () => {
     XLSX.writeFile(wb, `RDF_Invoices_${receivedOnly ? 'received' : 'all'}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const columns = [
+  const columns = React.useMemo(() => [
     { field: 'seq', headerName: '#', width: 55, sortable: false, renderCell: (p) => p.api.getRowIndexRelativeToVisibleRows(p.id) + 1 },
     { field: 'facility_name', headerName: 'Customer', flex: 1.5, minWidth: 180,
       renderCell: ({ row }) => (
@@ -114,38 +110,21 @@ const RDFTab = () => {
       )
     },
     { field: 'created_by_name', headerName: 'Submitted By', width: 150 },
-    { field: 'folder_number', headerName: 'Folder #', width: 150,
-      renderCell: ({ row }) => {
-        const [val, setVal] = useState(row.folder_number || '');
-        return (
-          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-            <TextField size="small" value={val} onChange={e => setVal(e.target.value)} placeholder="Folder #" sx={{ width: 90 }}
-              onKeyDown={e => { if (e.key === 'Enter') handleFolderSave(row, val); }} />
-            <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 0.5 }} onClick={() => handleFolderSave(row, val)}>✓</Button>
-          </Box>
-        );
-      }
+    { field: 'folder_number', headerName: 'Folder #', width: 130,
+      renderCell: ({ value }) => value
+        ? <Typography variant="body2" fontWeight={700} color="primary.main">{value}</Typography>
+        : <Typography variant="caption" color="text.disabled">—</Typography>
     },
-    { field: 'received', headerName: 'Received', width: 120,
+    { field: 'received_by', headerName: 'Finance Officer', width: 180,
       renderCell: ({ row }) => (
-        <Tooltip title={row.received ? `Received by ${row.received_by}` : row.returned ? 'Returned by EWM' : 'Mark as received'}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Checkbox checked={!!row.received} disabled={!!row.received} onChange={() => handleMarkReceived(row)} color="success" size="small" />
-            {row.received && <CheckCircle sx={{ color: 'success.main', fontSize: 16 }} />}
-            {row.returned && !row.received && <Chip label="Returned" size="small" color="warning" />}
-          </Box>
-        </Tooltip>
-      )
-    },
-    { field: 'received_by', headerName: 'Received By', width: 160,
-      renderCell: ({ row }) => !row.received ? <Typography variant="caption" color="text.secondary">—</Typography> : (
-        <Box>
+        <Box sx={{ py: 0.5 }}>
           <Typography variant="body2" fontWeight={600}>{row.received_by || '—'}</Typography>
           {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
         </Box>
       )
     },
-  ];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [handleMarkReceived]);
 
   return (
     <Box>
@@ -190,12 +169,13 @@ const RDFTab = () => {
 };
 
 // ─── HP TAB ─────────────────────────────────────────────────────────────────
+
 const HPTab = () => {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [receivedFilter, setReceivedFilter] = useState('');
+  const [receivedFilter, setReceivedFilter] = useState('received');
   const [officerFilter, setOfficerFilter] = useState('');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
@@ -222,16 +202,11 @@ const HPTab = () => {
 
   useEffect(() => { const t = setTimeout(fetchRecords, 300); return () => clearTimeout(t); }, [fetchRecords]);
 
-  const handleMarkReceived = async (row) => {
+  const handleMarkReceived = useCallback(async (row) => {
     if (row.received) return;
-    await api.post(`${API_URL}/api/hp-finance/received`, { process_id: row.process_id, odn_number: row.odn_number, received_by: fullName });
+    await api.post(`${API_URL}/api/hp-finance/received`, { process_id: row.process_id, received_by: fullName });
     fetchRecords();
-  };
-
-  const handleFolderSave = async (row, val) => {
-    await api.post(`${API_URL}/api/hp-finance/folder`, { process_id: row.process_id, odn_number: row.odn_number, folder_number: val });
-    fetchRecords();
-  };
+  }, [fetchRecords, fullName]);
 
   const filtered = records.filter(r => {
     if (officerFilter && (r.received_by || '').trim() !== officerFilter.trim()) return false;
@@ -242,7 +217,8 @@ const HPTab = () => {
     const data = receivedOnly ? filtered.filter(r => r.received) : filtered;
     const rows = data.map((r, i) => ({
       '#': i + 1, 'Facility': r.facility_name || '', 'Route': r.route_name || '',
-      'ODN': r.odn_number || '', 'POD #': r.pod_number || '',
+      'Vehicle': r.vehicle_name || '', 'Driver': r.driver_name || '', 'Deliverer': r.deliverer_name || '',
+      'ODN': r.odn_numbers || '', 'POD #': r.pod_numbers || '',
       'Reporting Month': r.reporting_month || '', 'Folder #': r.folder_number || '',
       'Received': r.received ? 'Yes' : 'No', 'Received By': r.received_by || '',
       'Received At': r.received_at ? new Date(r.received_at).toLocaleDateString() : '',
@@ -253,7 +229,7 @@ const HPTab = () => {
     XLSX.writeFile(wb, `HP_Finance_${receivedOnly ? 'received' : 'all'}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const columns = [
+  const columns = React.useMemo(() => [
     { field: 'seq', headerName: '#', width: 55, sortable: false, renderCell: (p) => p.api.getRowIndexRelativeToVisibleRows(p.id) + 1 },
     { field: 'facility_name', headerName: 'Facility', flex: 1.5, minWidth: 180,
       renderCell: ({ row }) => (
@@ -264,47 +240,40 @@ const HPTab = () => {
       )
     },
     { field: 'route_name', headerName: 'Route', width: 140, renderCell: ({ value }) => value ? <Chip label={value} size="small" color="primary" variant="outlined" /> : '-' },
-    { field: 'odn_number', headerName: 'ODN', width: 130, renderCell: ({ value }) => value ? <Typography fontWeight={700} color="secondary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{value}</Typography> : '-' },
-    { field: 'pod_number', headerName: 'POD #', width: 160,
+    { field: 'driver_name', headerName: 'Driver / Deliverer', width: 180,
+      renderCell: ({ row }) => (row.driver_name || row.deliverer_name) ? (
+        <Box sx={{ py: 0.5 }}>
+          {row.vehicle_name && <Typography variant="caption" color="primary.main" fontWeight={700} display="block">{row.vehicle_name}</Typography>}
+          {row.driver_name && <Typography variant="body2" fontWeight={600}>{row.driver_name}</Typography>}
+          {row.deliverer_name && <Typography variant="caption" color="text.secondary">{row.deliverer_name}</Typography>}
+        </Box>
+      ) : <Typography variant="caption" color="text.secondary">—</Typography>
+    },
+    { field: 'odn_numbers', headerName: 'ODN(s)', width: 200, renderCell: ({ value }) => value ? <Typography fontWeight={700} color="secondary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6, py: 0.5 }}>{value}</Typography> : '-' },
+    { field: 'pod_numbers', headerName: 'POD #(s)', width: 180,
       renderCell: ({ value }) => !value
         ? <Chip label="No POD" size="small" color="warning" variant="outlined" />
-        : <Typography fontWeight={700} color="success.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{value}</Typography>
+        : <Typography fontWeight={700} color="success.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6, py: 0.5 }}>{value}</Typography>
     },
     { field: 'reporting_month', headerName: 'Month', width: 130 },
-    { field: 'folder_number', headerName: 'Folder #', width: 150,
-      renderCell: ({ row }) => {
-        const [val, setVal] = useState(row.folder_number || '');
-        return (
-          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-            <TextField size="small" value={val} onChange={e => setVal(e.target.value)} placeholder="Folder #" sx={{ width: 90 }}
-              onKeyDown={e => { if (e.key === 'Enter') handleFolderSave(row, val); }} />
-            <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 0.5 }} onClick={() => handleFolderSave(row, val)}>✓</Button>
-          </Box>
-        );
-      }
+    { field: 'folder_number', headerName: 'Folder #', width: 130,
+      renderCell: ({ value }) => value
+        ? <Typography variant="body2" fontWeight={700} color="primary.main">{value}</Typography>
+        : <Typography variant="caption" color="text.disabled">—</Typography>
     },
-    { field: 'submitted_by', headerName: 'Submitted By', width: 150,
-      renderCell: ({ value }) => value ? <Typography variant="body2" fontWeight={600}>{value}</Typography> : <Typography variant="caption" color="text.secondary">—</Typography>
-    },
-    { field: 'received', headerName: 'Received', width: 120,
+    { field: 'received_by', headerName: 'Finance Officer', width: 180,
       renderCell: ({ row }) => (
-        <Tooltip title={row.received ? `Received by ${row.received_by}` : 'Mark as received'}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Checkbox checked={!!row.received} disabled={!!row.received} onChange={() => handleMarkReceived(row)} color="success" size="small" />
-            {row.received && <CheckCircle sx={{ color: 'success.main', fontSize: 16 }} />}
-          </Box>
-        </Tooltip>
-      )
-    },
-    { field: 'received_by', headerName: 'Received By', width: 160,
-      renderCell: ({ row }) => !row.received ? <Typography variant="caption" color="text.secondary">—</Typography> : (
-        <Box>
+        <Box sx={{ py: 0.5 }}>
           <Typography variant="body2" fontWeight={600}>{row.received_by || '—'}</Typography>
           {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
         </Box>
       )
     },
-  ];
+    { field: 'submitted_by', headerName: 'Submitted By', width: 150,
+      renderCell: ({ value }) => value ? <Typography variant="body2" fontWeight={600}>{value}</Typography> : <Typography variant="caption" color="text.secondary">—</Typography>
+    },
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [handleMarkReceived]);
 
   return (
     <Box>
@@ -337,9 +306,9 @@ const HPTab = () => {
       </Paper>
       <Paper sx={{ height: 540 }}>
         {loading ? <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><CircularProgress /></Box> : (
-          <DataGrid rows={filtered.map((r, i) => ({ ...r, id: r.invoice_id || `${r.process_id}_${r.odn_id || i}` }))} columns={columns}
+          <DataGrid rows={filtered.map((r, i) => ({ ...r, id: r.process_id }))} columns={columns}
             pageSize={10} rowsPerPageOptions={[10, 25, 50]} disableSelectionOnClick getRowHeight={() => 'auto'}
-            sx={{ '& .MuiDataGrid-columnHeaders': { backgroundColor: '#2e7d32', color: '#fff', fontWeight: 700 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#e8f5e9' }, '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1 } }}
+            sx={{ '& .MuiDataGrid-columnHeaders': { backgroundColor: '#2e7d32', color: '#fff', fontWeight: 700 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#e8f5e9' }, '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1, whiteSpace: 'normal !important', lineHeight: '1.6 !important' } }}
           />
         )}
       </Paper>
@@ -348,8 +317,13 @@ const HPTab = () => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-const FinanceInvoiceView = () => {
+// mode: 'rdf' | 'hp' | undefined (shows both tabs)
+const FinanceInvoiceView = ({ mode }) => {
   const [tab, setTab] = useState(0);
+
+  if (mode === 'rdf') return <Box sx={{ p: 2 }}><RDFTab /></Box>;
+  if (mode === 'hp') return <Box sx={{ p: 2 }}><HPTab /></Box>;
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, p: 2, borderRadius: 2, bgcolor: '#e3f2fd' }}>

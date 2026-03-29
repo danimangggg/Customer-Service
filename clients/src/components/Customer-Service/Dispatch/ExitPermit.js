@@ -37,6 +37,8 @@ const ExitPermit = () => {
   const [editingRecord, setEditingRecord] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [editSaving, setEditSaving] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
 
   // Access control - only for Dispatch-Documentation users
   const userJobTitle = localStorage.getItem('JobTitle') || '';
@@ -618,7 +620,7 @@ const ExitPermit = () => {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, backgroundColor: '#f4f6f8', minHeight: '100vh' }}>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 4 }, backgroundColor: '#f4f6f8', minHeight: '100vh' }}>
       
       {/* Header */}
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -673,13 +675,22 @@ const ExitPermit = () => {
 
       {/* Current Tab - Table View */}
       {currentTab === 0 && (
-        <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: '0 10px 30px rgba(0,0,0,0.05)' }}>
+        <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: '0 10px 30px rgba(0,0,0,0.05)', overflowX: 'auto' }}>
           {error && (
             <Alert severity="error" sx={{ m: 2 }}>
               {error}
             </Alert>
           )}
           <Table>
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#1a237e' }}>
+                <TableCell sx={{ fontWeight: 700, color: 'white', width: 60 }}>#</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'white' }}>ODN & FACILITY</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'white' }}>QUANTITY & UNITS</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'white' }}>PLATE & RECEIPTS</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 700, color: 'white' }}>ACTION</TableCell>
+              </TableRow>
+            </TableHead>
             <TableBody>
               {records.length === 0 ? (
                 <TableRow>
@@ -692,10 +703,11 @@ const ExitPermit = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                records.map((row) => {
+                records.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage).map((row, index) => {
                   const isCash = row.customer_type?.toLowerCase() === 'cash';
                   const val = formValues[row.id] || {};
                   const isFinalized = row.status === 'archived';
+                  const serialNumber = (currentPage - 1) * rowsPerPage + index + 1;
                     
                     return (
                       <TableRow 
@@ -706,6 +718,10 @@ const ExitPermit = () => {
                           bgcolor: isFinalized ? '#f5f5f5' : 'transparent'
                         }}
                       >
+                        {/* Serial Number */}
+                        <TableCell sx={{ fontWeight: 700, color: 'text.secondary', verticalAlign: 'top', py: 3 }}>
+                          {serialNumber}
+                        </TableCell>
                         {/* ODN & Store Info */}
                         <TableCell sx={{ verticalAlign: 'top', py: 3 }}>
                           <Box sx={{ mb: 2 }}>
@@ -867,6 +883,18 @@ const ExitPermit = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      )}
+      {currentTab === 0 && records.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+          <Pagination
+            count={Math.ceil(records.length / rowsPerPage)}
+            page={currentPage}
+            onChange={(_, val) => setCurrentPage(val)}
+            color="primary"
+            showFirstButton
+            showLastButton
+          />
+        </Box>
       )}
 
       {/* Advanced DataGrid for History Tab */}

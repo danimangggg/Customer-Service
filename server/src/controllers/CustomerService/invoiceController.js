@@ -225,7 +225,7 @@ const getHPDocumentationCompleted = async (req, res) => {
     const { search, month, year, received } = req.query;
     const branchCode = req.headers['x-account-type'] !== 'Super Admin' ? (req.headers['x-branch-code'] || null) : null;
 
-    let conditions = [`p.status = 'documentation_completed'`];
+    let conditions = [`p.status IN ('documentation_completed', 'finance_received')`];
     if (branchCode) conditions.push(`f.branch_code = '${branchCode}'`);
     const replacements = [];
 
@@ -237,43 +237,58 @@ const getHPDocumentationCompleted = async (req, res) => {
       conditions.push(`(f.facility_name LIKE ? OR o.odn_number LIKE ? OR o.pod_number LIKE ?)`);
       replacements.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
-    if (received === 'yes') conditions.push(`inv.received = 1`);
-    if (received === 'no') conditions.push(`(inv.received IS NULL OR inv.received = 0)`);
 
     const where = conditions.filter(Boolean).join(' AND ');
+
+    // received filter goes in HAVING (post-aggregation) to avoid row-level join issues
+    const havingClauses = [];
+    if (received === 'yes') havingClauses.push(`MAX(inv.received) = 1`);
+    if (received === 'no') havingClauses.push(`(MAX(inv.received) IS NULL OR MAX(inv.received) = 0)`);
+    const having = havingClauses.length > 0 ? `HAVING ${havingClauses.join(' AND ')}` : '';
 
     const query = `
       SELECT
         p.id as process_id,
         p.reporting_month,
         p.process_type,
+        p.driver_name,
+        p.deliverer_name,
+        p.vehicle_name,
         f.facility_name,
         f.region_name, f.zone_name, f.woreda_name,
         r.route_name,
-        o.id as odn_id,
-        o.odn_number,
-        o.pod_number,
-        o.pod_confirmed_at,
-        e.full_name as submitted_by,
-        inv.id as invoice_id,
-        inv.folder_number,
-        inv.received,
-        inv.received_by,
-        inv.received_at,
-        inv.returned,
-        inv.returned_by,
-        inv.returned_at
+        GROUP_CONCAT(DISTINCT o.odn_number ORDER BY o.odn_number SEPARATOR ', ') as odn_numbers,
+        GROUP_CONCAT(DISTINCT o.pod_number ORDER BY o.pod_number SEPARATOR ', ') as pod_numbers,
+        MAX(o.pod_confirmed_at) as pod_confirmed_at,
+        MAX(e.full_name) as submitted_by,
+        MAX(inv.id) as invoice_id,
+        MAX(inv.folder_number) as folder_number,
+        MAX(inv.received) as received,
+        MAX(inv.received_by) as received_by,
+        MAX(inv.received_at) as received_at,
+        MAX(inv.returned) as returned,
+        MAX(inv.returned_by) as returned_by,
+        MAX(inv.returned_at) as returned_at
       FROM processes p
       INNER JOIN odns o ON o.process_id = p.id
       LEFT JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN routes r ON f.route = r.route_name
       LEFT JOIN employees e ON o.pod_confirmed_by = e.id
-      LEFT JOIN invoices inv ON inv.process_id = p.id AND inv.odn_number = o.odn_number
+      LEFT JOIN invoices inv ON inv.process_id = p.id
       WHERE ${where}
-      ORDER BY o.pod_confirmed_at DESC
+      GROUP BY p.id, p.reporting_month, p.process_type, p.driver_name, p.deliverer_name, p.vehicle_name,
+               f.facility_name, f.region_name, f.zone_name, f.woreda_name, r.route_name
+      ${having}
+      ORDER BY pod_confirmed_at DESC
     `;
 
     const results = await db.sequelize.query(query, { replacements, type: db.sequelize.QueryTypes.SELECT });
+
+    // Debug: log to verify folder_number is coming through
+    if (results.length > 0) {
+      console.log('[HP Finance] process_id:', results[0].process_id, '| folder_number:', results[0].folder_number, '| invoice_id:', results[0].invoice_id);
+    }
+
     res.json({ success: true, data: results });
   } catch (error) {
     console.error('Error fetching HP documentation completed:', error);
@@ -284,11 +299,10 @@ const getHPDocumentationCompleted = async (req, res) => {
 // Mark HP invoice as received (reuse same invoices table, just with pod_number as identifier)
 const markHPReceived = async (req, res) => {
   try {
-    const { process_id, odn_number, received_by } = req.body;
-    // Upsert into invoices table
+    const { process_id, received_by } = req.body;
     const [existing] = await db.sequelize.query(
-      'SELECT id FROM invoices WHERE process_id = ? AND odn_number = ?',
-      { replacements: [process_id, odn_number], type: db.sequelize.QueryTypes.SELECT }
+      'SELECT id FROM invoices WHERE process_id = ? ORDER BY id DESC LIMIT 1',
+      { replacements: [process_id], type: db.sequelize.QueryTypes.SELECT }
     );
     if (existing) {
       await db.sequelize.query(
@@ -298,10 +312,26 @@ const markHPReceived = async (req, res) => {
     } else {
       await db.sequelize.query(
         `INSERT INTO invoices (process_id, odn_number, invoice_number, invoice_date, received, received_by, received_at, created_at, updated_at)
-         VALUES (?, ?, '', NOW(), 1, ?, NOW(), NOW(), NOW())`,
-        { replacements: [process_id, odn_number, received_by], type: db.sequelize.QueryTypes.INSERT }
+         VALUES (?, 'N/A', 'N/A', CURDATE(), 1, ?, NOW(), NOW(), NOW())`,
+        { replacements: [process_id, received_by], type: db.sequelize.QueryTypes.INSERT }
       );
     }
+
+    // Mark process as finance_received — this is the true completion point
+    await db.sequelize.query(
+      `UPDATE processes SET status = 'finance_received', finance_received_at = NOW() WHERE id = ?`,
+      { replacements: [process_id], type: db.sequelize.QueryTypes.UPDATE }
+    );
+
+    // Record service time — finance received = end of waiting time
+    try {
+      await db.sequelize.query(
+        `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes)
+         VALUES (?, 'Finance - Document Received', NOW(), NULL, ?, 'completed', 'Document received by finance')`,
+        { replacements: [process_id, received_by], type: db.sequelize.QueryTypes.INSERT }
+      );
+    } catch (e) { console.error('Service time error:', e); }
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -311,25 +341,30 @@ const markHPReceived = async (req, res) => {
 // Save folder number for HP
 const saveHPFolderNumber = async (req, res) => {
   try {
-    const { process_id, odn_number, folder_number } = req.body;
+    const { process_id, folder_number } = req.body;
+    console.log('[saveHPFolderNumber] process_id:', process_id, '| folder_number:', folder_number);
     const [existing] = await db.sequelize.query(
-      'SELECT id FROM invoices WHERE process_id = ? AND odn_number = ?',
-      { replacements: [process_id, odn_number], type: db.sequelize.QueryTypes.SELECT }
+      'SELECT id FROM invoices WHERE process_id = ? ORDER BY id DESC LIMIT 1',
+      { replacements: [process_id], type: db.sequelize.QueryTypes.SELECT }
     );
+    console.log('[saveHPFolderNumber] existing invoice row:', existing);
     if (existing) {
       await db.sequelize.query(
         `UPDATE invoices SET folder_number = ?, updated_at = NOW() WHERE id = ?`,
         { replacements: [folder_number, existing.id], type: db.sequelize.QueryTypes.UPDATE }
       );
+      console.log('[saveHPFolderNumber] updated invoice id:', existing.id);
     } else {
       await db.sequelize.query(
         `INSERT INTO invoices (process_id, odn_number, invoice_number, invoice_date, folder_number, created_at, updated_at)
-         VALUES (?, ?, '', NOW(), ?, NOW(), NOW())`,
-        { replacements: [process_id, odn_number, folder_number], type: db.sequelize.QueryTypes.INSERT }
+         VALUES (?, 'N/A', 'N/A', CURDATE(), ?, NOW(), NOW())`,
+        { replacements: [process_id, folder_number], type: db.sequelize.QueryTypes.INSERT }
       );
+      console.log('[saveHPFolderNumber] inserted new invoice row');
     }
     res.json({ success: true });
   } catch (error) {
+    console.error('saveHPFolderNumber error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 };

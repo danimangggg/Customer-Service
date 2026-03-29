@@ -173,16 +173,24 @@ const TvCustomer = () => {
   const activeOrdersRef = useRef([]);
   activeOrdersRef.current = activeOrders;
 
+  const processQueueRef = useRef(null);
+
   const processQueue = useCallback(async () => {
     try {
       if (isPlayingAudio.current || audioQueueRef.current.length === 0) return;
       isPlayingAudio.current = true;
-      const nextId = audioQueueRef.current.shift();
-      const order = activeOrdersRef.current.find(c => c && c.id === nextId);
-      if (order && order.displayTicket) await playNumber(order.displayTicket);
-      setTimeout(() => { isPlayingAudio.current = false; }, 3000);
+      const next = audioQueueRef.current.shift();
+      // next is { id, ticket } — use stored ticket so number matches what's on screen
+      const ticket = next?.ticket ?? activeOrdersRef.current.find(c => c?.id === next?.id)?.displayTicket;
+      if (ticket) await playNumber(ticket);
+      setTimeout(() => {
+        isPlayingAudio.current = false;
+        if (audioQueueRef.current.length > 0 && processQueueRef.current) processQueueRef.current();
+      }, 1500);
     } catch { isPlayingAudio.current = false; }
   }, [playNumber]);
+
+  processQueueRef.current = processQueue;
 
   useEffect(() => {
     if (!audioStarted) return;
@@ -191,8 +199,8 @@ const TvCustomer = () => {
       activeOrdersRef.current.forEach(cust => {
         if (cust && cust.isCalling && cust.id) {
           const lastTime = lastCallTimes.current.get(cust.id) || 0;
-          if (now - lastTime >= 15000 && !audioQueueRef.current.includes(cust.id)) {
-            audioQueueRef.current.push(cust.id);
+          if (now - lastTime >= 15000 && !audioQueueRef.current.find(q => q.id === cust.id)) {
+            audioQueueRef.current.push({ id: cust.id, ticket: cust.displayTicket });
             lastCallTimes.current.set(cust.id, now);
           }
         } else if (cust && !cust.isCalling && cust.id) {

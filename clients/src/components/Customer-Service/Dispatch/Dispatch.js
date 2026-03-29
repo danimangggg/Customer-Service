@@ -551,6 +551,9 @@ const DispatcherAccount = () => {
                                             ODN Number
                                         </TableCell>
                                         <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
+                                            Waiting Time
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
                                             Customer Type
                                         </TableCell>
                                         <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'text.primary' }}>
@@ -589,12 +592,36 @@ const DispatcherAccount = () => {
                                                     </TableCell>
                                                     
                                                     <TableCell>
-                                                        <Chip
-                                                            label={getCustomerOdns(item.id)}
-                                                            color={getCustomerOdns(item.id) !== 'Pending' ? "primary" : "default"}
-                                                            variant="outlined"
-                                                            sx={{ fontWeight: 'bold', borderRadius: 2 }}
-                                                        />
+                                                        <Typography
+                                                            variant="body2"
+                                                            sx={{
+                                                                fontWeight: 'bold',
+                                                                whiteSpace: 'normal',
+                                                                wordBreak: 'break-word',
+                                                                maxWidth: 200,
+                                                                color: getCustomerOdns(item.id) !== 'Pending' ? 'primary.main' : 'text.secondary'
+                                                            }}
+                                                        >
+                                                            {getCustomerOdns(item.id)}
+                                                        </Typography>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {item.started_at ? (
+                                                            (() => {
+                                                                const mins = Math.floor((Date.now() - new Date(item.started_at)) / 60000);
+                                                                const label = mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+                                                                const color = mins >= 60 ? 'error' : mins >= 30 ? 'warning' : 'success';
+                                                                return (
+                                                                    <Chip
+                                                                        label={label}
+                                                                        color={color}
+                                                                        size="small"
+                                                                        variant="outlined"
+                                                                        sx={{ fontWeight: 'bold' }}
+                                                                    />
+                                                                );
+                                                            })()
+                                                        ) : '—'}
                                                     </TableCell>
 
                                                     <TableCell>

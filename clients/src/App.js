@@ -1,5 +1,7 @@
 import Navbar2 from './components/Navbar/Navbar2'
 import './App.css'
+import { useState, useEffect } from 'react';
+import { registerOfflineHandler } from './axiosInstance';
 import SignIn from './pages/UserAccountPage/SignInPage';
 import ChangePassword from './pages/UserAccountPage/ChangePasswordPage';
 import ProtectedRoutes from './components/ProtectedRoutes/ProtectedRoutes';
@@ -81,6 +83,63 @@ const FuelLogBookRoute = () => {
 
 const AppContent = () => {
   const location = useLocation();
+  const [isOffline, setIsOffline] = useState(false);
+
+  // Cross-tab logout: if another tab clears localStorage (logs out), redirect immediately
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      // token key removed or cleared from another tab
+      if (e.key === 'token' && !e.newValue) {
+        window.location.href = '/';
+      }
+      // localStorage.clear() fires a storage event with key=null
+      if (e.key === null && !localStorage.getItem('token')) {
+        window.location.href = '/';
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  useEffect(() => {
+    registerOfflineHandler(setIsOffline);
+  }, []);
+
+  // Idle session timeout — 30 minutes of inactivity
+  useEffect(() => {
+    const TIMEOUT_MS = 30 * 60 * 1000;
+    let timer;
+
+    const reset = () => {
+      clearTimeout(timer);
+      // Only run if logged in
+      if (!localStorage.getItem('token')) return;
+      timer = setTimeout(() => {
+        localStorage.clear();
+        window.location.href = '/';
+      }, TIMEOUT_MS);
+    };
+
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, reset));
+    reset(); // start timer on mount
+
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, []);
+  useEffect(() => {
+    if (!isOffline) return;
+    const interval = setInterval(async () => {
+      try {
+        await fetch((process.env.REACT_APP_API_URL || 'http://localhost:3001') + '/api/health', { method: 'GET' });
+        setIsOffline(false);
+      } catch (_) {}
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isOffline]);
+
   const isPublicPage = location.pathname === '/' || location.pathname === '/login';
   
   // TV Display routes should be fullscreen (no navbar, no footer)
@@ -97,6 +156,55 @@ const AppContent = () => {
   
   return (
     <>
+      {isOffline && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          zIndex: 99999, display: 'flex', justifyContent: 'center', alignItems: 'center',
+          background: 'rgba(10,10,20,0.7)', backdropFilter: 'blur(6px)',
+          pointerEvents: 'none'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+            color: '#fff', borderRadius: '20px',
+            padding: '48px 56px', textAlign: 'center',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08)',
+            pointerEvents: 'auto', maxWidth: '380px', width: '90%'
+          }}>
+            <div style={{
+              width: '72px', height: '72px', borderRadius: '50%',
+              background: 'rgba(211,47,47,0.15)', border: '2px solid rgba(211,47,47,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 24px', fontSize: '2rem'
+            }}>📡</div>
+            <div style={{ fontWeight: 700, fontSize: '1.25rem', marginBottom: '10px', letterSpacing: 0.3 }}>
+              Connection Problem
+            </div>
+            <div style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: '28px' }}>
+              Check your internet connection.<br />Reconnecting automatically...
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <div style={{
+                width: '8px', height: '8px', borderRadius: '50%', background: '#ef5350',
+                animation: 'pulse-dot 1.4s ease-in-out infinite'
+              }} />
+              <div style={{
+                width: '8px', height: '8px', borderRadius: '50%', background: '#ef5350',
+                animation: 'pulse-dot 1.4s ease-in-out 0.2s infinite'
+              }} />
+              <div style={{
+                width: '8px', height: '8px', borderRadius: '50%', background: '#ef5350',
+                animation: 'pulse-dot 1.4s ease-in-out 0.4s infinite'
+              }} />
+            </div>
+          </div>
+          <style>{`
+            @keyframes pulse-dot {
+              0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+              40% { opacity: 1; transform: scale(1.2); }
+            }
+          `}</style>
+        </div>
+      )}
       {showNavbar && <Navbar2 />}
       <div className={isPublicPage || isTvDisplayPage ? 'public-content' : 'main-content'}>
         <Routes>

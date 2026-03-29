@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import api from '../../axiosInstance';
 import {
   Container, Card, CardContent, CardHeader, Grid, Typography, Box,
   Tabs, Tab, Button, TextField, MenuItem, Stack, Chip, Avatar,
@@ -15,7 +16,8 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PeopleIcon from '@mui/icons-material/People';
-import api from '../../axiosInstance';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import FinanceInvoiceView from '../Finance/FinanceInvoiceView';
 
 // Import sub-pages
 import ODNPODDetailReport from './HPReport/ODNPODDetailReport';
@@ -123,7 +125,7 @@ const HPComprehensiveReport = () => {
   }, [selectedMonth, selectedYear, processType, selectedBranch]);
 
   useEffect(() => {
-    if (activeTab === 7) fetchBestOfHP(bestOfRange);
+    if (activeTab === 8) fetchBestOfHP(bestOfRange);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBranch]);
 
@@ -146,7 +148,7 @@ const HPComprehensiveReport = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    if (newValue === 7) fetchBestOfHP(bestOfRange);
+    if (newValue === 8) fetchBestOfHP(bestOfRange);
   };
 
   const handleExportReport = () => {
@@ -162,7 +164,8 @@ const HPComprehensiveReport = () => {
     { label: 'Service Units Detail',      icon: <TableChartIcon /> },
     { label: 'Route Analysis',            icon: <RouteIcon /> },
     { label: 'All Picklists',             icon: <TrendingUpIcon /> },
-    { label: 'Best Of',                   icon: <EmojiEventsIcon /> }
+    { label: 'Finance',                    icon: <ReceiptIcon /> },
+    { label: 'Best Of',                    icon: <EmojiEventsIcon /> }
   ];
 
   return (
@@ -242,7 +245,8 @@ const HPComprehensiveReport = () => {
             {activeTab === 4 && <ServiceUnitsDetail data={reportData} />}
             {activeTab === 5 && <RouteAnalysis branchCode={selectedBranch} />}
             {activeTab === 6 && <HPPicklistReport branchCode={selectedBranch} />}
-            {activeTab === 7 && (
+            {activeTab === 7 && <FinanceInvoiceView mode="hp" />}
+            {activeTab === 8 && (
               <Box>
                 {/* Date Range Controls */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>

@@ -47,6 +47,9 @@ const uploadPicklist = require("../middleware/uploadPicklist");
 app.use(cors());
 let routes =  (app) => {
 
+  // Health check
+  router.get('/api/health', (req, res) => res.json({ ok: true }));
+
   // User Account routes
   router.post("/api/addUser", AddUser.AddUser);
   router.post("/api/login", Login.login);

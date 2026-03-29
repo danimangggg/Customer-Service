@@ -29,7 +29,8 @@ exports.getTMRoutes = async (req, res) => {
         r.route_name,
         COUNT(DISTINCT f.id) as total_facilities,
         COUNT(DISTINCT CASE
-          WHEN p.status IN (${READY_STATUSES.map(() => '?').join(',')})
+          WHEN p.vehicle_id IS NULL AND (
+            p.status IN (${READY_STATUSES.map(() => '?').join(',')})
             OR EXISTS (
               SELECT 1 FROM odns o JOIN processes op ON op.id = o.process_id
               WHERE op.facility_id = f.id AND op.reporting_month = ?
@@ -40,13 +41,13 @@ exports.getTMRoutes = async (req, res) => {
               WHERE op.facility_id = f.id AND op.reporting_month = ?
               AND o.quality_confirmed = 1
             )
+          )
           THEN f.id END) as ready_facilities
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
         AND (f.period = 'Monthly' OR f.period = ?)
         ${branchFilter}
       LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
-        AND p.vehicle_id IS NULL
       WHERE f.route IS NOT NULL
       GROUP BY r.id, r.route_name
       HAVING total_facilities > 0 AND ready_facilities > 0
@@ -119,7 +120,7 @@ exports.getTMPhase2Routes = async (req, res) => {
         r.route_name,
         COUNT(DISTINCT f.id) as total_facilities,
         COUNT(DISTINCT CASE
-          WHEN p_rep.status = 'biller_completed' AND p_rep.vehicle_id IS NOT NULL
+          WHEN p_rep.status = 'freight_order_sent_to_ewm' AND p_rep.vehicle_id IS NOT NULL
           THEN f.id END) as ready_facilities,
         MAX(p_rep.vehicle_name) as vehicle_name,
         MAX(p_rep.vehicle_id) as vehicle_id
@@ -146,7 +147,9 @@ exports.getTMPhase2Routes = async (req, res) => {
           COALESCE(p_reg.status, p_vac.status, 'no_process') as process_status,
           CASE WHEN p_vac.id IS NOT NULL AND p_reg.id IS NULL THEN 'vaccine'
                WHEN p_reg.id IS NOT NULL THEN 'regular'
-               ELSE NULL END as process_type
+               ELSE NULL END as process_type,
+          COALESCE(p_reg.vehicle_id, p_vac.vehicle_id) as vehicle_id,
+          COALESCE(p_reg.vehicle_name, p_vac.vehicle_name) as vehicle_name
         FROM facilities f
         LEFT JOIN processes p_reg ON p_reg.facility_id = f.id AND p_reg.reporting_month = ? AND p_reg.process_type = 'regular'
         LEFT JOIN processes p_vac ON p_vac.facility_id = f.id AND p_vac.reporting_month = ? AND p_vac.process_type = 'vaccine'
@@ -169,60 +172,76 @@ exports.getTMPhase2Routes = async (req, res) => {
   }
 };
 
-// TM Phase 1: Assign vehicle to ALL ready processes in a route
+// TM Phase 1: Assign vehicles to processes in a route — supports multiple vehicles per route
 exports.createFreightOrder = async (req, res) => {
   try {
-    const { route_name, reporting_month, vehicle_id, vehicle_name, tm_officer_id, tm_officer_name } = req.body;
+    const { route_name, reporting_month, vehicle_assignments, tm_officer_id, tm_officer_name } = req.body;
 
-    const facilitiesInRoute = await Facility.findAll({ where: { route: route_name }, attributes: ['id'] });
-    const facilityIds = facilitiesInRoute.map(f => f.id);
+    // vehicle_assignments: [{ vehicle_id, vehicle_name, facility_ids[] }]
+    for (const assignment of vehicle_assignments) {
+      const { vehicle_id, vehicle_name, facility_ids } = assignment;
+      if (!facility_ids || facility_ids.length === 0) continue;
 
-    await Process.update(
-      { vehicle_id, vehicle_name, tm_confirmed_at: new Date(), tm_officer_id, tm_officer_name, status: 'freight_order_sent_to_ewm' },
-      { where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: { [Op.in]: READY_STATUSES } } }
-    );
+      await Process.update(
+        { vehicle_id, vehicle_name, tm_confirmed_at: new Date(), tm_officer_id, tm_officer_name, status: 'freight_order_sent_to_ewm' },
+        { where: { facility_id: { [Op.in]: facility_ids }, reporting_month, status: { [Op.in]: READY_STATUSES } } }
+      );
 
-    try {
-      const procs = await Process.findAll({ where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: 'freight_order_sent_to_ewm' } });
-      for (const p of procs) {
-        await db.sequelize.query(
-          `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes) VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
-          { replacements: [p.id, 'TM - Vehicle Assignment', tm_officer_id, tm_officer_name || 'TM Manager', 'completed', `Vehicle: ${vehicle_name}`], type: db.sequelize.QueryTypes.INSERT }
-        );
-      }
-    } catch (e) { console.error('Service time error:', e); }
+      try {
+        const procs = await Process.findAll({ where: { facility_id: { [Op.in]: facility_ids }, reporting_month, status: 'freight_order_sent_to_ewm', vehicle_id } });
+        for (const p of procs) {
+          await db.sequelize.query(
+            `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes) VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
+            { replacements: [p.id, 'TM - Vehicle Assignment', tm_officer_id, tm_officer_name || 'TM Manager', 'completed', `Vehicle: ${vehicle_name}`], type: db.sequelize.QueryTypes.INSERT }
+          );
+        }
+      } catch (e) { console.error('Service time error:', e); }
+    }
 
-    res.json({ success: true, message: 'Vehicle assigned to all route processes' });
+    res.json({ success: true, message: 'Vehicles assigned to route processes' });
   } catch (error) {
     console.error('createFreightOrder error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// TM Phase 2: Assign driver/deliverer to ALL tm_confirmed processes in a route
+// TM Phase 2: Assign driver/deliverer per vehicle for a route — supports multiple vehicles
 exports.assignVehicle = async (req, res) => {
   try {
-    const { route_name, reporting_month, driver_id, driver_name, deliverer_id, deliverer_name, departure_kilometer, tm_officer_id, tm_officer_name } = req.body;
+    const { route_name, reporting_month, driver_assignments, tm_officer_id, tm_officer_name } = req.body;
 
-    const facilitiesInRoute = await Facility.findAll({ where: { route: route_name }, attributes: ['id'] });
-    const facilityIds = facilitiesInRoute.map(f => f.id);
+    // driver_assignments: [{ vehicle_id, driver_id, driver_name, deliverer_id, deliverer_name, departure_kilometer, facility_ids[] }]
+    for (const assignment of driver_assignments) {
+      const { vehicle_id, driver_id, driver_name, deliverer_id, deliverer_name, departure_kilometer, facility_ids } = assignment;
 
-    await Process.update(
-      { driver_id, driver_name, deliverer_id: deliverer_id || null, deliverer_name: deliverer_name || null, departure_kilometer: departure_kilometer ? parseFloat(departure_kilometer) : null, driver_assigned_at: new Date(), status: 'driver_assigned' },
-      { where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: 'biller_completed', vehicle_id: { [Op.ne]: null } } }
-    );
-
-    try {
-      const procs = await Process.findAll({ where: { facility_id: { [Op.in]: facilityIds }, reporting_month, status: 'driver_assigned', vehicle_id: { [Op.ne]: null } } });
-      for (const p of procs) {
-        await db.sequelize.query(
-          `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes) VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
-          { replacements: [p.id, 'TM - Driver & Deliverer Assignment', tm_officer_id, tm_officer_name || 'TM Manager', 'completed', `Driver: ${driver_name}`], type: db.sequelize.QueryTypes.INSERT }
-        );
+      // If facility_ids provided, scope to those; otherwise scope to all facilities with this vehicle in the route
+      let whereClause = { reporting_month, status: 'freight_order_sent_to_ewm', vehicle_id };
+      if (facility_ids && facility_ids.length > 0) {
+        whereClause.facility_id = { [Op.in]: facility_ids };
+      } else {
+        const facilitiesInRoute = await Facility.findAll({ where: { route: route_name }, attributes: ['id'] });
+        whereClause.facility_id = { [Op.in]: facilitiesInRoute.map(f => f.id) };
       }
-    } catch (e) { console.error('Service time error:', e); }
 
-    res.json({ success: true, message: 'Driver assigned to all route processes' });
+      await Process.update(
+        { driver_id, driver_name, deliverer_id: deliverer_id || null, deliverer_name: deliverer_name || null,
+          departure_kilometer: departure_kilometer ? parseFloat(departure_kilometer) : null,
+          driver_assigned_at: new Date(), status: 'driver_assigned' },
+        { where: whereClause }
+      );
+
+      try {
+        const procs = await Process.findAll({ where: { ...whereClause, status: 'driver_assigned' } });
+        for (const p of procs) {
+          await db.sequelize.query(
+            `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes) VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
+            { replacements: [p.id, 'TM - Driver & Deliverer Assignment', tm_officer_id, tm_officer_name || 'TM Manager', 'completed', `Driver: ${driver_name}`], type: db.sequelize.QueryTypes.INSERT }
+          );
+        }
+      } catch (e) { console.error('Service time error:', e); }
+    }
+
+    res.json({ success: true, message: 'Drivers assigned to route vehicles' });
   } catch (error) {
     console.error('assignVehicle error:', error);
     res.status(500).json({ success: false, message: error.message });

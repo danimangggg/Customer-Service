@@ -10,8 +10,7 @@ import {
   CheckCircle as CheckIcon,
   HourglassEmpty as PendingIcon,
   Info as InfoIcon,
-  LocalHospital as HPIcon,
-  Vaccines as VaccineIcon,
+  DirectionsCar as CarIcon,
 } from '@mui/icons-material';
 import api from '../../axiosInstance';
 import Swal from 'sweetalert2';
@@ -162,9 +161,7 @@ const DispatchManagement = () => {
                 <TableCell>Route</TableCell>
                 <TableCell align="center">Facilities</TableCell>
                 <TableCell align="center">Ready</TableCell>
-                <TableCell>Vehicle</TableCell>
-                <TableCell>Driver</TableCell>
-                <TableCell>Deliverer</TableCell>
+                <TableCell>Vehicles / Drivers</TableCell>
                 <TableCell align="center">Details</TableCell>
                 <TableCell align="center">Action</TableCell>
               </TableRow>
@@ -188,13 +185,19 @@ const DispatchManagement = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">{route.vehicle_name || '—'}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{route.driver_name || '—'}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">{route.deliverer_name || '—'}</Typography>
+                      <Stack spacing={0.5}>
+                        {(route.vehicles || []).length > 0
+                          ? (route.vehicles || []).map(v => (
+                              <Stack key={v.vehicle_id} spacing={0.2}>
+                                <Chip label={v.vehicle_name} size="small" color="primary" variant="outlined" icon={<CarIcon />} />
+                                <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
+                                  {v.driver_name || '—'}{v.deliverer_name ? ` / ${v.deliverer_name}` : ''}
+                                </Typography>
+                              </Stack>
+                            ))
+                          : <Typography variant="body2" color="text.secondary">—</Typography>
+                        }
+                      </Stack>
                     </TableCell>
                     <TableCell align="center">
                       <Button
@@ -224,7 +227,7 @@ const DispatchManagement = () => {
               })}
               {routes.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary' }}>
                     No routes ready for dispatch
                   </TableCell>
                 </TableRow>

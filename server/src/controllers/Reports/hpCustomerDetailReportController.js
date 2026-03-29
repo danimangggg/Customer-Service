@@ -161,8 +161,10 @@ const getHPCustomersDetailReport = async (req, res) => {
         
         CASE 
           WHEN p.status = 'vehicle_requested' THEN 'Vehicle Requested'
+          WHEN p.status = 'finance_received' THEN 'Completed'
           WHEN p.status = 'completed' THEN 'Completed'
           WHEN p.status = 'documentation_completed' THEN 'Completed'
+          WHEN p.status = 'partial_completed' THEN 'Partial Completed'
           WHEN p.status = 'dispatch_completed' THEN 'Dispatch Completed'
           WHEN p.status = 'in_progress' THEN 'In Progress'
           ELSE p.status
@@ -190,14 +192,15 @@ const getHPCustomersDetailReport = async (req, res) => {
 
     console.log('Query successful, found', customers.length, 'real HP processes');
 
-    // Calculate total waiting time: process created_at → quality_evaluated_at
+    // Calculate total waiting time: process created_at → finance_received_at (if received), else NOW()
     const waitingTimeQuery = `
       SELECT p.id,
-        TIMESTAMPDIFF(MINUTE, p.created_at, COALESCE(MAX(o.quality_evaluated_at), NOW())) as total_waiting_time
+        TIMESTAMPDIFF(MINUTE, p.created_at, COALESCE(p.finance_received_at, MAX(inv.received_at), NOW())) as total_waiting_time
       FROM processes p
+      LEFT JOIN invoices inv ON inv.process_id = p.id AND inv.received = 1
       LEFT JOIN odns o ON o.process_id = p.id AND (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%')
       WHERE p.id IN (${customers.map(c => c.id).join(',') || 'NULL'})
-      GROUP BY p.id, p.created_at
+      GROUP BY p.id, p.created_at, p.finance_received_at
     `;
     if (customers.length > 0) {
       const waitingTimes = await db.sequelize.query(waitingTimeQuery, {

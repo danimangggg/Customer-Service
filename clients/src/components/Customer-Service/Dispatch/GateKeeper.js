@@ -7,7 +7,7 @@ import {
   TableContainer, TableHead, TableRow, Paper, CircularProgress, 
   Snackbar, Alert, Chip, Card, CardContent, Stack, Divider,
   Badge, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  Select, MenuItem, FormControl, InputLabel, Autocomplete, TextField
+  Select, MenuItem, FormControl, InputLabel, Autocomplete, TextField, Pagination
 } from '@mui/material';
 import { 
   Security, CheckCircle, LocalShipping, Receipt, 
@@ -35,6 +35,8 @@ const GateKeeper = () => {
   const [availableStores, setAvailableStores] = useState([]);
   const [assignedStores, setAssignedStores] = useState([]); // Use state instead of useMemo
   const [hasCheckedStore, setHasCheckedStore] = useState(false);
+  const [gatePage, setGatePage] = useState(1);
+  const gateRowsPerPage = 10;
   const audioRef = useRef(null);
   const notificationIntervalRef = useRef(null);
   const isFetchingRef = useRef(false);
@@ -327,13 +329,12 @@ const GateKeeper = () => {
             officer_id: gateKeeperId,
             officer_name: gateKeeperName
           });
-          // Mark completed for reporting — process stays in active query because
-          // ODNs still have pending gate_status (tvDisplayController EXISTS check)
+          // Mark as partial_completed — process stays active for remaining stores
+          // Only mark 'completed' when ALL stores have finished (handled in step 4)
           await axios.put(`${API_URL}/api/update-service-status/${record.process_id}`, {
-            status: 'completed',
-            completed_at: new Date().toISOString()
+            status: 'partial_completed'
           });
-          console.log(`✅ Partial exit: reset ${record.store_id} statuses to pending, marked completed for reporting`);
+          console.log(`✅ Partial exit: reset ${record.store_id} statuses to pending, marked partial_completed`);
         } catch (err) {
           console.error('❌ Failed to reset partial exit statuses:', err);
         }
@@ -703,11 +704,22 @@ const GateKeeper = () => {
         overflowX: 'auto'
       }}>
         <Table stickyHeader>
-          <TableHead sx={{ bgcolor: '#ffffff' }}>
+          <TableHead>
             <TableRow>
               <TableCell sx={{ 
                 fontWeight: 700, 
-                color: '#5c6bc0',
+                color: 'white',
+                bgcolor: '#1a237e',
+                fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.85rem' },
+                width: { xs: '30px', sm: '40px' },
+                py: { xs: 0.75, sm: 1 }
+              }}>
+                #
+              </TableCell>
+              <TableCell sx={{ 
+                fontWeight: 700, 
+                color: 'white',
+                bgcolor: '#1a237e',
                 fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.85rem' },
                 minWidth: { xs: '120px', sm: '140px', md: '170px' },
                 py: { xs: 0.75, sm: 1 }
@@ -716,7 +728,8 @@ const GateKeeper = () => {
               </TableCell>
               <TableCell sx={{ 
                 fontWeight: 700, 
-                color: '#5c6bc0',
+                color: 'white',
+                bgcolor: '#1a237e',
                 fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.85rem' },
                 minWidth: { xs: '110px', sm: '130px', md: '150px' },
                 py: { xs: 0.75, sm: 1 }
@@ -725,7 +738,8 @@ const GateKeeper = () => {
               </TableCell>
               <TableCell align="center" sx={{ 
                 fontWeight: 700, 
-                color: '#5c6bc0',
+                color: 'white',
+                bgcolor: '#1a237e',
                 fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.85rem' },
                 minWidth: { xs: '100px', sm: '120px', md: '140px' },
                 py: { xs: 0.75, sm: 1 }
@@ -752,14 +766,26 @@ const GateKeeper = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              records.map((row) => {
+              records.slice((gatePage - 1) * gateRowsPerPage, gatePage * gateRowsPerPage).map((row, index) => {
                 const isCash = row.customer_type?.toLowerCase() === 'cash';
+                const serialNumber = (gatePage - 1) * gateRowsPerPage + index + 1;
                 
                 return (
                   <TableRow key={row.id} sx={{ 
                     '&:hover': { bgcolor: '#fcfdff' },
                     height: { xs: 'auto', sm: 'auto' }
                   }}>
+                    {/* Serial Number */}
+                    <TableCell sx={{ 
+                      fontWeight: 700, 
+                      color: 'text.secondary',
+                      fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.85rem' },
+                      verticalAlign: 'top',
+                      py: { xs: 0.75, sm: 1, md: 1.5 },
+                      px: { xs: 0.5, sm: 0.75, md: 1 }
+                    }}>
+                      {serialNumber}
+                    </TableCell>
                     {/* Vehicle & Facility Info - Ultra Compact */}
                     <TableCell sx={{ 
                       verticalAlign: 'top', 
@@ -919,6 +945,20 @@ const GateKeeper = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {records.length > 0 && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <Pagination
+            count={Math.ceil(records.length / gateRowsPerPage)}
+            page={gatePage}
+            onChange={(_, val) => setGatePage(val)}
+            color="primary"
+            showFirstButton
+            showLastButton
+            size="small"
+          />
+        </Box>
+      )}
 
       {/* Store Selection Dialog */}
       <Dialog
