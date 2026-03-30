@@ -1,7 +1,7 @@
 const db = require('../../models');
 const { Op } = require('sequelize');
 
-// Get routes assigned for dispatch — grouped by route (all process types combined)
+// Get vehicles assigned for dispatch — grouped by vehicle (all process types combined)
 const getDispatchRoutes = async (req, res) => {
   try {
     const { month, year } = req.query;
@@ -15,71 +15,65 @@ const getDispatchRoutes = async (req, res) => {
     const isEvenMonth = (monthIndex + 1) % 2 === 0;
     const currentPeriod = isEvenMonth ? 'Even' : 'Odd';
 
-    // Group by route — show routes that have at least one driver_assigned process
-    const routesQuery = `
+    // Group by vehicle — show each vehicle separately
+    const vehiclesQuery = `
       SELECT
-        r.id as route_id,
+        p.vehicle_id,
+        p.vehicle_name,
+        p.driver_name,
+        p.deliverer_name,
         r.route_name,
         COUNT(DISTINCT f.id) as total_facilities,
         COUNT(DISTINCT CASE WHEN p.status = 'driver_assigned' THEN f.id END) as ready_facilities,
         COUNT(DISTINCT CASE WHEN p.status = 'dispatch_completed' THEN f.id END) as completed_facilities
-      FROM routes r
-      INNER JOIN facilities f ON f.route = r.route_name
+      FROM processes p
+      INNER JOIN facilities f ON f.id = p.facility_id
         AND (f.period = 'Monthly' OR f.period = ?)
         ${branchFilter}
-      INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+      LEFT JOIN routes r ON f.route = r.route_name
+      WHERE p.reporting_month = ?
         AND p.status IN ('driver_assigned', 'dispatch_completed')
-      WHERE f.route IS NOT NULL
-      GROUP BY r.id, r.route_name
+        AND p.vehicle_id IS NOT NULL
+        AND f.route IS NOT NULL
+      GROUP BY p.vehicle_id, p.vehicle_name, p.driver_name, p.deliverer_name, r.route_name
       HAVING ready_facilities > 0
-      ORDER BY r.route_name
+      ORDER BY r.route_name, p.vehicle_name
     `;
 
-    const routes = await db.sequelize.query(routesQuery, {
+    const vehicles = await db.sequelize.query(vehiclesQuery, {
       replacements: [currentPeriod, reportingMonth],
       type: db.sequelize.QueryTypes.SELECT
     });
 
-    const routesWithFacilities = await Promise.all(routes.map(async (route) => {
+    const vehiclesWithFacilities = await Promise.all(vehicles.map(async (vehicle) => {
       const facilitiesQuery = `
         SELECT
           f.id, f.facility_name,
-          COALESCE(p_reg.status, p_vac.status, 'no_process') as process_status,
-          CASE WHEN p_vac.id IS NOT NULL AND p_reg.id IS NULL THEN 'vaccine'
-               WHEN p_reg.id IS NOT NULL THEN 'regular'
-               ELSE NULL END as process_type,
-          COALESCE(p_reg.vehicle_id, p_vac.vehicle_id) as vehicle_id,
-          COALESCE(p_reg.vehicle_name, p_vac.vehicle_name) as vehicle_name,
-          COALESCE(p_reg.driver_name, p_vac.driver_name) as driver_name,
-          COALESCE(p_reg.deliverer_name, p_vac.deliverer_name) as deliverer_name
+          p.status as process_status,
+          p.process_type,
+          p.vehicle_id,
+          p.vehicle_name,
+          p.driver_name,
+          p.deliverer_name
         FROM facilities f
-        LEFT JOIN processes p_reg ON p_reg.facility_id = f.id AND p_reg.reporting_month = ? AND p_reg.process_type = 'regular'
-        LEFT JOIN processes p_vac ON p_vac.facility_id = f.id AND p_vac.reporting_month = ? AND p_vac.process_type = 'vaccine'
-        WHERE f.route = ? AND (f.period = 'Monthly' OR f.period = ?)
+        INNER JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+          AND p.vehicle_id = ? AND p.status IN ('driver_assigned', 'dispatch_completed')
+        WHERE (f.period = 'Monthly' OR f.period = ?)
         ${branchFilter}
         ORDER BY f.facility_name
       `;
       const facilities = await db.sequelize.query(facilitiesQuery, {
-        replacements: [reportingMonth, reportingMonth, route.route_name, currentPeriod],
+        replacements: [reportingMonth, vehicle.vehicle_id, currentPeriod],
         type: db.sequelize.QueryTypes.SELECT
       });
 
-      // Derive distinct vehicles from facilities
-      const vehicleMap = {};
-      facilities.forEach(f => {
-        if (f.vehicle_id && !vehicleMap[f.vehicle_id]) {
-          vehicleMap[f.vehicle_id] = { vehicle_id: f.vehicle_id, vehicle_name: f.vehicle_name, driver_name: f.driver_name, deliverer_name: f.deliverer_name };
-        }
-      });
-      const vehicles = Object.values(vehicleMap);
-
-      return { ...route, facilities, vehicles };
+      return { ...vehicle, facilities };
     }));
 
-    res.json({ routes: routesWithFacilities });
+    res.json({ routes: vehiclesWithFacilities });
   } catch (error) {
-    console.error('Error fetching dispatch routes:', error);
-    res.status(500).json({ error: 'Failed to fetch dispatch routes', details: error.message });
+    console.error('Error fetching dispatch vehicles:', error);
+    res.status(500).json({ error: 'Failed to fetch dispatch vehicles', details: error.message });
   }
 };
 
@@ -311,10 +305,10 @@ const completeDispatch = async (req, res) => {
 // Complete dispatch for ALL processes in a route (HP workflow)
 const completeDispatchHP = async (req, res) => {
   try {
-    const { route_name, reporting_month, completed_by } = req.body;
+    const { vehicle_id, route_name, reporting_month, completed_by } = req.body;
 
-    if (!route_name || !reporting_month || !completed_by) {
-      return res.status(400).json({ error: 'route_name, reporting_month, and completed_by are required' });
+    if (!reporting_month || !completed_by || (!vehicle_id && !route_name)) {
+      return res.status(400).json({ error: 'vehicle_id (or route_name), reporting_month, and completed_by are required' });
     }
 
     // Fetch officer name
@@ -332,18 +326,27 @@ const completeDispatchHP = async (req, res) => {
       }
     } catch (e) {}
 
-    // Get all driver_assigned processes in this route
-    const processes = await db.sequelize.query(`
-      SELECT p.id FROM processes p
-      INNER JOIN facilities f ON f.id = p.facility_id
-      WHERE f.route = ? AND p.reporting_month = ? AND p.status = 'driver_assigned'
-    `, { replacements: [route_name, reporting_month], type: db.sequelize.QueryTypes.SELECT });
+    // Get all driver_assigned processes for this vehicle (or route as fallback)
+    let processes;
+    if (vehicle_id) {
+      processes = await db.sequelize.query(`
+        SELECT p.id FROM processes p
+        WHERE p.vehicle_id = ? AND p.reporting_month = ? AND p.status = 'driver_assigned'
+      `, { replacements: [vehicle_id, reporting_month], type: db.sequelize.QueryTypes.SELECT });
+    } else {
+      processes = await db.sequelize.query(`
+        SELECT p.id FROM processes p
+        INNER JOIN facilities f ON f.id = p.facility_id
+        WHERE f.route = ? AND p.reporting_month = ? AND p.status = 'driver_assigned'
+      `, { replacements: [route_name, reporting_month], type: db.sequelize.QueryTypes.SELECT });
+    }
 
     if (processes.length === 0) {
-      return res.status(404).json({ error: 'No driver_assigned processes found for this route' });
+      return res.status(404).json({ error: 'No driver_assigned processes found for this vehicle' });
     }
 
     const processIds = processes.map(p => p.id);
+    const label = vehicle_id ? `vehicle_id: ${vehicle_id}` : `route: ${route_name}`;
 
     // Update all to dispatch_completed
     await db.sequelize.query(`
@@ -364,12 +367,12 @@ const completeDispatchHP = async (req, res) => {
         }
         await db.sequelize.query(
           `INSERT INTO service_time_hp (process_id, service_unit, end_time, officer_id, officer_name, status, notes) VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
-          { replacements: [p.id, 'Dispatcher - HP', completed_by, officerName, 'completed', `Dispatch completed for route: ${route_name}, waiting: ${waitingMinutes} min`], type: db.sequelize.QueryTypes.INSERT }
+          { replacements: [p.id, 'Dispatcher - HP', completed_by, officerName, 'completed', `Dispatch completed for ${label}, waiting: ${waitingMinutes} min`], type: db.sequelize.QueryTypes.INSERT }
         );
       } catch (e) { console.error('Service time error for process', p.id, e); }
     }
 
-    res.json({ success: true, message: `Dispatch completed for ${processIds.length} processes in route ${route_name}` });
+    res.json({ success: true, message: `Dispatch completed for ${processIds.length} processes` });
   } catch (error) {
     console.error('Error completing dispatch:', error);
     res.status(500).json({ success: false, error: 'Failed to complete dispatch', details: error.message });

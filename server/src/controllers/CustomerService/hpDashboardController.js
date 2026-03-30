@@ -175,7 +175,7 @@ const getHPDashboardData = async (req, res) => {
 
     const [completedResult] = await db.sequelize.query(completedFacilitiesQuery, {
       replacements: queryParams,
-      type: db.Sequelize.QueryTypes.SELECT
+      type: db.sequelize.QueryTypes.SELECT
     });
     const done = completedResult.count;
 

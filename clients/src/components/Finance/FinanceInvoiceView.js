@@ -5,10 +5,10 @@ import * as XLSX from 'xlsx';
 import {
   Box, Typography, TextField, Button, Chip, CircularProgress,
   Alert, InputAdornment, MenuItem, Select, FormControl, InputLabel,
-  Paper, Stack, Tabs, Tab
+  Paper, Checkbox, Tooltip, Stack, Tabs, Tab
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
-import { Search, FileDownload, Receipt } from '@mui/icons-material';
+import { Search, FileDownload, Receipt, CheckCircle } from '@mui/icons-material';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -17,14 +17,13 @@ const ethiopianMonths = [
 ];
 
 // ─── RDF TAB ────────────────────────────────────────────────────────────────
-
-const RDFTab = () => {
+const RDFTab = ({ reportMode }) => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [storeFilter, setStoreFilter] = useState('');
-  const [receivedFilter, setReceivedFilter] = useState('received');
+  const [receivedFilter, setReceivedFilter] = useState(reportMode ? 'received' : '');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [officerFilter, setOfficerFilter] = useState('');
@@ -53,11 +52,16 @@ const RDFTab = () => {
 
   useEffect(() => { const t = setTimeout(fetchInvoices, 300); return () => clearTimeout(t); }, [fetchInvoices]);
 
-  const handleMarkReceived = useCallback(async (inv) => {
+  const handleMarkReceived = async (inv) => {
     if (inv.received) return;
     await axios.put(`${API_URL}/api/invoices/${inv.id}/received`, { received_by: fullName });
     fetchInvoices();
-  }, [fetchInvoices, fullName]);
+  };
+
+  const handleFolderSave = async (inv, val) => {
+    await axios.put(`${API_URL}/api/invoices/${inv.id}/folder`, { folder_number: val });
+    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, folder_number: val } : i));
+  };
 
   const filtered = invoices.filter(inv => {
     if (receivedFilter === 'received' && !inv.received) return false;
@@ -74,30 +78,46 @@ const RDFTab = () => {
     'Received By': inv.received_by || '', 'Received At': inv.received_at ? new Date(inv.received_at).toLocaleDateString() : '',
   }));
 
-  const handleExport = (receivedOnly) => {
-    const data = receivedOnly ? filtered.filter(i => i.received) : filtered;
-    const ws = XLSX.utils.json_to_sheet(toExportRows(data));
+  const handleExport = () => {
+    const ws = XLSX.utils.json_to_sheet(toExportRows(filtered));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'RDF Invoices');
-    XLSX.writeFile(wb, `RDF_Invoices_${receivedOnly ? 'received' : 'all'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `RDF_Invoices_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const columns = React.useMemo(() => [
+
+  const FolderCell = ({ row }) => {
+    const [val, setVal] = useState(row.folder_number || '');
+    return (
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+        <TextField size="small" value={val} onChange={e => setVal(e.target.value)}
+          placeholder="Folder #" sx={{ width: 90 }}
+          onKeyDown={e => { if (e.key === 'Enter') handleFolderSave(row, val); }} />
+        <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 0.5 }} onClick={() => handleFolderSave(row, val)}>✓</Button>
+      </Box>
+    );
+  };
+
+  const baseColumns = [
     { field: 'seq', headerName: '#', width: 55, sortable: false, renderCell: (p) => p.api.getRowIndexRelativeToVisibleRows(p.id) + 1 },
     { field: 'facility_name', headerName: 'Customer', flex: 1.5, minWidth: 180,
       renderCell: ({ row }) => (
         <Box sx={{ py: 0.5 }}>
           <Typography variant="body2" fontWeight={600} sx={{ whiteSpace: 'normal', lineHeight: 1.3 }}>{row.facility_name || row.customer_name || '-'}</Typography>
           {row.customer_type === 'Credit' && <Chip label="Credit" size="small" color="warning" sx={{ mt: 0.3, height: 18, fontSize: '0.7rem' }} />}
+          {row.customer_type === 'SRM' && <Typography variant="caption" color="secondary.main" fontWeight={700} display="block">SRM</Typography>}
+          {row.customer_type === 'Cross-Docking' && <Chip label="Cross-Docking" size="small" color="success" variant="outlined" sx={{ mt: 0.3, height: 18, fontSize: '0.7rem' }} />}
         </Box>
       )
     },
     { field: 'store', headerName: 'Store', width: 85, renderCell: ({ value }) => value ? <Chip label={value} size="small" color="primary" /> : '-' },
-    { field: 'odn_number', headerName: 'ODN', width: 130, renderCell: ({ value }) => value ? <Typography fontWeight={700} color="secondary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{value}</Typography> : '-' },
+    { field: 'odn_number', headerName: 'ODN', width: 130,
+      renderCell: ({ value }) => value ? <Typography fontWeight={700} color="secondary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.5, py: 0.5 }}>{value}</Typography> : '-'
+    },
     { field: 'invoice_number', headerName: 'Invoice #', width: 160,
       renderCell: ({ row }) => !row.invoice_number
         ? <Chip label="Not saved" size="small" color="warning" variant="outlined" />
-        : <Typography fontWeight={700} color="primary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word' }}>{row.invoice_number}</Typography>
+        : <Typography fontWeight={700} color="primary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.5, py: 0.5 }}>{row.invoice_number}</Typography>
     },
     { field: 'invoice_date', headerName: 'Invoice Date', width: 120, renderCell: ({ value }) => value ? new Date(value).toLocaleDateString() : '-' },
     { field: 'region_name', headerName: 'Location', flex: 1.2, minWidth: 150, sortable: false,
@@ -110,21 +130,48 @@ const RDFTab = () => {
       )
     },
     { field: 'created_by_name', headerName: 'Submitted By', width: 150 },
+  ];
+
+  const editColumns = [
+    { field: 'folder_number', headerName: 'Folder #', width: 160, renderCell: ({ row }) => <FolderCell row={row} /> },
+    { field: 'received', headerName: 'Received', width: 120,
+      renderCell: ({ row }) => (
+        <Tooltip title={row.received ? `Received by ${row.received_by}` : row.returned ? 'Returned by EWM' : 'Mark as received'}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Checkbox checked={!!row.received} disabled={!!row.received} onChange={() => handleMarkReceived(row)} color="success" size="small" />
+            {row.received && <CheckCircle sx={{ color: 'success.main', fontSize: 16 }} />}
+            {row.returned && !row.received && <Chip label="Returned" size="small" color="warning" />}
+          </Box>
+        </Tooltip>
+      )
+    },
+  ];
+
+  const reportColumns = [
     { field: 'folder_number', headerName: 'Folder #', width: 130,
-      renderCell: ({ value }) => value
-        ? <Typography variant="body2" fontWeight={700} color="primary.main">{value}</Typography>
-        : <Typography variant="caption" color="text.disabled">—</Typography>
+      renderCell: ({ value }) => value ? <Typography variant="body2" fontWeight={700} color="primary.main">{value}</Typography> : <Typography variant="caption" color="text.disabled">-</Typography>
     },
     { field: 'received_by', headerName: 'Finance Officer', width: 180,
       renderCell: ({ row }) => (
         <Box sx={{ py: 0.5 }}>
-          <Typography variant="body2" fontWeight={600}>{row.received_by || '—'}</Typography>
+          <Typography variant="body2" fontWeight={600}>{row.received_by || '-'}</Typography>
           {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
         </Box>
       )
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [handleMarkReceived]);
+  ];
+
+  const columns = reportMode
+    ? [...baseColumns, ...reportColumns]
+    : [...baseColumns, ...editColumns, { field: 'received_by', headerName: 'Received By', width: 160,
+        renderCell: ({ row }) => !row.received ? <Typography variant="caption" color="text.secondary">-</Typography> : (
+          <Box>
+            <Typography variant="body2" fontWeight={600}>{row.received_by || '-'}</Typography>
+            {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
+          </Box>
+        )
+      }
+    ];
 
   return (
     <Box>
@@ -138,11 +185,13 @@ const RDFTab = () => {
               <MenuItem value="">All</MenuItem>{stores.map(s => <MenuItem key={s} value={s}>{s}</MenuItem>)}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Received</InputLabel>
-            <Select value={receivedFilter} label="Received" onChange={e => setReceivedFilter(e.target.value)}>
-              <MenuItem value="">All</MenuItem><MenuItem value="received">Received</MenuItem><MenuItem value="not_received">Not Received</MenuItem>
-            </Select>
-          </FormControl>
+          {!reportMode && (
+            <FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Received</InputLabel>
+              <Select value={receivedFilter} label="Received" onChange={e => setReceivedFilter(e.target.value)}>
+                <MenuItem value="">All</MenuItem><MenuItem value="received">Received</MenuItem><MenuItem value="not_received">Not Received</MenuItem>
+              </Select>
+            </FormControl>
+          )}
           <FormControl size="small" sx={{ minWidth: 150 }}><InputLabel>Finance Officer</InputLabel>
             <Select value={officerFilter} label="Finance Officer" onChange={e => setOfficerFilter(e.target.value)}>
               <MenuItem value="">All</MenuItem>{officers.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
@@ -150,17 +199,16 @@ const RDFTab = () => {
           </FormControl>
           <TextField size="small" label="From" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 145 }} />
           <TextField size="small" label="To" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} InputLabelProps={{ shrink: true }} sx={{ width: 145 }} />
-          <Stack direction="row" gap={1} sx={{ ml: 'auto' }}>
-            <Button variant="outlined" startIcon={<FileDownload />} onClick={() => handleExport(false)} disabled={!filtered.length}>Export All</Button>
-            <Button variant="contained" startIcon={<FileDownload />} onClick={() => handleExport(true)} disabled={!filtered.some(i => i.received)}>Export Received</Button>
-          </Stack>
+          <Box sx={{ ml: 'auto' }}>
+            <Button variant="contained" startIcon={<FileDownload />} onClick={handleExport} disabled={!filtered.length}>Export</Button>
+          </Box>
         </Stack>
       </Paper>
       <Paper sx={{ height: 540 }}>
         {loading ? <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><CircularProgress /></Box> : (
           <DataGrid rows={filtered.map((inv, i) => ({ ...inv, id: inv.id || i }))} columns={columns}
-            pageSize={10} rowsPerPageOptions={[10, 25, 50]} disableSelectionOnClick getRowHeight={() => 'auto'}
-            sx={{ '& .MuiDataGrid-columnHeaders': { backgroundColor: '#1565c0', color: '#fff', fontWeight: 700 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#e3f2fd' }, '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1 } }}
+            pageSize={25} rowsPerPageOptions={[25, 50, 100]} disableSelectionOnClick getRowHeight={() => 'auto'}
+            sx={{ '& .MuiDataGrid-columnHeaders': { backgroundColor: '#1565c0', color: '#fff', fontWeight: 700 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#e3f2fd' }, '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1, whiteSpace: 'normal !important', lineHeight: '1.5 !important' } }}
           />
         )}
       </Paper>
@@ -169,13 +217,12 @@ const RDFTab = () => {
 };
 
 // ─── HP TAB ─────────────────────────────────────────────────────────────────
-
-const HPTab = () => {
+const HPTab = ({ reportMode }) => {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [receivedFilter, setReceivedFilter] = useState('received');
+  const [receivedFilter, setReceivedFilter] = useState(reportMode ? 'received' : '');
   const [officerFilter, setOfficerFilter] = useState('');
   const [month, setMonth] = useState('');
   const [year, setYear] = useState('');
@@ -202,22 +249,25 @@ const HPTab = () => {
 
   useEffect(() => { const t = setTimeout(fetchRecords, 300); return () => clearTimeout(t); }, [fetchRecords]);
 
-  const handleMarkReceived = useCallback(async (row) => {
+  const handleMarkReceived = async (row) => {
     if (row.received) return;
     await api.post(`${API_URL}/api/hp-finance/received`, { process_id: row.process_id, received_by: fullName });
     fetchRecords();
-  }, [fetchRecords, fullName]);
+  };
+
+  const handleFolderSave = async (row, val) => {
+    await api.post(`${API_URL}/api/hp-finance/folder`, { process_id: row.process_id, folder_number: val });
+    setRecords(prev => prev.map(r => r.process_id === row.process_id ? { ...r, folder_number: val } : r));
+  };
 
   const filtered = records.filter(r => {
     if (officerFilter && (r.received_by || '').trim() !== officerFilter.trim()) return false;
     return true;
   });
 
-  const handleExport = (receivedOnly) => {
-    const data = receivedOnly ? filtered.filter(r => r.received) : filtered;
-    const rows = data.map((r, i) => ({
+  const handleExport = () => {
+    const rows = filtered.map((r, i) => ({
       '#': i + 1, 'Facility': r.facility_name || '', 'Route': r.route_name || '',
-      'Vehicle': r.vehicle_name || '', 'Driver': r.driver_name || '', 'Deliverer': r.deliverer_name || '',
       'ODN': r.odn_numbers || '', 'POD #': r.pod_numbers || '',
       'Reporting Month': r.reporting_month || '', 'Folder #': r.folder_number || '',
       'Received': r.received ? 'Yes' : 'No', 'Received By': r.received_by || '',
@@ -226,10 +276,22 @@ const HPTab = () => {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'HP Finance');
-    XLSX.writeFile(wb, `HP_Finance_${receivedOnly ? 'received' : 'all'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, `HP_Finance_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const columns = React.useMemo(() => [
+  const FolderCell = ({ row }) => {
+    const [val, setVal] = useState(row.folder_number || '');
+    return (
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+        <TextField size="small" value={val} onChange={e => setVal(e.target.value)}
+          placeholder="Folder #" sx={{ width: 90 }}
+          onKeyDown={e => { if (e.key === 'Enter') handleFolderSave(row, val); }} />
+        <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 0.5 }} onClick={() => handleFolderSave(row, val)}>✓</Button>
+      </Box>
+    );
+  };
+
+  const baseColumns = [
     { field: 'seq', headerName: '#', width: 55, sortable: false, renderCell: (p) => p.api.getRowIndexRelativeToVisibleRows(p.id) + 1 },
     { field: 'facility_name', headerName: 'Facility', flex: 1.5, minWidth: 180,
       renderCell: ({ row }) => (
@@ -240,40 +302,56 @@ const HPTab = () => {
       )
     },
     { field: 'route_name', headerName: 'Route', width: 140, renderCell: ({ value }) => value ? <Chip label={value} size="small" color="primary" variant="outlined" /> : '-' },
-    { field: 'driver_name', headerName: 'Driver / Deliverer', width: 180,
-      renderCell: ({ row }) => (row.driver_name || row.deliverer_name) ? (
-        <Box sx={{ py: 0.5 }}>
-          {row.vehicle_name && <Typography variant="caption" color="primary.main" fontWeight={700} display="block">{row.vehicle_name}</Typography>}
-          {row.driver_name && <Typography variant="body2" fontWeight={600}>{row.driver_name}</Typography>}
-          {row.deliverer_name && <Typography variant="caption" color="text.secondary">{row.deliverer_name}</Typography>}
-        </Box>
-      ) : <Typography variant="caption" color="text.secondary">—</Typography>
+    { field: 'odn_numbers', headerName: 'ODN(s)', width: 200,
+      renderCell: ({ value }) => value ? <Typography fontWeight={700} color="secondary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6, py: 0.5 }}>{value}</Typography> : '-'
     },
-    { field: 'odn_numbers', headerName: 'ODN(s)', width: 200, renderCell: ({ value }) => value ? <Typography fontWeight={700} color="secondary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6, py: 0.5 }}>{value}</Typography> : '-' },
     { field: 'pod_numbers', headerName: 'POD #(s)', width: 180,
-      renderCell: ({ value }) => !value
-        ? <Chip label="No POD" size="small" color="warning" variant="outlined" />
+      renderCell: ({ value }) => !value ? <Chip label="No POD" size="small" color="warning" variant="outlined" />
         : <Typography fontWeight={700} color="success.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.6, py: 0.5 }}>{value}</Typography>
     },
     { field: 'reporting_month', headerName: 'Month', width: 130 },
-    { field: 'folder_number', headerName: 'Folder #', width: 130,
-      renderCell: ({ value }) => value
-        ? <Typography variant="body2" fontWeight={700} color="primary.main">{value}</Typography>
-        : <Typography variant="caption" color="text.disabled">—</Typography>
+    { field: 'submitted_by', headerName: 'Submitted By', width: 150,
+      renderCell: ({ value }) => value ? <Typography variant="body2" fontWeight={600}>{value}</Typography> : <Typography variant="caption" color="text.secondary">-</Typography>
     },
-    { field: 'received_by', headerName: 'Finance Officer', width: 180,
+  ];
+
+  const editColumns = [
+    { field: 'folder_number', headerName: 'Folder #', width: 160, renderCell: ({ row }) => <FolderCell row={row} /> },
+    { field: 'received', headerName: 'Received', width: 120,
       renderCell: ({ row }) => (
-        <Box sx={{ py: 0.5 }}>
-          <Typography variant="body2" fontWeight={600}>{row.received_by || '—'}</Typography>
+        <Tooltip title={row.received ? `Received by ${row.received_by}` : 'Mark as received'}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Checkbox checked={!!row.received} disabled={!!row.received} onChange={() => handleMarkReceived(row)} color="success" size="small" />
+            {row.received && <CheckCircle sx={{ color: 'success.main', fontSize: 16 }} />}
+          </Box>
+        </Tooltip>
+      )
+    },
+    { field: 'received_by', headerName: 'Received By', width: 160,
+      renderCell: ({ row }) => !row.received ? <Typography variant="caption" color="text.secondary">-</Typography> : (
+        <Box>
+          <Typography variant="body2" fontWeight={600}>{row.received_by || '-'}</Typography>
           {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
         </Box>
       )
     },
-    { field: 'submitted_by', headerName: 'Submitted By', width: 150,
-      renderCell: ({ value }) => value ? <Typography variant="body2" fontWeight={600}>{value}</Typography> : <Typography variant="caption" color="text.secondary">—</Typography>
+  ];
+
+  const reportColumns = [
+    { field: 'folder_number', headerName: 'Folder #', width: 130,
+      renderCell: ({ value }) => value ? <Typography variant="body2" fontWeight={700} color="primary.main">{value}</Typography> : <Typography variant="caption" color="text.disabled">-</Typography>
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [handleMarkReceived]);
+    { field: 'received_by', headerName: 'Finance Officer', width: 180,
+      renderCell: ({ row }) => (
+        <Box sx={{ py: 0.5 }}>
+          <Typography variant="body2" fontWeight={600}>{row.received_by || '-'}</Typography>
+          {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
+        </Box>
+      )
+    },
+  ];
+
+  const columns = reportMode ? [...baseColumns, ...reportColumns] : [...baseColumns, ...editColumns];
 
   return (
     <Box>
@@ -288,27 +366,139 @@ const HPTab = () => {
             </Select>
           </FormControl>
           <TextField size="small" label="Year" type="number" value={year} onChange={e => setYear(e.target.value)} sx={{ width: 100 }} />
-          <FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Received</InputLabel>
-            <Select value={receivedFilter} label="Received" onChange={e => setReceivedFilter(e.target.value)}>
-              <MenuItem value="">All</MenuItem><MenuItem value="received">Received</MenuItem><MenuItem value="not_received">Not Received</MenuItem>
-            </Select>
-          </FormControl>
+          {!reportMode && (
+            <FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Received</InputLabel>
+              <Select value={receivedFilter} label="Received" onChange={e => setReceivedFilter(e.target.value)}>
+                <MenuItem value="">All</MenuItem><MenuItem value="received">Received</MenuItem><MenuItem value="not_received">Not Received</MenuItem>
+              </Select>
+            </FormControl>
+          )}
           <FormControl size="small" sx={{ minWidth: 150 }}><InputLabel>Finance Officer</InputLabel>
             <Select value={officerFilter} label="Finance Officer" onChange={e => setOfficerFilter(e.target.value)}>
               <MenuItem value="">All</MenuItem>{officers.map(o => <MenuItem key={o} value={o}>{o}</MenuItem>)}
             </Select>
           </FormControl>
-          <Stack direction="row" gap={1} sx={{ ml: 'auto' }}>
-            <Button variant="outlined" startIcon={<FileDownload />} onClick={() => handleExport(false)} disabled={!filtered.length}>Export All</Button>
-            <Button variant="contained" startIcon={<FileDownload />} onClick={() => handleExport(true)} disabled={!filtered.some(r => r.received)}>Export Received</Button>
-          </Stack>
+          <Box sx={{ ml: 'auto' }}>
+            <Button variant="contained" startIcon={<FileDownload />} onClick={handleExport} disabled={!filtered.length}>Export</Button>
+          </Box>
         </Stack>
       </Paper>
       <Paper sx={{ height: 540 }}>
         {loading ? <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><CircularProgress /></Box> : (
-          <DataGrid rows={filtered.map((r, i) => ({ ...r, id: r.process_id }))} columns={columns}
-            pageSize={10} rowsPerPageOptions={[10, 25, 50]} disableSelectionOnClick getRowHeight={() => 'auto'}
-            sx={{ '& .MuiDataGrid-columnHeaders': { backgroundColor: '#2e7d32', color: '#fff', fontWeight: 700 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#e8f5e9' }, '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1, whiteSpace: 'normal !important', lineHeight: '1.6 !important' } }}
+          <DataGrid rows={filtered.map((r, i) => ({ ...r, id: r.invoice_id || `${r.process_id}_${i}` }))} columns={columns}
+            pageSize={25} rowsPerPageOptions={[25, 50, 100]} disableSelectionOnClick getRowHeight={() => 'auto'}
+            sx={{ '& .MuiDataGrid-columnHeaders': { backgroundColor: '#2e7d32', color: '#fff', fontWeight: 700 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#e8f5e9' }, '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1, whiteSpace: 'normal !important', lineHeight: '1.5 !important' } }}
+          />
+        )}
+      </Paper>
+    </Box>
+  );
+};
+
+
+// ─── CROSS-DOCKING TAB ──────────────────────────────────────────────────────
+const CrossDockingTab = () => {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const fullName = localStorage.getItem('FullName') || '';
+
+  const fetchRecords = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.get(`${API_URL}/api/cross-docking`);
+      setRecords(res.data.data || []);
+    } catch (_) {}
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchRecords(); }, [fetchRecords]);
+
+  const handleMarkReceived = async (row) => {
+    if (row.received) return;
+    await api.put(`${API_URL}/api/cross-docking/${row.id}/received`, { received_by: fullName });
+    fetchRecords();
+  };
+
+  const handleFolderSave = async (row, val) => {
+    await api.put(`${API_URL}/api/cross-docking/${row.id}/folder`, { folder_number: val });
+    setRecords(prev => prev.map(r => r.id === row.id ? { ...r, folder_number: val } : r));
+  };
+
+  const FolderCell = ({ row }) => {
+    const [val, setVal] = useState(row.folder_number || '');
+    return (
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+        <TextField size="small" value={val} onChange={e => setVal(e.target.value)}
+          placeholder="Folder #" sx={{ width: 90 }}
+          onKeyDown={e => { if (e.key === 'Enter') handleFolderSave(row, val); }} />
+        <Button size="small" variant="outlined" sx={{ minWidth: 0, px: 0.5 }} onClick={() => handleFolderSave(row, val)}>✓</Button>
+      </Box>
+    );
+  };
+
+  const handleExport = () => {
+    const rows = records.map((r, i) => ({
+      '#': i + 1, 'Facility': r.facility_name || '', 'ODN': r.odn_number || '',
+      'Invoice #': r.invoice_number || '', 'Invoice Date': r.invoice_date ? new Date(r.invoice_date).toLocaleDateString() : '',
+      'Folder #': r.folder_number || '', 'Received': r.received ? 'Yes' : 'No',
+      'Received By': r.received_by || '', 'Submitted By': r.created_by_name || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Cross-Docking');
+    XLSX.writeFile(wb, `Cross_Docking_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  return (
+    <Box>
+      <Paper sx={{ p: 2, mb: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="flex-end">
+          <Button variant="contained" startIcon={<FileDownload />} onClick={handleExport} disabled={!records.length}>Export</Button>
+        </Stack>
+      </Paper>
+      <Paper sx={{ height: 540 }}>
+        {loading ? <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}><CircularProgress /></Box> : (
+          <DataGrid rows={records.map((r, i) => ({ ...r, id: r.id || i }))}
+            columns={[
+              { field: 'seq', headerName: '#', width: 55, sortable: false, renderCell: (p) => p.api.getRowIndexRelativeToVisibleRows(p.id) + 1 },
+              { field: 'facility_name', headerName: 'Facility', flex: 1.5, minWidth: 180,
+                renderCell: ({ row }) => (
+                  <Box sx={{ py: 0.5 }}>
+                    <Typography variant="body2" fontWeight={600} sx={{ whiteSpace: 'normal', lineHeight: 1.3 }}>{row.facility_name || '-'}</Typography>
+                    <Chip label="Cross-Docking" size="small" color="success" variant="outlined" sx={{ mt: 0.3, height: 18, fontSize: '0.7rem' }} />
+                    {row.woreda_name && <Typography variant="caption" color="text.secondary" display="block">{row.woreda_name}</Typography>}
+                  </Box>
+                )
+              },
+              { field: 'odn_number', headerName: 'ODN', width: 160,
+                renderCell: ({ value }) => <Typography fontWeight={700} color="secondary.main" variant="body2" sx={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.5, py: 0.5 }}>{value || '-'}</Typography>
+              },
+              { field: 'invoice_number', headerName: 'Invoice #', width: 150,
+                renderCell: ({ value }) => <Typography fontWeight={700} color="primary.main" variant="body2">{value || '-'}</Typography>
+              },
+              { field: 'invoice_date', headerName: 'Invoice Date', width: 120, renderCell: ({ value }) => value ? new Date(value).toLocaleDateString() : '-' },
+              { field: 'folder_number', headerName: 'Folder #', width: 160, renderCell: ({ row }) => <FolderCell row={row} /> },
+              { field: 'received', headerName: 'Received', width: 120,
+                renderCell: ({ row }) => (
+                  <Tooltip title={row.received ? `Received by ${row.received_by}` : 'Mark as received'}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Checkbox checked={!!row.received} disabled={!!row.received} onChange={() => handleMarkReceived(row)} color="success" size="small" />
+                      {row.received && <CheckCircle sx={{ color: 'success.main', fontSize: 16 }} />}
+                    </Box>
+                  </Tooltip>
+                )
+              },
+              { field: 'received_by', headerName: 'Received By', width: 160,
+                renderCell: ({ row }) => !row.received ? <Typography variant="caption" color="text.secondary">-</Typography> : (
+                  <Box>
+                    <Typography variant="body2" fontWeight={600}>{row.received_by || '-'}</Typography>
+                    {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
+                  </Box>
+                )
+              },
+            ]}
+            pageSize={25} rowsPerPageOptions={[25, 50, 100]} disableSelectionOnClick getRowHeight={() => 'auto'}
+            sx={{ '& .MuiDataGrid-columnHeaders': { backgroundColor: '#00695c', color: '#fff', fontWeight: 700 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#e0f2f1' }, '& .MuiDataGrid-cell': { alignItems: 'flex-start', py: 1, whiteSpace: 'normal !important', lineHeight: '1.5 !important' } }}
           />
         )}
       </Paper>
@@ -317,12 +507,12 @@ const HPTab = () => {
 };
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
-// mode: 'rdf' | 'hp' | undefined (shows both tabs)
+// mode: 'rdf' | 'hp' | 'rdf-report' | 'hp-report' | undefined (shows both tabs for invoice record)
 const FinanceInvoiceView = ({ mode }) => {
   const [tab, setTab] = useState(0);
 
-  if (mode === 'rdf') return <Box sx={{ p: 2 }}><RDFTab /></Box>;
-  if (mode === 'hp') return <Box sx={{ p: 2 }}><HPTab /></Box>;
+  if (mode === 'rdf-report') return <Box sx={{ p: 2 }}><RDFTab reportMode={true} /></Box>;
+  if (mode === 'hp-report') return <Box sx={{ p: 2 }}><HPTab reportMode={true} /></Box>;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -337,10 +527,12 @@ const FinanceInvoiceView = ({ mode }) => {
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tab label="RDF" />
           <Tab label="Health Program" />
+          <Tab label="Cross-Docking" />
         </Tabs>
       </Paper>
-      {tab === 0 && <RDFTab />}
-      {tab === 1 && <HPTab />}
+      {tab === 0 && <RDFTab reportMode={false} />}
+      {tab === 1 && <HPTab reportMode={false} />}
+      {tab === 2 && <CrossDockingTab />}
     </Box>
   );
 };

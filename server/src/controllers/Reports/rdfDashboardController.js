@@ -39,7 +39,7 @@ const getRDFDashboardStats = async (req, res) => {
     );
 
     const [avgWaitingResult] = await db.sequelize.query(
-      `SELECT AVG(TIMESTAMPDIFF(MINUTE, cq.started_at, COALESCE(cq.completed_at, NOW()))) as avg_time
+      `SELECT AVG(GREATEST(0, TIMESTAMPDIFF(MINUTE, cq.started_at, COALESCE(cq.completed_at, NOW())))) as avg_time
        FROM customer_queue cq
        WHERE cq.started_at IS NOT NULL ${branchWhere}`,
       { type: db.sequelize.QueryTypes.SELECT }

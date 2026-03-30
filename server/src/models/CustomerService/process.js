@@ -132,6 +132,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(15, 2),
       allowNull: true,
     },
+    arrival_kilometer: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: true,
+    },
     tm_confirmed_at: {
       type: DataTypes.DATE,
       allowNull: true,

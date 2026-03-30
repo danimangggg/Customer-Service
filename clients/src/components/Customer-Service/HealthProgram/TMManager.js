@@ -478,7 +478,7 @@ const TMManager = () => {
                       {deliverers.map(d => <MenuItem key={d.id} value={d.id}>{d.full_name}</MenuItem>)}
                     </Select>
                   </FormControl>
-                  <TextField fullWidth label="Departure Kilometer *" type="number" value={row.departure_kilometer}
+                  <TextField fullWidth label="Arrival Kilometer *" type="number" value={row.departure_kilometer}
                     onChange={e => updateDriverRow(idx, 'departure_kilometer', e.target.value)} inputProps={{ step: '0.01', min: '0' }} />
                 </Stack>
                 {idx < driverAssignments.length - 1 && <Divider sx={{ mt: 2 }} />}

@@ -126,6 +126,14 @@ let routes =  (app) => {
   router.post('/api/hp-finance/folder', invoiceController.saveHPFolderNumber);
   router.put('/api/hp-finance/odn/:odn_id/pod', invoiceController.updateOdnPodNumber);
 
+  // Cross-Docking routes
+  const crossDockingController = require('../controllers/CustomerService/crossDockingController');
+  router.post('/api/cross-docking', crossDockingController.saveCrossDocking);
+  router.get('/api/cross-docking', crossDockingController.getCrossDocking);
+  router.put('/api/cross-docking/:id/received', crossDockingController.markCrossDockingReceived);
+  router.put('/api/cross-docking/:id/folder', crossDockingController.saveCrossDockingFolder);
+  router.put('/api/cross-docking/:id/edit', crossDockingController.editCrossDocking);
+
   // Customer Availability routes
   const customerAvailabilityController = require('../controllers/CustomerService/customerAvailabilityController');
   router.post('/api/customer-availability/mark-available', customerAvailabilityController.markCustomerAvailable);
@@ -272,6 +280,7 @@ let routes =  (app) => {
   const documentFollowupController = require('../controllers/Documentation/documentFollowupController');
   router.get('/api/dispatched-odns', documentationController.getDispatchedODNs);
   router.get('/api/documentation/route-km', documentationController.getRouteKilometer);
+  router.get('/api/documentation/vehicle-km', documentationController.getVehicleKilometer);
   router.get('/api/documentation/stats', documentationController.getDocumentationStats);
   router.get('/api/documentation/available-months', documentationController.getAvailableMonths);
   router.put('/api/odns/:id/pod-confirmation', documentationController.updatePODConfirmation);

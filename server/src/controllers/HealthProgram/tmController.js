@@ -120,7 +120,7 @@ exports.getTMPhase2Routes = async (req, res) => {
         r.route_name,
         COUNT(DISTINCT f.id) as total_facilities,
         COUNT(DISTINCT CASE
-          WHEN p_rep.status = 'freight_order_sent_to_ewm' AND p_rep.vehicle_id IS NOT NULL
+          WHEN p_rep.status = 'biller_completed' AND p_rep.vehicle_id IS NOT NULL
           THEN f.id END) as ready_facilities,
         MAX(p_rep.vehicle_name) as vehicle_name,
         MAX(p_rep.vehicle_id) as vehicle_id
@@ -154,6 +154,8 @@ exports.getTMPhase2Routes = async (req, res) => {
         LEFT JOIN processes p_reg ON p_reg.facility_id = f.id AND p_reg.reporting_month = ? AND p_reg.process_type = 'regular'
         LEFT JOIN processes p_vac ON p_vac.facility_id = f.id AND p_vac.reporting_month = ? AND p_vac.process_type = 'vaccine'
         WHERE f.route = ? AND (f.period = 'Monthly' OR f.period = ?)
+          AND COALESCE(p_reg.status, p_vac.status) = 'biller_completed'
+          AND COALESCE(p_reg.vehicle_id, p_vac.vehicle_id) IS NOT NULL
         ${branchFilter}
         ORDER BY f.facility_name
       `;
@@ -215,7 +217,7 @@ exports.assignVehicle = async (req, res) => {
       const { vehicle_id, driver_id, driver_name, deliverer_id, deliverer_name, departure_kilometer, facility_ids } = assignment;
 
       // If facility_ids provided, scope to those; otherwise scope to all facilities with this vehicle in the route
-      let whereClause = { reporting_month, status: 'freight_order_sent_to_ewm', vehicle_id };
+      let whereClause = { reporting_month, status: 'biller_completed', vehicle_id };
       if (facility_ids && facility_ids.length > 0) {
         whereClause.facility_id = { [Op.in]: facility_ids };
       } else {

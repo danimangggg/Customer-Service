@@ -244,22 +244,24 @@ const DocumentationHP = () => {
       // then fall back to any sibling in facilityData, then fetch from server
       let prefillKm = facility.arrival_kilometer || '';
 
-      if (!prefillKm && facility.route_name) {
-        // Check in-memory list first (unconfirmed siblings)
+      if (!prefillKm && facility.vehicle_name) {
+        // Check in-memory list for another facility under the same vehicle
         const sibling = facilityData.find(
-          f => f.route_name === facility.route_name &&
+          // eslint-disable-next-line eqeqeq
+          f => f.vehicle_id && f.vehicle_id == facility.vehicle_id &&
+               f.route_name === facility.route_name &&
                f.facility_id !== facility.facility_id &&
                f.arrival_kilometer
         );
         if (sibling) {
           prefillKm = sibling.arrival_kilometer;
         } else {
-          // Fetch from server — includes completed facilities not in current list
+          // Fetch from server — scoped to vehicle, not route
           try {
-            const res = await api.get(`${api_url}/api/documentation/route-km`, {
-              params: { route_name: facility.route_name, month: selectedMonth, year: selectedYear }
+            const res = await api.get(`${api_url}/api/documentation/vehicle-km`, {
+              params: { vehicle_id: facility.vehicle_id, route_name: facility.route_name, month: selectedMonth, year: selectedYear }
             });
-            if (res.data.arrival_kilometer) prefillKm = res.data.arrival_kilometer;
+            if (res.data.departure_kilometer) prefillKm = res.data.departure_kilometer;
           } catch (e) { /* non-critical */ }
         }
       }
@@ -359,7 +361,7 @@ const DocumentationHP = () => {
 
     if (!editFormData.arrival_kilometer || parseFloat(editFormData.arrival_kilometer) < 0) {
       console.log('❌ Validation failed: Arrival kilometer invalid');
-      MySwal.fire('Warning', 'Please enter destination kilometer before completing', 'warning');
+      MySwal.fire('Warning', 'Please enter arrival kilometer before completing', 'warning');
       return;
     }
 
@@ -374,7 +376,7 @@ const DocumentationHP = () => {
             <strong>Route:</strong> ${selectedFacility.route_name}<br>
             <strong>Total ODNs:</strong> ${selectedFacility.total_odns}<br>
             <strong>POD Numbers:</strong> ${editFormData.pod_numbers}<br>
-            <strong>Destination KM:</strong> ${editFormData.arrival_kilometer}
+            <strong>Arrival KM:</strong> ${editFormData.arrival_kilometer}
           </div>
         </div>
       `,
@@ -693,6 +695,12 @@ const DocumentationHP = () => {
                     },
                     { field: 'reporting_month', headerName: 'Month', width: 130 },
                     {
+                      field: 'arrival_kilometer', headerName: 'Arrival KM', width: 130,
+                      renderCell: ({ value }) => value
+                        ? <Typography variant="body2" fontWeight={600} color="primary.main">{parseFloat(value).toFixed(1)} km</Typography>
+                        : <Typography variant="caption" color="text.disabled">—</Typography>,
+                    },
+                    {
                       field: 'pod_confirmed_at', headerName: 'Submitted Date', width: 160,
                       renderCell: ({ value }) => value ? new Date(value).toLocaleDateString() : '—',
                     },
@@ -775,10 +783,28 @@ const DocumentationHP = () => {
                 <TextField fullWidth size="small" label="POD Numbers" placeholder="e.g., POD001, POD002"
                   value={editFormData.pod_numbers}
                   onChange={(e) => setEditFormData(prev => ({ ...prev, pod_numbers: e.target.value }))} />
-                <TextField fullWidth size="small" type="number" label="Destination Kilometer"
-                  value={editFormData.arrival_kilometer}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, arrival_kilometer: e.target.value }))}
-                  inputProps={{ step: 0.01, min: 0 }} />
+                {(() => {
+                  // Read-only only if same vehicle_id (string-cast) AND same route already has km set
+                  const vehicleKmAlreadySet = facilityData.some(
+                    f => String(f.vehicle_id) === String(selectedFacility?.vehicle_id) &&
+                         f.route_name === selectedFacility?.route_name &&
+                         String(f.facility_id) !== String(selectedFacility?.facility_id) &&
+                         f.arrival_kilometer
+                  );
+                  return vehicleKmAlreadySet ? (
+                    <TextField fullWidth size="small" type="number" label="Arrival Kilometer (shared for vehicle)"
+                      value={editFormData.arrival_kilometer}
+                      InputProps={{ readOnly: true }}
+                      helperText={`KM already set for vehicle: ${selectedFacility?.vehicle_name} on route: ${selectedFacility?.route_name}`}
+                      sx={{ '& .MuiInputBase-input': { color: 'text.secondary' } }} />
+                  ) : (
+                    <TextField fullWidth size="small" type="number" label="Arrival Kilometer"
+                      value={editFormData.arrival_kilometer}
+                      onChange={(e) => setEditFormData(prev => ({ ...prev, arrival_kilometer: e.target.value }))}
+                      inputProps={{ step: 0.01, min: 0 }}
+                      helperText={`Enter once — shared across facilities under ${selectedFacility?.vehicle_name || 'this vehicle'} on this route`} />
+                  );
+                })()}
               </Stack>
             </Box>
 

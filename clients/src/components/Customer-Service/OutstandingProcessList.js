@@ -613,6 +613,8 @@ const OutstandingCustomers = () => {
                 nextOptions = { EWM: 'EWM' };
             } else if (customer.customer_type === 'Cash') {
                 nextOptions = { Cashier: 'Cashier', EWM: 'EWM' };
+            } else if (customer.customer_type === 'SRM') {
+                nextOptions = { EWM: 'EWM' };
             } else {
                 Swal.fire("Error", "Customer type not recognized.", "error");
                 return;
@@ -649,8 +651,10 @@ const OutstandingCustomers = () => {
                     if (!odnResponse.data.success || odnResponse.data.odns.length === 0) {
                         Swal.fire({
                             icon: 'warning',
-                            title: 'No ODNs Found',
-                            text: 'You must add at least one Outbound Delivery Number (ODN) before sending to EWM. Please use the "Manage ODNs" button to add ODNs.',
+                            title: customer.customer_type === 'SRM' ? 'No SRM Numbers Found' : 'No ODNs Found',
+                            text: customer.customer_type === 'SRM'
+                              ? 'You must add at least one SRM Number (SRMN) before sending to EWM. Please use the "Manage SRMNs" button.'
+                              : 'You must add at least one Outbound Delivery Number (ODN) before sending to EWM. Please use the "Manage ODNs" button to add ODNs.',
                             confirmButtonText: 'OK'
                         });
                         return;
@@ -1144,9 +1148,9 @@ const OutstandingCustomers = () => {
                                 const showStartAndStopButtons = normalizedStatus === 'notifying';
                                 const showCompleteButton = normalizedStatus === 'o2c_started';
                                 const hasOdns = (customerOdns[customer.id] || []).length > 0;
-                                // Complete button only requires ODNs for Credit customers (always go to EWM)
+                                // Complete button only requires ODNs for Credit/SRM customers (always go to EWM)
                                 // Cash customers can go to Cashier without ODNs
-                                const completeButtonDisabled = customer.customer_type === 'Credit' && !hasOdns;
+                                const completeButtonDisabled = (customer.customer_type === 'Credit' || customer.customer_type === 'SRM') && !hasOdns;
 
                                 const myStoreStatus = getStoreODN(customer);
                                 
@@ -1232,7 +1236,7 @@ const OutstandingCustomers = () => {
                                                                 onClick={() => handleManageOdns(customer)}
                                                                 size="small"
                                                             >
-                                                                Manage ODNs
+                                                                {customer.customer_type === 'SRM' ? 'Manage SRMNs' : 'Manage ODNs'}
                                                             </Button>
                                                             <Button
                                                                 variant="contained"
@@ -1305,7 +1309,7 @@ const OutstandingCustomers = () => {
                                                                     onClick={() => handleManageOdns(customer)}
                                                                     size="small"
                                                                 >
-                                                                    Manage ODNs
+                                                                    {customer.customer_type === 'SRM' ? 'Manage SRMNs' : 'Manage ODNs'}
                                                                 </Button>
                                                             )}
                                                             <Button
@@ -1439,6 +1443,7 @@ const OutstandingCustomers = () => {
                     onClose={handleCloseOdnManager}
                     processId={selectedCustomer.id}
                     facilityName={getFacilityDetails(selectedCustomer.facility_id).name}
+                    customerType={selectedCustomer.customer_type}
                 />
             )}
         </>

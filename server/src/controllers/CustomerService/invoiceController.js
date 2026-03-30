@@ -157,11 +157,16 @@ const getInvoices = async (req, res) => {
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
     const query = `
-      SELECT inv.*, cq.facility_id, cq.customer_type,
-        f.facility_name, f.region_name, f.zone_name, f.woreda_name
+      SELECT inv.*,
+        COALESCE(cq.customer_type, IF(inv.type = 'cross_docking', 'Cross-Docking', NULL)) as customer_type,
+        COALESCE(f.facility_name, f2.facility_name, inv.customer_name) as facility_name,
+        COALESCE(f.region_name, f2.region_name) as region_name,
+        COALESCE(f.zone_name, f2.zone_name) as zone_name,
+        COALESCE(f.woreda_name, f2.woreda_name) as woreda_name
       FROM invoices inv
       LEFT JOIN customer_queue cq ON inv.process_id = cq.id
       LEFT JOIN facilities f ON cq.facility_id = f.id
+      LEFT JOIN facilities f2 ON inv.facility_id = f2.id
       ${whereClause}
       ORDER BY inv.invoice_date DESC, inv.created_at DESC
     `;
@@ -254,6 +259,7 @@ const getHPDocumentationCompleted = async (req, res) => {
         p.driver_name,
         p.deliverer_name,
         p.vehicle_name,
+        p.arrival_kilometer,
         f.facility_name,
         f.region_name, f.zone_name, f.woreda_name,
         r.route_name,
@@ -277,7 +283,7 @@ const getHPDocumentationCompleted = async (req, res) => {
       LEFT JOIN invoices inv ON inv.process_id = p.id
       WHERE ${where}
       GROUP BY p.id, p.reporting_month, p.process_type, p.driver_name, p.deliverer_name, p.vehicle_name,
-               f.facility_name, f.region_name, f.zone_name, f.woreda_name, r.route_name
+               p.arrival_kilometer, f.facility_name, f.region_name, f.zone_name, f.woreda_name, r.route_name
       ${having}
       ORDER BY pod_confirmed_at DESC
     `;

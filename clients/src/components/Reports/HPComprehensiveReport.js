@@ -245,7 +245,7 @@ const HPComprehensiveReport = () => {
             {activeTab === 4 && <ServiceUnitsDetail data={reportData} />}
             {activeTab === 5 && <RouteAnalysis branchCode={selectedBranch} />}
             {activeTab === 6 && <HPPicklistReport branchCode={selectedBranch} />}
-            {activeTab === 7 && <FinanceInvoiceView mode="hp" />}
+            {activeTab === 7 && <FinanceInvoiceView mode="hp-report" />}
             {activeTab === 8 && (
               <Box>
                 {/* Date Range Controls */}

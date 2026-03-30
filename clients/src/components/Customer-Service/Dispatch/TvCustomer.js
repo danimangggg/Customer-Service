@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
-import api from '../../../axiosInstance';
+import axios from 'axios';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Typography, CircularProgress, Button } from '@mui/material';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -51,8 +51,8 @@ const TvCustomer = () => {
     if (isInitial) setLoading(true);
     try {
       const [custRes, facRes] = await Promise.all([
-        api.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} }),
-        api.get(`${API_URL}/api/facilities`,            { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} })
+        axios.get(`${API_URL}/api/tv-display-customers`, { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} }),
+        axios.get(`${API_URL}/api/facilities`,            { timeout: 5000, params: branchParam ? { branch_code: branchParam } : {} })
       ]);
       setCustomers(prev => {
         const next = custRes.data;

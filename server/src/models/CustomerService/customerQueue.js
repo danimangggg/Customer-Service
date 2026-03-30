@@ -10,7 +10,7 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
     },
     customer_type: {
-      type: DataTypes.ENUM('Cash', 'Credit'),
+      type: DataTypes.ENUM('Cash', 'Credit', 'SRM'),
       allowNull: false,
     },
     next_service_point: {

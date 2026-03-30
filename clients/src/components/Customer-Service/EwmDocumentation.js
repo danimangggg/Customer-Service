@@ -5,7 +5,7 @@ import {
   Box, Typography, TextField, Button, Container, Card, CardContent,
   Chip, CircularProgress, Alert, Tooltip, Tabs, Tab, Paper, Stack,
   FormControl, InputLabel, Select, MenuItem,
-  Dialog, DialogTitle, DialogContent, DialogActions
+  Dialog, DialogTitle, DialogContent, DialogActions, IconButton
 } from '@mui/material';
 import { DataGrid, GridToolbarContainer, GridToolbarColumnsButton, GridToolbarFilterButton, GridToolbarDensitySelector, GridToolbarQuickFilter } from '@mui/x-data-grid';
 import { Description, Save, Undo, Edit } from '@mui/icons-material';
@@ -38,6 +38,16 @@ const EwmDocumentation = () => {
   const [historyDateTo, setHistoryDateTo] = useState('');
   const [historyReceived, setHistoryReceived] = useState('');
 
+  // Cross-Docking state
+  const [cdRegions, setCdRegions] = useState([]);
+  const [cdZones, setCdZones] = useState([]);
+  const [cdWoredas, setCdWoredas] = useState([]);
+  const [cdFacilities, setCdFacilities] = useState([]);
+  const [cdForm, setCdForm] = useState({ region: '', zone: '', woreda: '', facility_id: '', facility_name: '', odn_number: '', invoice_number: '', invoice_date: new Date().toISOString().split('T')[0] });
+  const [cdSaving, setCdSaving] = useState(false);
+  const [cdHistory, setCdHistory] = useState([]);
+  const [cdEditDialog, setCdEditDialog] = useState({ open: false, row: null, odn_number: '', invoice_number: '', invoice_date: '' });
+
   const userStore = localStorage.getItem('store') || '';
   const userId = localStorage.getItem('EmployeeID');
   const userName = localStorage.getItem('FullName');
@@ -67,6 +77,67 @@ const EwmDocumentation = () => {
   }, [userStore]);
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
+
+  // Cross-Docking: fetch regions on mount, fetch CD history when tab=2
+  useEffect(() => {
+    api.get('/api/regions').then(r => setCdRegions(r.data || [])).catch(() => {});
+    fetchCdHistory();
+  }, []);
+
+  useEffect(() => {
+    if (!cdForm.region) { setCdZones([]); setCdWoredas([]); setCdFacilities([]); return; }
+    api.get('/api/zones', { params: { region: cdForm.region } }).then(r => setCdZones(r.data || [])).catch(() => {});
+    setCdForm(p => ({ ...p, zone: '', woreda: '', facility_id: '', facility_name: '' }));
+    setCdWoredas([]); setCdFacilities([]);
+  }, [cdForm.region]);
+
+  useEffect(() => {
+    if (!cdForm.zone) { setCdWoredas([]); setCdFacilities([]); return; }
+    api.get('/api/woredas', { params: { zone: cdForm.zone } }).then(r => setCdWoredas(r.data || [])).catch(() => {});
+    setCdForm(p => ({ ...p, woreda: '', facility_id: '', facility_name: '' }));
+    setCdFacilities([]);
+  }, [cdForm.zone]);
+
+  useEffect(() => {
+    if (!cdForm.woreda) { setCdFacilities([]); return; }
+    api.get('/api/filtered-facilities', { params: { woreda: cdForm.woreda } }).then(r => setCdFacilities(r.data || [])).catch(() => {});
+    setCdForm(p => ({ ...p, facility_id: '', facility_name: '' }));
+  }, [cdForm.woreda]);
+
+  const fetchCdHistory = async () => {
+    try {
+      const res = await api.get('/api/cross-docking', { params: { store: userStore } });
+      setCdHistory(res.data.data || []);
+    } catch (_) {}
+  };
+
+  const handleCdSave = async () => {
+    if (!cdForm.facility_id || !cdForm.odn_number || !cdForm.invoice_number) {
+      Swal.fire('Warning', 'Please fill facility, ODN number, and invoice number', 'warning'); return;
+    }
+    setCdSaving(true);
+    try {
+      await api.post('/api/cross-docking', {
+        ...cdForm, store: userStore, created_by_id: userId, created_by_name: userName
+      });
+      setCdForm({ region: '', zone: '', woreda: '', facility_id: '', facility_name: '', odn_number: '', invoice_number: '', invoice_date: new Date().toISOString().split('T')[0] });
+      fetchCdHistory();
+      setTab(1); // switch to History tab
+      Swal.fire({ icon: 'success', title: 'Saved', timer: 1500, showConfirmButton: false });
+    } catch (e) {
+      Swal.fire('Error', 'Failed to save', 'error');
+    } finally { setCdSaving(false); }
+  };
+
+  const handleCdEditSave = async () => {
+    const { row, odn_number, invoice_number, invoice_date } = cdEditDialog;
+    try {
+      await api.put(`/api/cross-docking/${row.id}/edit`, { odn_number, invoice_number, invoice_date });
+      setCdEditDialog({ open: false, row: null, odn_number: '', invoice_number: '', invoice_date: '' });
+      fetchCdHistory();
+      Swal.fire({ icon: 'success', title: 'Updated', timer: 1200, showConfirmButton: false });
+    } catch { Swal.fire('Error', 'Failed to update', 'error'); }
+  };
 
   const handleInvoiceChange = (processId, odnNumber, field, value) => {
     const key = `${processId}-${odnNumber}`;
@@ -196,7 +267,10 @@ const EwmDocumentation = () => {
       renderCell: ({ row }) => (
         <Box sx={{ py: 0.5 }}>
           <Typography variant="body2" fontWeight={600} sx={{ whiteSpace: 'normal', lineHeight: 1.3 }}>{row.customer_name || '—'}</Typography>
-          <Chip label={row.store} size="small" color="primary" sx={{ mt: 0.3 }} />
+          <Stack direction="row" spacing={0.5} sx={{ mt: 0.3 }}>
+            <Chip label={row.store} size="small" color="primary" />
+            {row.customer_type && <Chip label={row.customer_type} size="small" color={row.customer_type === 'SRM' ? 'secondary' : row.customer_type === 'Credit' ? 'warning' : 'success'} variant="outlined" />}
+          </Stack>
         </Box>
       ),
     },
@@ -269,7 +343,10 @@ const EwmDocumentation = () => {
       renderCell: ({ row }) => (
         <Box sx={{ py: 0.5 }}>
           <Typography variant="body2" fontWeight={600} sx={{ whiteSpace: 'normal', lineHeight: 1.3 }}>{row.customer_name || '—'}</Typography>
-          <Chip label={row.store} size="small" color="primary" sx={{ mt: 0.3 }} />
+          <Stack direction="row" spacing={0.5} sx={{ mt: 0.3 }}>
+            <Chip label={row.store} size="small" color="primary" />
+            {row.customer_type && <Chip label={row.customer_type} size="small" color={row.customer_type === 'SRM' ? 'secondary' : row.customer_type === 'Credit' ? 'warning' : 'success'} variant="outlined" />}
+          </Stack>
         </Box>
       ),
     },
@@ -366,6 +443,7 @@ const EwmDocumentation = () => {
               <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tab label={`In Progress (${inProgress.length})`} />
                 <Tab label={`History (${history.length})`} />
+                <Tab label="Cross-Docking" />
               </Tabs>
             </Paper>
 
@@ -423,6 +501,113 @@ const EwmDocumentation = () => {
                 </Box>
               </Paper>
             )}
+
+            {tab === 1 && cdHistory.length > 0 && (
+              <Paper sx={{ mt: 2, p: 2 }}>
+                <Typography variant="subtitle1" fontWeight={700} color="#00695c" gutterBottom>Cross-Docking Records</Typography>
+                <DataGrid
+                  rows={cdHistory.map((r, i) => ({ ...r, id: r.id || i }))}
+                  columns={[
+                    { field: 'facility_name', headerName: 'Facility', flex: 1.5, minWidth: 180,
+                      renderCell: ({ row }) => (
+                        <Box sx={{ py: 0.5 }}>
+                          <Typography variant="body2" fontWeight={600}>{row.facility_name || '—'}</Typography>
+                          <Chip label="Cross-Docking" size="small" color="success" variant="outlined" sx={{ height: 16, fontSize: '0.65rem', mt: 0.3 }} />
+                        </Box>
+                      )
+                    },
+                    { field: 'odn_number', headerName: 'ODN', width: 180 },
+                    { field: 'invoice_number', headerName: 'Invoice #', width: 150 },
+                    { field: 'invoice_date', headerName: 'Invoice Date', width: 130, renderCell: ({ value }) => value ? new Date(value).toLocaleDateString() : '—' },
+                    { field: 'created_by_name', headerName: 'Submitted By', width: 160 },
+                    { field: 'received', headerName: 'Received', width: 110,
+                      renderCell: ({ value }) => value
+                        ? <Chip label="Yes" size="small" color="success" />
+                        : <Chip label="No" size="small" color="warning" variant="outlined" />
+                    },
+                    { field: 'received_by', headerName: 'Received By', width: 170,
+                      renderCell: ({ row }) => !row.received ? '—' : (
+                        <Box sx={{ py: 0.5 }}>
+                          <Typography variant="body2" fontWeight={600}>{row.received_by || '—'}</Typography>
+                          {row.received_at && <Typography variant="caption" color="text.secondary">{new Date(row.received_at).toLocaleDateString()}</Typography>}
+                        </Box>
+                      )
+                    },
+                    { field: 'created_at', headerName: 'Date', width: 160, renderCell: ({ value }) => value ? new Date(value).toLocaleString() : '—' },
+                    { field: 'actions', headerName: 'Actions', width: 100, sortable: false,
+                      renderCell: ({ row }) => !row.received ? (
+                        <Tooltip title="Edit">
+                          <IconButton size="small" color="primary" onClick={() => setCdEditDialog({ open: true, row, odn_number: row.odn_number || '', invoice_number: row.invoice_number || '', invoice_date: row.invoice_date ? row.invoice_date.split('T')[0] : '' })}>
+                            <Edit fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      ) : null
+                    },
+                  ]}
+                  autoHeight
+                  disableSelectionOnClick
+                  pageSize={10}
+                  rowsPerPageOptions={[10, 25]}
+                  sx={{ border: 0, '& .MuiDataGrid-columnHeaders': { backgroundColor: '#00695c', color: '#fff', fontWeight: 700 } }}
+                />
+              </Paper>
+            )}
+            {tab === 2 && (
+              <Box>
+                {/* Cross-Docking Form */}
+                <Paper sx={{ p: 3, mb: 3 }}>
+                  <Typography variant="h6" fontWeight={700} gutterBottom>New Cross-Docking Entry</Typography>
+                  <Stack spacing={2}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                      <FormControl fullWidth size="small">
+                        <InputLabel>Region</InputLabel>
+                        <Select value={cdForm.region} label="Region" onChange={e => setCdForm(p => ({ ...p, region: e.target.value }))}>
+                          {cdRegions.map(r => <MenuItem key={r.region_name} value={r.region_name}>{r.region_name}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <FormControl fullWidth size="small" disabled={!cdForm.region}>
+                        <InputLabel>Zone</InputLabel>
+                        <Select value={cdForm.zone} label="Zone" onChange={e => setCdForm(p => ({ ...p, zone: e.target.value }))}>
+                          {cdZones.map(z => <MenuItem key={z.zone_name} value={z.zone_name}>{z.zone_name}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <FormControl fullWidth size="small" disabled={!cdForm.zone}>
+                        <InputLabel>Woreda</InputLabel>
+                        <Select value={cdForm.woreda} label="Woreda" onChange={e => setCdForm(p => ({ ...p, woreda: e.target.value }))}>
+                          {cdWoredas.map(w => <MenuItem key={w.woreda_name} value={w.woreda_name}>{w.woreda_name}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                    </Stack>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                      <FormControl fullWidth size="small" disabled={!cdForm.woreda}>
+                        <InputLabel>Facility</InputLabel>
+                        <Select value={cdForm.facility_id} label="Facility" onChange={e => {
+                          const f = cdFacilities.find(x => x.id === e.target.value);
+                          setCdForm(p => ({ ...p, facility_id: e.target.value, facility_name: f?.facility_name || '' }));
+                        }}>
+                          {cdFacilities.map(f => <MenuItem key={f.id} value={f.id}>{f.facility_name}</MenuItem>)}
+                        </Select>
+                      </FormControl>
+                      <TextField fullWidth size="small" label="ODN Number(s)" value={cdForm.odn_number}
+                        onChange={e => setCdForm(p => ({ ...p, odn_number: e.target.value }))}
+                        placeholder="e.g. ODN001, ODN002" />
+                    </Stack>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                      <TextField fullWidth size="small" label="Invoice Number" value={cdForm.invoice_number}
+                        onChange={e => setCdForm(p => ({ ...p, invoice_number: e.target.value }))} />
+                      <TextField fullWidth size="small" label="Invoice Date" type="date" value={cdForm.invoice_date}
+                        onChange={e => setCdForm(p => ({ ...p, invoice_date: e.target.value }))}
+                        InputLabelProps={{ shrink: true }} />
+                    </Stack>
+                    <Box>
+                      <Button variant="contained" startIcon={<Save />} onClick={handleCdSave} disabled={cdSaving}>
+                        {cdSaving ? 'Saving...' : 'Save'}
+                      </Button>
+                    </Box>
+                  </Stack>
+                </Paper>
+              </Box>
+            )}
           </>
         )}
       </Container>
@@ -443,6 +628,25 @@ const EwmDocumentation = () => {
           <Button onClick={() => setEditDialog({ open: false, row: null, invoice_number: '', invoice_date: '' })}>Cancel</Button>
           <Button variant="contained" startIcon={<Save />} onClick={handleEditSave}
             disabled={!editDialog.invoice_number}>Save</Button>
+        </DialogActions>
+      </Dialog>
+      {/* Cross-Docking Edit Dialog */}
+      <Dialog open={cdEditDialog.open} onClose={() => setCdEditDialog({ open: false, row: null, odn_number: '', invoice_number: '', invoice_date: '' })} maxWidth="xs" fullWidth>
+        <DialogTitle>Edit Cross-Docking Record</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField fullWidth size="small" label="ODN Number(s)" value={cdEditDialog.odn_number}
+              onChange={e => setCdEditDialog(p => ({ ...p, odn_number: e.target.value }))} />
+            <TextField fullWidth size="small" label="Invoice Number" value={cdEditDialog.invoice_number}
+              onChange={e => setCdEditDialog(p => ({ ...p, invoice_number: e.target.value }))} />
+            <TextField fullWidth size="small" label="Invoice Date" type="date" value={cdEditDialog.invoice_date}
+              onChange={e => setCdEditDialog(p => ({ ...p, invoice_date: e.target.value }))}
+              InputLabelProps={{ shrink: true }} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCdEditDialog({ open: false, row: null, odn_number: '', invoice_number: '', invoice_date: '' })}>Cancel</Button>
+          <Button variant="contained" startIcon={<Save />} onClick={handleCdEditSave}>Save</Button>
         </DialogActions>
       </Dialog>
     </LocalizationProvider>

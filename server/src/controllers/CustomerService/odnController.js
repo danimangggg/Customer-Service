@@ -25,10 +25,15 @@ const checkAndUpdateProcessStatus = async (processId) => {
 
     const allCompleted = allODNs.every(odnItem => odnItem.status === 'ewm_completed');
 
-    if (allCompleted && process.status !== 'ewm_completed') {
-      // All ODNs completed, update process to ewm_completed
-      await process.update({ status: 'ewm_completed' });
-      console.log(`Process ${processId} automatically updated to ewm_completed - all ODNs completed`);
+    if (allCompleted && process.status !== 'ewm_completed' && process.status !== 'completed') {
+      // All ODNs completed — SRM ends here, others go to ewm_completed
+      if (process.customer_type === 'SRM') {
+        await process.update({ status: 'completed', completed_at: new Date() });
+        console.log(`Process ${processId} SRM completed`);
+      } else {
+        await process.update({ status: 'ewm_completed' });
+        console.log(`Process ${processId} automatically updated to ewm_completed - all ODNs completed`);
+      }
       return true;
     } else if (!allCompleted && process.status === 'ewm_completed') {
       // Not all ODNs completed, revert process from ewm_completed
@@ -308,8 +313,12 @@ const ewmCompleteProcess = async (req, res) => {
       });
     }
 
-    // Update process status to EWM completed
-    await process.update({ status: 'ewm_completed' });
+    // Update process status — SRM completes here, others go to ewm_completed
+    if (process.customer_type === 'SRM') {
+      await process.update({ status: 'completed', completed_at: new Date() });
+    } else {
+      await process.update({ status: 'ewm_completed' });
+    }
 
     // Record service time for EWM Phase - Passed to TM Manager
     try {

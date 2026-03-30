@@ -243,7 +243,7 @@ const RegisterCustomer = () => {
       return;
     }
 
-    if ((customerType === 'Cash' || forwardPath === 'O2C') && !selectedOfficer) {
+    if ((customerType === 'Cash' || customerType === 'SRM' || forwardPath === 'O2C') && !selectedOfficer) {
       setSnackbarMessage('Please select an O2C Officer.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
@@ -692,6 +692,7 @@ const RegisterCustomer = () => {
                 >
                   <MenuItem value="Cash">Cash Sale</MenuItem>
                   <MenuItem value="Credit">Credit Sale</MenuItem>
+                  <MenuItem value="SRM">SRM (Stock Return Memo)</MenuItem>
                 </TextField>
               </Grid>
 
@@ -800,6 +801,52 @@ const RegisterCustomer = () => {
                       sx={{ py: 2 }}
                     >
                       Finalize Registration
+                    </Button>
+                  </Grid>
+                </>
+              )}
+
+              {/* SRM — same as Cash: assign O2C officer and forward */}
+              {customerType === 'SRM' && (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      select
+                      fullWidth
+                      label="Assign O2C Officer"
+                      value={selectedOfficer}
+                      onChange={e => setSelectedOfficer(e.target.value)}
+                      className="form-field"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          transition: 'all 0.3s ease',
+                          '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
+                        }
+                      }}
+                    >
+                      {filteredO2cOfficers.map(officer => (
+                        <MenuItem key={officer.id} value={officer.id}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                            <span>{officer.full_name}</span>
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                              ({assignedCustomerCounts[officer.id] || 0})
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="large"
+                      onClick={() => handleSubmit('O2C')}
+                      className="enhanced-button"
+                      sx={{ py: 2, bgcolor: '#7b1fa2', '&:hover': { bgcolor: '#6a1b9a' } }}
+                    >
+                      Register SRM & Forward to O2C
                     </Button>
                   </Grid>
                 </>

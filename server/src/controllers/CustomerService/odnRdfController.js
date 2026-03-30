@@ -376,18 +376,28 @@ const completeEwm = async (req, res) => {
     console.log('Pending count:', allCompleted.pending_count);
 
     // If all stores completed EWM, update global status
-    if (allCompleted.pending_count === 0) {
+    if (parseInt(allCompleted.pending_count) === 0) {
       console.log('All stores completed - updating global status...');
-      await db.sequelize.query(
-        `UPDATE customer_queue 
-         SET status = 'ewm_completed'
-         WHERE id = ?`,
-        {
-          replacements: [process_id],
-          type: db.sequelize.QueryTypes.UPDATE
-        }
+
+      // Check customer type — SRM completes here, others go to ewm_completed
+      const [customer] = await db.sequelize.query(
+        `SELECT customer_type FROM customer_queue WHERE id = ?`,
+        { replacements: [process_id], type: db.sequelize.QueryTypes.SELECT }
       );
-      console.log('Global status updated to ewm_completed');
+      const isSRM = customer?.customer_type === 'SRM';
+
+      if (isSRM) {
+        await db.sequelize.query(
+          `UPDATE customer_queue SET status = 'completed', completed_at = (SELECT MAX(o.ewm_completed_at) FROM odns_rdf o WHERE o.process_id = ?) WHERE id = ?`,
+          { replacements: [process_id, process_id], type: db.sequelize.QueryTypes.UPDATE }
+        );
+      } else {
+        await db.sequelize.query(
+          `UPDATE customer_queue SET status = 'ewm_completed' WHERE id = ?`,
+          { replacements: [process_id], type: db.sequelize.QueryTypes.UPDATE }
+        );
+      }
+      console.log(`Global status updated to ${isSRM ? 'completed (SRM)' : 'ewm_completed'}`);
     }
 
     console.log('=== EWM COMPLETED SUCCESSFULLY ===');

@@ -36,7 +36,8 @@ const getDispatchedODNs = async (req, res) => {
         r.id as route_id,
         p.reporting_month,
         ra.id as route_assignment_id,
-        ra.arrival_kilometer,
+        p.arrival_kilometer,
+        p.vehicle_id,
         p.vehicle_name,
         p.driver_name,
         p.deliverer_name,
@@ -63,8 +64,8 @@ const getDispatchedODNs = async (req, res) => {
         ${branchFilter}
         ${search ? 'AND (COALESCE(f.facility_name, \'\') LIKE ? OR COALESCE(r.route_name, \'\') LIKE ?)' : ''}
       GROUP BY p.facility_id, f.facility_name, f.region_name, f.zone_name, f.woreda_name, 
-               r.route_name, r.id, p.reporting_month, ra.id, ra.arrival_kilometer,
-               p.vehicle_name, p.driver_name, p.deliverer_name
+               r.route_name, r.id, p.reporting_month, ra.id, p.arrival_kilometer,
+               p.vehicle_id, p.vehicle_name, p.driver_name, p.deliverer_name
       HAVING fully_completed_odns < total_odns
       ORDER BY dispatch_completed_at DESC, facility_name
       LIMIT ? OFFSET ?
@@ -305,14 +306,12 @@ const bulkUpdatePODConfirmation = async (req, res) => {
             transaction
           });
 
-          // Save arrival_kilometer to route_assignments
-          if (arrival_kilometer !== undefined && arrival_kilometer !== null && route_assignment_id) {
+          // Save arrival_kilometer to processes (per vehicle, not per route)
+          if (arrival_kilometer !== undefined && arrival_kilometer !== null) {
             await db.sequelize.query(
-              `UPDATE route_assignments SET arrival_kilometer = ? WHERE id = ?`,
-              { replacements: [arrival_kilometer, route_assignment_id], type: db.sequelize.QueryTypes.UPDATE, transaction }
+              `UPDATE processes SET arrival_kilometer = ? WHERE id = (SELECT process_id FROM odns WHERE id = ? LIMIT 1)`,
+              { replacements: [arrival_kilometer, odn_id], type: db.sequelize.QueryTypes.UPDATE, transaction }
             );
-            routeKilometerUpdates.set(route_assignment_id, arrival_kilometer);
-            console.log(`Updated route_assignment ${route_assignment_id} with arrival_kilometer: ${arrival_kilometer}`);
           }
 
           // Commit the transaction
@@ -627,6 +626,35 @@ const getRouteKilometer = async (req, res) => {
   }
 };
 
+// Get departure_kilometer for a vehicle from processes
+const getVehicleKilometer = async (req, res) => {
+  try {
+    const { vehicle_id, route_name, month, year } = req.query;
+    if (!vehicle_id || !month || !year) {
+      return res.status(400).json({ error: 'vehicle_id, month, and year are required' });
+    }
+    const routeFilter = route_name ? `AND f.route = ?` : '';
+    const replacements = route_name
+      ? [vehicle_id, `${month} ${year}`, route_name]
+      : [vehicle_id, `${month} ${year}`];
+
+    const [row] = await db.sequelize.query(`
+      SELECT p.arrival_kilometer
+      FROM processes p
+      INNER JOIN facilities f ON f.id = p.facility_id
+      WHERE p.vehicle_id = ? AND p.reporting_month = ?
+        ${routeFilter}
+        AND p.arrival_kilometer IS NOT NULL
+      LIMIT 1
+    `, { replacements, type: db.sequelize.QueryTypes.SELECT });
+
+    res.json({ departure_kilometer: row?.arrival_kilometer || null });
+  } catch (error) {
+    console.error('getVehicleKilometer error:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicle kilometer' });
+  }
+};
+
 module.exports = {
   getDispatchedODNs,
   getDocumentationStats,
@@ -634,5 +662,6 @@ module.exports = {
   bulkUpdatePODConfirmation,
   bulkUpdateFacilityPODConfirmation,
   getAvailableMonths,
-  getRouteKilometer
+  getRouteKilometer,
+  getVehicleKilometer
 };

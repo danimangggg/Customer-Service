@@ -164,6 +164,8 @@ const RDFReport = () => {
       fetchCustomers();
     } else if (activeTab === 2) {
       fetchDocumentation();
+    } else if (activeTab === 3) {
+      fetchCompletedPicklists();
     } else if (activeTab === 4) {
       fetchCompletedPicklists();
     } else if (activeTab === 5) {
@@ -280,19 +282,25 @@ const RDFReport = () => {
       const params = { page: 1, limit: 10000 };
       if (selectedBranch) params.branch_code = selectedBranch;
       const response = await api.get(`${API_URL}/api/picklist-history`, { params });
-      if (response.data.success && response.data.picklists) {
-        const rows = response.data.picklists
-          .filter(p => p.store && p.store !== 'HP' && p.store !== 'CR')
-          .map(p => ({
-            ...p,
-            facility_name: p.facility?.facility_name || 'Unknown',
-            region_name: p.facility?.region_name || 'N/A',
-            woreda_name: p.facility?.woreda_name || 'N/A',
-          }));
-        setCompletedPicklists(rows);
-      } else {
-        setCompletedPicklists([]);
+
+      let rawList = [];
+      if (response.data.success && Array.isArray(response.data.picklists)) {
+        rawList = response.data.picklists;
+      } else if (Array.isArray(response.data.data)) {
+        rawList = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        rawList = response.data;
       }
+
+      const rows = rawList
+        .filter(p => p.store && p.store !== 'HP' && p.store !== 'CR')
+        .map(p => ({
+          ...p,
+          facility_name: p.facility?.facility_name || p.facility_name || 'Unknown',
+          region_name: p.facility?.region_name || p.region_name || 'N/A',
+          woreda_name: p.facility?.woreda_name || p.woreda_name || 'N/A',
+        }));
+      setCompletedPicklists(rows);
     } catch (err) {
       console.error('Error fetching completed picklists:', err);
       setCompletedPicklists([]);
@@ -502,12 +510,11 @@ const RDFReport = () => {
       width: 180,
       filterable: true,
       renderCell: (params) => {
-        const isCredit = params.row.customer_type?.toLowerCase() === 'credit';
-        
-        if (isCredit) {
+        const type = params.row.customer_type?.toLowerCase();
+        if (type === 'credit' || type === 'srm') {
           return (
             <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
-              Credit
+              {params.row.customer_type}
             </Typography>
           );
         }
@@ -972,12 +979,14 @@ const RDFReport = () => {
                   width: 130,
                   headerClassName: 'super-app-theme--header',
                   renderCell: (params) => {
-                    const isCash = params.value?.toLowerCase() === 'cash';
+                    const val = params.value?.toLowerCase();
+                    const label = val === 'cash' ? 'Cash' : val === 'srm' ? 'SRM' : 'Credit';
+                    const color = val === 'cash' ? 'success' : val === 'srm' ? 'secondary' : 'primary';
                     return (
-                      <Chip 
-                        label={isCash ? 'Cash' : 'Credit'} 
-                        size="small" 
-                        color={isCash ? 'success' : 'primary'}
+                      <Chip
+                        label={label}
+                        size="small"
+                        color={color}
                         variant="outlined"
                         sx={{ fontWeight: 600 }}
                       />
@@ -1267,7 +1276,7 @@ const RDFReport = () => {
 
       {/* Finance Tab */}
       {activeTab === 4 && (
-        <FinanceInvoiceView mode="rdf" />
+        <FinanceInvoiceView mode="rdf-report" />
       )}
 
       {/* Best Of Tab */}
@@ -1572,9 +1581,11 @@ const RDFReport = () => {
                         <TableRow sx={{ bgcolor: '#f5f5f5' }}>
                           <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
                           <TableCell sx={{ fontWeight: 700 }}>EWM</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Dispatch</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Exit Permit</TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>Security</TableCell>
+                          {selectedCustomer?.customer_type !== 'SRM' && <>
+                            <TableCell sx={{ fontWeight: 700 }}>Dispatch</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Exit Permit</TableCell>
+                            <TableCell sx={{ fontWeight: 700 }}>Security</TableCell>
+                          </>}
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1603,6 +1614,7 @@ const RDFReport = () => {
                           const dispatch = statusChip(odn.dispatch_status);
                           const exitPermit = statusChip(odn.exit_permit_status);
                           const gate = statusChip(odn.gate_status);
+                          const isSRM = selectedCustomer?.customer_type === 'SRM';
 
                           return (
                             <TableRow key={index} sx={{ '&:hover': { bgcolor: '#fafafa' } }}>
@@ -1610,15 +1622,17 @@ const RDFReport = () => {
                               <TableCell>
                                 <Chip label={ewm.label} color={ewm.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
                               </TableCell>
-                              <TableCell>
-                                <Chip label={dispatch.label} color={dispatch.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
-                              </TableCell>
-                              <TableCell>
-                                <Chip label={exitPermit.label} color={exitPermit.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
-                              </TableCell>
-                              <TableCell>
-                                <Chip label={gate.label} color={gate.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
-                              </TableCell>
+                              {!isSRM && <>
+                                <TableCell>
+                                  <Chip label={dispatch.label} color={dispatch.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
+                                </TableCell>
+                                <TableCell>
+                                  <Chip label={exitPermit.label} color={exitPermit.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
+                                </TableCell>
+                                <TableCell>
+                                  <Chip label={gate.label} color={gate.color} size="small" sx={{ minWidth: 80, fontWeight: 600 }} />
+                                </TableCell>
+                              </>}
                             </TableRow>
                           );
                         })}
@@ -1629,7 +1643,9 @@ const RDFReport = () => {
                   {/* Show info about process flow */}
                   <Alert severity="info" sx={{ mt: 2, borderRadius: 2 }}>
                     <Typography variant="caption">
-                      Each store follows: EWM → Dispatch → Exit Permit (Documentation) → Security
+                      {selectedCustomer?.customer_type === 'SRM'
+                        ? 'SRM flow: Customer Service → O2C → EWM (process ends here)'
+                        : 'Each store follows: EWM → Dispatch → Exit Permit (Documentation) → Security'}
                     </Typography>
                   </Alert>
                 </Grid>

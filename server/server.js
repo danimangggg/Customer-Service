@@ -54,6 +54,24 @@ if (process.env.NODE_ENV === 'production') {
 // Run a simple model sync at startup (no automatic ALTERs)
 db.sequelize.sync().then(() => {
   console.log('Database synchronized.');
+
+  // Auto-fix any SRM processes stuck at ewm_completed
+  const fixSRMProcesses = () => {
+    db.sequelize.query(`
+      UPDATE customer_queue cq
+      SET status = 'completed',
+          completed_at = (SELECT MAX(o.ewm_completed_at) FROM odns_rdf o WHERE o.process_id = cq.id)
+      WHERE cq.customer_type = 'SRM'
+        AND cq.status = 'ewm_completed'
+        AND (SELECT COUNT(*) FROM odns_rdf o WHERE o.process_id = cq.id AND o.ewm_status != 'completed') = 0
+    `).then(([, meta]) => {
+      if (meta.affectedRows > 0) console.log(`Auto-fixed ${meta.affectedRows} stuck SRM process(es).`);
+    }).catch(err => console.error('SRM auto-fix error:', err));
+  };
+
+  fixSRMProcesses(); // run on startup
+  setInterval(fixSRMProcesses, 5000); // run every 5 seconds
+
 }).catch(err => {
   console.error('DB sync error:', err);
 });

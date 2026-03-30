@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import api from '../../axiosInstance';
 import { successToast } from '../../utils/toast';
+import Swal from 'sweetalert2';
 import {
   Dialog,
   DialogTitle,
@@ -40,7 +41,10 @@ style.innerHTML = `
 `;
 document.head.appendChild(style);
 
-const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
+const OdnRdfManager = ({ open, onClose, processId, facilityName, customerType }) => {
+  const isSRM = customerType === 'SRM';
+  const label = isSRM ? 'SRM Number' : 'ODN Number';
+  const labelShort = isSRM ? 'SRMN' : 'ODN';
   const [odns, setOdns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [newOdn, setNewOdn] = useState('');
@@ -104,7 +108,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
       }
     } catch (error) {
       console.error('Error fetching ODNs:', error);
-      Swal.fire('Error', 'Failed to fetch ODNs', 'error');
+      Swal.fire('Error', (`Failed to fetch ${labelShort}s`), 'error');
     } finally {
       setLoading(false);
     }
@@ -112,7 +116,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
 
   const handleAddOdn = async () => {
     if (!newOdn.trim()) {
-      Swal.fire('Error', 'Please enter an ODN number', 'error');
+      Swal.fire('Error', (`Please enter a ${label}`), 'error');
       return;
     }
 
@@ -129,11 +133,11 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
         setNewOdn('');
         // Keep the selected store for convenience
         fetchOdns();
-        successToast('ODN added successfully');
+        successToast((`${labelShort} added successfully`));
       }
     } catch (error) {
       console.error('Error adding ODN:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to add ODN';
+      const errorMessage = error.response?.data?.error || (`Failed to add ${labelShort}`);
       Swal.fire('Error', errorMessage, 'error');
     }
   };
@@ -146,7 +150,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
 
   const handleSaveEdit = async () => {
     if (!editOdn.trim()) {
-      Swal.fire('Error', 'Please enter an ODN number', 'error');
+      Swal.fire('Error', (`Please enter a ${label}`), 'error');
       return;
     }
 
@@ -161,11 +165,11 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
         setEditOdn('');
         setEditStore('');
         fetchOdns();
-        successToast('ODN updated successfully');
+        successToast((`${labelShort} updated successfully`));
       }
     } catch (error) {
       console.error('Error updating ODN:', error);
-      const errorMessage = error.response?.data?.error || 'Failed to update ODN';
+      const errorMessage = error.response?.data?.error || (`Failed to update ${labelShort}`);
       Swal.fire('Error', errorMessage, 'error');
     }
   };
@@ -179,7 +183,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
   const handleDeleteOdn = async (odnId) => {
     const result = await Swal.fire({
       title: 'Are you sure?',
-      text: 'This will permanently delete the ODN',
+      text: (`This will permanently delete the ${labelShort}`),
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -197,7 +201,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
           fetchOdns();
           Swal.fire({
             title: 'Deleted!',
-            text: 'ODN has been deleted',
+            text: (`${labelShort} has been deleted`),
             icon: 'success',
             timer: 1500,
             showConfirmButton: false
@@ -205,7 +209,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
         }
       } catch (error) {
         console.error('Error deleting ODN:', error);
-        Swal.fire('Error', 'Failed to delete ODN', 'error');
+        Swal.fire('Error', (`Failed to delete ${labelShort}`), 'error');
       }
     }
   };
@@ -227,7 +231,7 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={window.innerWidth < 600}>
       <DialogTitle>
         <Typography variant="h6" component="div">
-          Manage ODNs - {facilityName}
+          {isSRM ? 'Manage SRM Numbers' : 'Manage ODNs'} - {facilityName}
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Process ID: {processId}
@@ -238,11 +242,11 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
         {/* Add New ODN Section */}
         <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
           <Typography variant="subtitle1" gutterBottom>
-            Add New ODN
+            Add New {label}
           </Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
             <TextField
-              label="ODN Number"
+              label={label}
               value={newOdn}
               onChange={(e) => setNewOdn(e.target.value)}
               size="small"
@@ -279,17 +283,17 @@ const OdnRdfManager = ({ open, onClose, processId, facilityName }) => {
 
         {/* ODNs List */}
         <Typography variant="subtitle1" gutterBottom>
-          Current ODNs ({odns.length})
+          Current {labelShort}s ({odns.length})
         </Typography>
         
         {loading ? (
           <Box sx={{ textAlign: 'center', py: 3 }}>
-            <Typography>Loading ODNs...</Typography>
+            <Typography>Loading {labelShort}s...</Typography>
           </Box>
         ) : odns.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 3 }}>
             <Typography color="text.secondary">
-              No ODNs added yet. Click "Add" to create the first ODN.
+              No {labelShort}s added yet. Click "Add" to create the first {labelShort}.
             </Typography>
           </Box>
         ) : (

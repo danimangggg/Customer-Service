@@ -76,14 +76,14 @@ const DispatchManagement = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const isRouteReady = (route) =>
-    Number(route.ready_facilities) > 0 &&
-    Number(route.ready_facilities) === Number(route.total_facilities);
+  const isRouteReady = (vehicle) =>
+    Number(vehicle.ready_facilities) > 0 &&
+    Number(vehicle.ready_facilities) === Number(vehicle.total_facilities);
 
-  const handleCompleteDispatch = async (route) => {
+  const handleCompleteDispatch = async (vehicle) => {
     const confirm = await Swal.fire({
       title: 'Complete Dispatch?',
-      text: `Mark all facilities in route "${route.route_name}" as dispatch completed?`,
+      text: `Mark all facilities for vehicle "${vehicle.vehicle_name}" as dispatch completed?`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#4caf50',
@@ -93,11 +93,11 @@ const DispatchManagement = () => {
 
     try {
       await api.post(`${api_url}/api/complete-dispatch-hp`, {
-        route_name: route.route_name,
+        vehicle_id: vehicle.vehicle_id,
         reporting_month: `${currentEthiopian.month} ${currentEthiopian.year}`,
         completed_by: loggedInUserId
       });
-      successToast('Dispatch completed for all facilities in route');
+      successToast('Dispatch completed for all facilities in vehicle');
       fetchRoutes();
     } catch (err) {
       Swal.fire('Error', err.response?.data?.error || 'Failed to complete dispatch', 'error');
@@ -150,61 +150,56 @@ const DispatchManagement = () => {
         <Box sx={{ background: 'linear-gradient(90deg, #e65100 0%, #ef6c00 100%)', px: 3, py: 2 }}>
           <Stack direction="row" alignItems="center" spacing={2}>
             <DispatchIcon sx={{ color: 'white' }} />
-            <Typography variant="h6" fontWeight="bold" color="white">Routes Ready for Dispatch</Typography>
-            <Chip label={`${routes.length} routes`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
+            <Typography variant="h6" fontWeight="bold" color="white">Vehicles Ready for Dispatch</Typography>
+            <Chip label={`${routes.length} vehicles`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 700 }} />
           </Stack>
         </Box>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow sx={{ '& .MuiTableCell-head': { bgcolor: '#e65100', color: 'white', fontWeight: 700 } }}>
+                <TableCell>Vehicle</TableCell>
                 <TableCell>Route</TableCell>
+                <TableCell>Driver / Deliverer</TableCell>
                 <TableCell align="center">Facilities</TableCell>
                 <TableCell align="center">Ready</TableCell>
-                <TableCell>Vehicles / Drivers</TableCell>
                 <TableCell align="center">Details</TableCell>
                 <TableCell align="center">Action</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {routes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((route) => {
-                const ready = isRouteReady(route);
+              {routes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((vehicle) => {
+                const ready = isRouteReady(vehicle);
                 return (
-                  <TableRow key={route.route_name} hover>
+                  <TableRow key={vehicle.vehicle_id} hover>
                     <TableCell>
-                      <Chip label={route.route_name} size="small" variant="outlined" color="warning" />
+                      <Chip label={vehicle.vehicle_name} size="small" color="primary" icon={<CarIcon />} />
+                    </TableCell>
+                    <TableCell>
+                      <Chip label={vehicle.route_name} size="small" variant="outlined" color="warning" />
+                    </TableCell>
+                    <TableCell>
+                      <Stack spacing={0.2}>
+                        <Typography variant="body2" fontWeight={600}>{vehicle.driver_name || '—'}</Typography>
+                        {vehicle.deliverer_name && <Typography variant="caption" color="text.secondary">{vehicle.deliverer_name}</Typography>}
+                      </Stack>
                     </TableCell>
                     <TableCell align="center">
-                      <Typography variant="body2" fontWeight={600}>{route.total_facilities}</Typography>
+                      <Typography variant="body2" fontWeight={600}>{vehicle.total_facilities}</Typography>
                     </TableCell>
                     <TableCell align="center">
                       <Chip
-                        label={`${route.ready_facilities || 0} / ${route.total_facilities}`}
+                        label={`${vehicle.ready_facilities || 0} / ${vehicle.total_facilities}`}
                         size="small"
                         color={ready ? 'success' : 'warning'}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Stack spacing={0.5}>
-                        {(route.vehicles || []).length > 0
-                          ? (route.vehicles || []).map(v => (
-                              <Stack key={v.vehicle_id} spacing={0.2}>
-                                <Chip label={v.vehicle_name} size="small" color="primary" variant="outlined" icon={<CarIcon />} />
-                                <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
-                                  {v.driver_name || '—'}{v.deliverer_name ? ` / ${v.deliverer_name}` : ''}
-                                </Typography>
-                              </Stack>
-                            ))
-                          : <Typography variant="body2" color="text.secondary">—</Typography>
-                        }
-                      </Stack>
                     </TableCell>
                     <TableCell align="center">
                       <Button
                         variant="outlined"
                         size="small"
                         startIcon={<InfoIcon />}
-                        onClick={() => setDetailRoute(route)}
+                        onClick={() => setDetailRoute(vehicle)}
                         sx={{ borderRadius: 2 }}
                       >
                         Details
@@ -216,7 +211,7 @@ const DispatchManagement = () => {
                         size="small"
                         startIcon={<CheckIcon />}
                         disabled={!ready}
-                        onClick={() => handleCompleteDispatch(route)}
+                        onClick={() => handleCompleteDispatch(vehicle)}
                         sx={{ bgcolor: '#e65100', '&:hover': { filter: 'brightness(0.9)' }, borderRadius: 2 }}
                       >
                         Complete
@@ -227,8 +222,8 @@ const DispatchManagement = () => {
               })}
               {routes.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                    No routes ready for dispatch
+                  <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                    No vehicles ready for dispatch
                   </TableCell>
                 </TableRow>
               )}
@@ -242,9 +237,9 @@ const DispatchManagement = () => {
       {/* Details Dialog */}
       <Dialog open={!!detailRoute} onClose={() => setDetailRoute(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
         <DialogTitle sx={{ fontWeight: 700 }}>
-          Route: {detailRoute?.route_name}
+          Vehicle: {detailRoute?.vehicle_name}
           <Typography variant="body2" color="text.secondary">
-            {detailRoute?.ready_facilities || 0} / {detailRoute?.total_facilities} facilities ready
+            Route: {detailRoute?.route_name} — {detailRoute?.ready_facilities || 0} / {detailRoute?.total_facilities} facilities ready
           </Typography>
         </DialogTitle>
         <DialogContent dividers>
