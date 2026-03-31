@@ -45,17 +45,20 @@ const groupByFacility = (odnData) => {
   odnData.forEach(odn => {
     const key = odn.facility_name;
     if (!map[key]) {
-      map[key] = { facility_name: odn.facility_name, route: odn.route || 'N/A', branch_name: odn.branch_name || odn.branch_code || 'N/A', odns: [], pods: [], confirmed_count: 0, total_pods: 0 };
+      map[key] = { facility_name: odn.facility_name, route: odn.route || 'N/A', branch_name: odn.branch_name || odn.branch_code || 'N/A', odns: [], pods: new Set(), confirmed_count: 0, total_pods: 0 };
     }
     if (odn.odn_number) map[key].odns.push(odn.odn_number);
     if (odn.pod_number) {
       const podList = odn.pod_number.split(',').map(p => p.trim()).filter(Boolean);
-      map[key].pods.push(...podList);
-      map[key].total_pods += podList.length;
-      if (odn.pod_confirmed == 1) map[key].confirmed_count += podList.length;
+      podList.forEach(p => map[key].pods.add(p));
+      if (odn.pod_confirmed == 1) map[key].confirmed_count = map[key].pods.size;
     }
   });
-  return Object.values(map);
+  return Object.values(map).map(r => ({
+    ...r,
+    pods: [...r.pods],
+    total_pods: r.pods.size
+  }));
 };
 
 const getPODStatus = (confirmed, total) => {

@@ -767,7 +767,7 @@ const OutstandingCustomers = () => {
                 Swal.fire('Error', 'Failed to update service point', 'error');
             }
 
-        } else if (jobTitle === 'Finance') {
+        } else if ((jobTitle === 'Finance' || jobTitle === 'Finance Officer')) {
             // Finance has its own reporting flow — no action here
             successToast('Finance action not applicable here.');
         } else if (jobTitle === 'Cashier') {
@@ -1116,9 +1116,9 @@ const OutstandingCustomers = () => {
 
                                             {jobTitle === 'Cashier' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
 
-                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Current Service Point</TableCell>}
-                                            {jobTitle === 'Finance' && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
-                                            {jobTitle === 'Finance' && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
+                                            {(jobTitle === 'Finance' || jobTitle === 'Finance Officer') && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Current Service Point</TableCell>}
+                                            {(jobTitle === 'Finance' || jobTitle === 'Finance Officer') && <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Status</TableCell>}
+                                            {(jobTitle === 'Finance' || jobTitle === 'Finance Officer') && <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem', color: 'white' }}>Action</TableCell>}
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -1370,7 +1370,7 @@ const OutstandingCustomers = () => {
                                                 </Button>
                                             </TableCell>
                                         )}
-                                        {jobTitle === 'Finance' && (
+                                        {(jobTitle === 'Finance' || jobTitle === 'Finance Officer') && (
                                             <>
                                                 <TableCell>{customer.next_service_point || "N/A"}</TableCell>
                                                 <TableCell>

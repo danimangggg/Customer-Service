@@ -201,7 +201,7 @@ export default function SignIn() {
         } else if (jobTitle === 'Biller')                   { navigate('/biller');
         } else if (jobTitle === 'Dispatcher')               { navigate('/dispatch');
         } else if (jobTitle === 'Cashier') { navigate('/outstandingProcess');
-        } else if (jobTitle === 'Finance')                  { navigate('/finance-invoices');
+        } else if ((jobTitle === 'Finance' || jobTitle === 'Finance Officer'))                  { navigate('/finance-invoices');
         } else if (jobTitle === 'Dispatcher - HP')          { navigate('/dispatch-management');
         } else if (jobTitle === 'Dispatch-Documentation')   { navigate('/exit-permit');
         } else if (jobTitle === 'EWM-Documentation')        { navigate('/ewm-documentation');

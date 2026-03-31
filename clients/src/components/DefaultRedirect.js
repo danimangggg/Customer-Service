@@ -54,7 +54,7 @@ const DefaultRedirect = () => {
         navigate('/register-customer');
       } else if (jobTitle === "Cashier") {
         navigate('/outstandingProcess');
-      } else if (jobTitle === "Finance") {
+      } else if ((jobTitle === "Finance" || jobTitle === "Finance Officer")) {
         navigate('/finance-invoices');
       }
       // Redirect all other authenticated users to customer dashboard

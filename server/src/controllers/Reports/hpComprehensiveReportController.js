@@ -326,27 +326,32 @@ const getComprehensiveHPReport = async (req, res) => {
     // 9. POD Details with Kilometer (excluding "RRF not sent")
     const podDetailsQuery = `
       SELECT 
-        o.id as odn_id,
-        o.odn_number,
+        MIN(o.id) as odn_id,
+        GROUP_CONCAT(DISTINCT o.odn_number ORDER BY o.odn_number SEPARATOR ', ') as odn_number,
         o.pod_number,
         o.pod_confirmed,
-        o.pod_confirmed_at,
+        MAX(o.pod_confirmed_at) as pod_confirmed_at,
         f.facility_name,
         f.route,
         r.route_name,
-        ra.arrival_kilometer,
+        p.arrival_kilometer,
         ra.status as dispatch_status
       FROM odns o
       INNER JOIN processes p ON o.process_id = p.id
       INNER JOIN facilities f ON p.facility_id = f.id
       LEFT JOIN routes r ON f.route = r.route_name
-      LEFT JOIN route_assignments ra ON ra.route_id = r.id AND ra.ethiopian_month = ?
+      LEFT JOIN route_assignments ra ON ra.id = (
+        SELECT ra_sub.id FROM route_assignments ra_sub
+        WHERE ra_sub.route_id = r.id AND ra_sub.ethiopian_month = ?
+        ORDER BY ra_sub.created_at DESC LIMIT 1
+      )
       WHERE 1=1
         ${monthFilter}
         AND o.pod_confirmed = 1
         AND (o.odn_number NOT LIKE 'RRF not sent%' AND o.odn_number NOT LIKE 'VRF not sent%')
         ${ptFilter}
-      ORDER BY f.route, f.facility_name, o.odn_number
+      GROUP BY o.pod_number, p.id, f.facility_name, f.route, r.route_name, p.arrival_kilometer, ra.status
+      ORDER BY f.route, f.facility_name, o.pod_number
     `;
     const podReplacements = [month];
     if (!skipMonthFilter) podReplacements.push(reportingMonth);

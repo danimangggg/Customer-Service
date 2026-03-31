@@ -39,7 +39,7 @@ const RDFTab = ({ reportMode }) => {
       if (search) params.search = search;
       if (dateFrom) params.startDate = dateFrom;
       if (dateTo) params.endDate = dateTo;
-      const res = await axios.get(`${API_URL}/api/invoices`, { params });
+      const res = await api.get(`${API_URL}/api/invoices`, { params });
       if (res.data.success) {
         const data = Array.isArray(res.data.data) ? res.data.data : [];
         setInvoices(data);
@@ -54,12 +54,12 @@ const RDFTab = ({ reportMode }) => {
 
   const handleMarkReceived = async (inv) => {
     if (inv.received) return;
-    await axios.put(`${API_URL}/api/invoices/${inv.id}/received`, { received_by: fullName });
+    await api.put(`${API_URL}/api/invoices/${inv.id}/received`, { received_by: fullName });
     fetchInvoices();
   };
 
   const handleFolderSave = async (inv, val) => {
-    await axios.put(`${API_URL}/api/invoices/${inv.id}/folder`, { folder_number: val });
+    await api.put(`${API_URL}/api/invoices/${inv.id}/folder`, { folder_number: val });
     setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, folder_number: val } : i));
   };
 

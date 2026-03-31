@@ -70,6 +70,7 @@ const Sidebar = () => {
   const [tmReportsOpen, setTmReportsOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [mgmtReportsOpen, setMgmtReportsOpen] = useState(false);
+  const [financeReportsOpen, setFinanceReportsOpen] = useState(false);
   const [mgmtProfileOpen, setMgmtProfileOpen] = useState(false);
 
   const signOut = async () => {
@@ -344,7 +345,7 @@ const Sidebar = () => {
          )}
 
          {/* Invoice Records - Finance only */}
-         {jobTitle === "Finance" && (
+         {(jobTitle === "Finance" || jobTitle === "Finance Officer") && (
            <MenuTooltip title={"Invoice Records"}>
              <ListItem
                button
@@ -369,6 +370,38 @@ const Sidebar = () => {
                />
              </ListItem>
            </MenuTooltip>
+         )}
+
+         {/* Reports submenu - Finance only */}
+         {(jobTitle === "Finance" || jobTitle === "Finance Officer") && (
+           <>
+             <MenuTooltip title={"Reports"}>
+               <ListItem button onClick={() => setFinanceReportsOpen(!financeReportsOpen)}
+                 sx={{ borderRadius: 2, mx: 1, mb: 1, bgcolor: financeReportsOpen ? 'rgba(21,101,192,0.12)' : 'transparent', '&:hover': { bgcolor: 'rgba(21,101,192,0.08)' } }}>
+                 <ListItemIcon><BarChart sx={{ color: '#1565c0' }} /></ListItemIcon>
+                 <ListItemText primary={"Reports"} sx={{ '& .MuiListItemText-primary': { fontWeight: financeReportsOpen ? 600 : 500, fontSize: '0.95rem' } }} />
+                 {financeReportsOpen ? <ExpandLess /> : <ExpandMore />}
+               </ListItem>
+             </MenuTooltip>
+             <Collapse in={financeReportsOpen} timeout="auto" unmountOnExit>
+               <List component="div" disablePadding>
+                 <MenuTooltip title={"RDF Report"}>
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/rdf"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/reports/rdf') }}>
+                     <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"RDF Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/rdf') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+                 <MenuTooltip title={"HP Report"}>
+                   <ListItem button component={Link} onClick={handleNavClick} to="/reports/hp-comprehensive"
+                     sx={{ pl: 4, borderRadius: 2, mx: 1, mb: 0.5, ...getActiveStyles('/reports/hp-comprehensive') }}>
+                     <ListItemIcon><BarChart sx={{ color: '#c62828', fontSize: 20 }} /></ListItemIcon>
+                     <ListItemText primary={"HP Report"} sx={{ '& .MuiListItemText-primary': { fontWeight: isActivePath('/reports/hp-comprehensive') ? 600 : 500, fontSize: '0.9rem' } }} />
+                   </ListItem>
+                 </MenuTooltip>
+               </List>
+             </Collapse>
+           </>
          )}
 
          {/* Outstanding Process - Cashier only */}
@@ -1395,7 +1428,7 @@ const Sidebar = () => {
          )}
 
          {/* RDF Report - for RDF users (non-HP users) */}
-         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "O2C Officer - HP" && jobTitle !== "EWM Officer - HP" && jobTitle !== "PI Officer-HP" && jobTitle !== "Documentation Officer - HP" && jobTitle !== "Quality Evaluator" && jobTitle !== "Dispatcher - HP" && jobTitle !== "TM Manager" && jobTitle !== "Biller" && jobTitle && (
+         {!isAdminOrSuperAdmin && jobTitle !== "Coordinator" && jobTitle !== "Manager" && jobTitle !== "O2C Officer - HP" && jobTitle !== "EWM Officer - HP" && jobTitle !== "PI Officer-HP" && jobTitle !== "Documentation Officer - HP" && jobTitle !== "Quality Evaluator" && jobTitle !== "Dispatcher - HP" && jobTitle !== "TM Manager" && jobTitle !== "Biller" && jobTitle !== "Finance" && jobTitle !== "Finance Officer" && jobTitle && (
            <MenuTooltip title={"RDF Report"}>
              <ListItem 
                button 

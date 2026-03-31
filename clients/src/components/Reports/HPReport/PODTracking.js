@@ -125,80 +125,63 @@ const PODTracking = ({ data }) => {
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.100' }}>
                   <TableCell sx={{ fontWeight: 'bold' }}>#</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>ODN Number</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Facility Name</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Route</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>ODN Number(s)</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>POD Number</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>Kilometers</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Dispatch Status</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Confirmed At</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginatedData.length > 0 ? (
-                  paginatedData.map((pod, index) => (
-                    <TableRow key={pod.odn_id} hover>
-                      <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={pod.odn_number}
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
-                          {pod.facility_name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          icon={<RouteIcon />}
-                          label={pod.route || 'N/A'}
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={pod.pod_number || 'N/A'}
-                          size="small"
-                          color="success"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          icon={<SpeedIcon />}
-                          label={`${parseFloat(pod.arrival_kilometer || 0).toFixed(1)} km`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={pod.dispatch_status || 'N/A'}
-                          size="small"
-                          color={
-                            pod.dispatch_status === 'completed' ? 'success' :
-                            pod.dispatch_status === 'in_progress' ? 'warning' :
-                            'default'
-                          }
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption">
-                          {pod.pod_confirmed_at
-                            ? new Date(pod.pod_confirmed_at).toLocaleString()
-                            : 'N/A'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  (() => {
+                    // Group by facility + pod_number to avoid duplicating POD per ODN
+                    const grouped = [];
+                    const seen = new Map();
+                    paginatedData.forEach(pod => {
+                      const key = `${pod.facility_name}||${pod.pod_number || ''}`;
+                      if (seen.has(key)) {
+                        seen.get(key).odns.push(pod.odn_number);
+                      } else {
+                        const entry = { ...pod, odns: [pod.odn_number] };
+                        seen.set(key, entry);
+                        grouped.push(entry);
+                      }
+                    });
+                    return grouped.map((pod, index) => (
+                      <TableRow key={`${pod.odn_id}-${index}`} hover>
+                        <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="medium">{pod.facility_name}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip icon={<RouteIcon />} label={pod.route || 'N/A'} size="small" color="secondary" variant="outlined" />
+                        </TableCell>
+                        <TableCell>
+                          <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                            {pod.odns.map(odn => (
+                              <Chip key={odn} label={odn} size="small" color="info" variant="outlined" />
+                            ))}
+                          </Stack>
+                        </TableCell>
+                        <TableCell>
+                          <Chip label={pod.pod_number || 'N/A'} size="small" color="success" />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Chip icon={<SpeedIcon />} label={`${parseFloat(pod.arrival_kilometer || 0).toFixed(1)} km`} size="small" variant="outlined" />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption">
+                            {pod.pod_confirmed_at ? new Date(pod.pod_confirmed_at).toLocaleString() : 'N/A'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ));
+                  })()
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={7} align="center">
                       <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
                         No POD confirmations found
                       </Typography>
