@@ -10,8 +10,8 @@ const getTvDisplayCustomers = async (req, res) => {
     const accountType  = req.headers['x-account-type'] || null;
     const queryBranch  = req.query.branch_code || null;
     const branchCode   = queryBranch || (accountType !== 'Super Admin' ? headerBranch : null);
-    const branchFilter = branchCode ? `AND s.branch_code = '${branchCode}'` : '';
-    const branchFilterActive = branchCode ? `AND s.branch_code = '${branchCode}'` : '';
+    const branchFilter = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
+    const branchFilterActive = branchCode ? `AND f.branch_code = '${branchCode}'` : '';
 
     if (includeCompleted) {
       const exitHistoryQuery = `
@@ -150,6 +150,7 @@ const getTvDisplayCustomers = async (req, res) => {
         cq.id, cq.facility_id, cq.customer_type, cq.status,
         cq.started_at, cq.completed_at, cq.next_service_point,
         cq.assigned_gate_keeper_id, cq.assigned_gate_keeper_name,
+        f.facility_name,
         GROUP_CONCAT(DISTINCT s.store_name ORDER BY s.store_name) as assigned_stores,
         GROUP_CONCAT(
           CONCAT(
@@ -168,11 +169,12 @@ const getTvDisplayCustomers = async (req, res) => {
       FROM customer_queue cq
       INNER JOIN odns_rdf odn ON cq.id = odn.process_id
       INNER JOIN stores s ON odn.store_id = s.id
+      LEFT JOIN facilities f ON cq.facility_id = f.id
       WHERE cq.status NOT IN ('canceled', 'rejected')
          ${branchFilterActive}
       GROUP BY cq.id, cq.facility_id, cq.customer_type, cq.status,
                cq.started_at, cq.completed_at, cq.next_service_point,
-               cq.assigned_gate_keeper_id, cq.assigned_gate_keeper_name
+               cq.assigned_gate_keeper_id, cq.assigned_gate_keeper_name, f.facility_name
       HAVING cq.status != 'completed' OR pending_gate_count > 0
       ORDER BY cq.started_at ASC
     `;

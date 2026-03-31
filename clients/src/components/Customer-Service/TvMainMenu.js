@@ -85,8 +85,11 @@ const TvMainMenu = () => {
   ];
 
   const handleMenuClick = (route) => {
+    const userBranch = localStorage.getItem('branch_code') || '';
     if (canSelectBranch && selectedBranch) {
       navigate(`${route}?branch_code=${selectedBranch}`);
+    } else if (userBranch) {
+      navigate(`${route}?branch_code=${userBranch}`);
     } else {
       navigate(route);
     }

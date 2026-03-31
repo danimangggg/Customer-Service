@@ -246,7 +246,6 @@ const TvCustomer = () => {
       justifyContent: 'center', alignItems: 'center', position: 'fixed', top: 0, left: 0 }}>
       <Button variant="outlined" sx={{ color: '#00d2ff', borderColor: '#00d2ff', px: 4, py: 2, fontWeight: 'bold' }}
         onClick={async () => {
-          // Unlock browser audio on user gesture
           try {
             const unlock = new Audio('/audio/amharic/1.mp3');
             unlock.volume = 0.01;
@@ -350,10 +349,22 @@ const TvCustomer = () => {
       )}
 
       <Box sx={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0, paddingBottom: 2 }}>
-        <Box ref={scrollCallbackRef} sx={{ position: 'absolute', width: '100%' }}>
-          {regularOrders.map(cust => <RowItem key={cust.uniqueKey} cust={cust} isSpecial={false} />)}
-          {shouldScroll && regularOrders.map(cust => <RowItem key={`clone-${cust.uniqueKey}`} cust={cust} isSpecial={false} />)}
-        </Box>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <CircularProgress sx={{ color: '#00d2ff' }} size={60} />
+          </Box>
+        ) : activeOrders.length === 0 ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', flexDirection: 'column', gap: 2 }}>
+            <CheckCircleOutlineIcon sx={{ fontSize: 80, color: '#00b894' }} />
+            <Typography variant="h4" sx={{ color: '#00d2ff', fontWeight: 'bold', letterSpacing: 4 }}>NO ACTIVE ORDERS</Typography>
+            <Typography sx={{ color: '#636e72', fontSize: '1rem' }}>All processes are up to date</Typography>
+          </Box>
+        ) : (
+          <Box ref={scrollCallbackRef} sx={{ position: 'absolute', width: '100%' }}>
+            {regularOrders.map(cust => <RowItem key={cust.uniqueKey} cust={cust} isSpecial={false} />)}
+            {shouldScroll && regularOrders.map(cust => <RowItem key={`clone-${cust.uniqueKey}`} cust={cust} isSpecial={false} />)}
+          </Box>
+        )}
       </Box>
 
       <style>{`
