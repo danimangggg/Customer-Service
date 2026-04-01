@@ -42,19 +42,32 @@ exports.getTMRoutes = async (req, res) => {
               AND o.quality_confirmed = 1
             )
           )
+          -- Exclude if facility is a vaccine site but vaccine process is missing or not ready
+          AND NOT EXISTS (
+            SELECT 1 FROM facilities fv
+            WHERE fv.id = f.id AND fv.is_vaccine_site = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM processes pv
+              WHERE pv.facility_id = f.id AND pv.reporting_month = ? AND pv.process_type = 'vaccine'
+              AND (
+                pv.status IN (${READY_STATUSES.map(() => '?').join(',')})
+                OR EXISTS (SELECT 1 FROM odns ov WHERE ov.process_id = pv.id AND (ov.odn_number LIKE 'VRF not sent%' OR ov.quality_confirmed = 1))
+              )
+            )
+          )
           THEN f.id END) as ready_facilities
       FROM routes r
       INNER JOIN facilities f ON f.route = r.route_name
         AND (f.period = 'Monthly' OR f.period = ?)
         ${branchFilter}
-      LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ?
+      LEFT JOIN processes p ON p.facility_id = f.id AND p.reporting_month = ? AND p.process_type = 'regular'
       WHERE f.route IS NOT NULL
       GROUP BY r.id, r.route_name
       HAVING total_facilities > 0 AND ready_facilities > 0
       ORDER BY (total_facilities = ready_facilities) DESC, r.route_name
     `;
 
-    const params = [...READY_STATUSES, reportingMonth, reportingMonth, currentPeriod, reportingMonth];
+    const params = [...READY_STATUSES, reportingMonth, reportingMonth, reportingMonth, ...READY_STATUSES, currentPeriod, reportingMonth];
 
     const routes = await db.sequelize.query(routesQuery, {
       replacements: params,

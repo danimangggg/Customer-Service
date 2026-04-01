@@ -1363,7 +1363,12 @@ const HpFacilities = () => {
                       );
                     } else {
                       const selReporting = `${currentEthiopianMonth} ${currentEthiopianYear}`;
-                      proc = activeProcesses.find(a => a.facility_id === f.id && a.reporting_month === selReporting);
+                      const expectedType = filterType.toLowerCase();
+                      proc = activeProcesses.find(a =>
+                        a.facility_id === f.id &&
+                        a.reporting_month === selReporting &&
+                        a.process_type === expectedType
+                      );
                     }
                     const isOwner = proc && String(proc.o2c_officer_id) === String(loggedInUserId);
                     const hasODNs = proc && (processODNCounts[proc.id] || 0) > 0;
